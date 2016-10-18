@@ -1,6 +1,15 @@
-UnityMumbleClient
-=================
+# Mumble-Unity
 
-A Mumble client for Unity 3D
+A simple to use Mumble Client made for Unity3D.
+Easily send low-latency text and voice to a group of other users
 
-An implementation of OCB Mode encryption in C# together with a client Mumble implementation.
+## Features
+* End-to-End OCB/AES encryption
+* Client-to-server architecture allowing far more scalability than peer-to-peer
+* Opus codec support, allowing lightweight low latency HD voice communication
+* Open source server
+
+## TODO
+1 Android support
+2 Refractor
+3 Optimize GC usage
