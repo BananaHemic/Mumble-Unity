@@ -4,10 +4,11 @@ using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
-using System.Timers;
 using MumbleProto;
 using UnityEngine;
 using ProtoBuf;
+using System.Timers;
+using System.Threading;
 using Version = MumbleProto.Version;
 
 namespace Mumble
@@ -23,19 +24,30 @@ namespace Mumble
         private readonly TcpClient _tcpClient;
         private BinaryReader _reader;
         private SslStream _ssl;
+        private MumbleUdpConnection _muc;
         private bool _validConnection;
         private BinaryWriter _writer;
-        private Timer _tcpTimer;//TODO close this on application close
+        private System.Timers.Timer _tcpTimer;
+        private Thread _processThread;
+        private string _username;
+        private string _password;
 
         internal MumbleTcpConnection(IPEndPoint host, string hostname, UpdateOcbServerNonce updateOcbServerNonce,  MumbleError errorCallback,
-            MumbleClient mc)
+            MumbleUdpConnection muc, MumbleClient mc)
         {
             _host = host;
             _hostname = hostname;
             _mc = mc;
+            _muc = muc;
             _tcpClient = new TcpClient();
             _updateOcbServerNonce = updateOcbServerNonce;
             _errorCallback = errorCallback;
+            
+            _processThread = new Thread(ProcessTcpData)
+            {
+                IsBackground = true
+            };
+            
         }
 
         internal void StartClient(string username, string password)
@@ -55,27 +67,23 @@ namespace Mumble
             Debug.Log("version = " + version.version);
             SendMessage(MessageType.Version, version);
 
-            var authenticate = new Authenticate
-            {
-                username = username,
-                password = password,
-                opus = true
-            };
-            SendMessage(MessageType.Authenticate, authenticate);
+            _username = username;
+            _password = password;
 
             // Keepalive, if the Mumble server doesn't get a message 
             // for 30 seconds it will close the connection
-            _tcpTimer = new Timer(Constants.PING_INTERVAL);
+            _tcpTimer = new System.Timers.Timer(Constants.PING_INTERVAL);
             _tcpTimer.Elapsed += SendPing;
             _tcpTimer.Enabled = true;
+            _processThread.Start();
         }
 
         internal void SendMessage<T>(MessageType mt, T message)
         {
             lock (_ssl)
             {
-                if(mt != MessageType.Ping)
-                    Debug.Log("Sending " + mt + " message");
+                //if(mt != MessageType.Ping)
+                Debug.Log("Sending " + mt + " message");
                 //_writer.Write(IPAddress.HostToNetworkOrder((Int16) mt));
                 //Debug.Log("Can SSL read? " + _ssl.CanRead);
                 //Debug.Log("Can SSL write? " + _ssl.CanWrite);
@@ -137,7 +145,7 @@ namespace Mumble
             return true;
         }
 
-        internal void ProcessTcpData()
+        private void ProcessTcpData()
         {
             try
             {
@@ -150,15 +158,24 @@ namespace Mumble
                         _mc.RemoteVersion = Serializer.DeserializeWithLengthPrefix<Version>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         Debug.Log("Server version: " + _mc.RemoteVersion.release);
+                        var authenticate = new Authenticate
+                        {
+                            username = _username,
+                            password = _password,
+                            opus = true
+                        };
+                        SendMessage(MessageType.Authenticate, authenticate);
                         break;
                     case MessageType.CryptSetup:
                         var cryptSetup = Serializer.DeserializeWithLengthPrefix<CryptSetup>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         ProcessCryptSetup(cryptSetup);
+                        Debug.Log("Got crypt");
                         break;
                     case MessageType.CodecVersion:
                         _mc.CodecVersion = Serializer.DeserializeWithLengthPrefix<CodecVersion>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
+                        Debug.Log("Got codec version");
                         break;
                     case MessageType.ChannelState:
                         _mc.ChannelState = Serializer.DeserializeWithLengthPrefix<ChannelState>(_ssl,
@@ -173,6 +190,7 @@ namespace Mumble
                     case MessageType.UserState:
                         //This is called for every user in the room, I don't really understand why we'd be setting the
                         //Mumble Client User State each time...
+                        //TODO add support for multiple users
                         _mc.UserState = Serializer.DeserializeWithLengthPrefix<UserState>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         Debug.Log("User State Actor= " + _mc.UserState.actor);
@@ -191,6 +209,13 @@ namespace Mumble
                         Debug.LogWarning("Connected!");
                         _validConnection = true; // handshake complete
                         break;
+                    case MessageType.SuggestConfig:
+                        var config = Serializer.DeserializeWithLengthPrefix<SuggestConfig>(_ssl,
+                            PrefixStyle.Fixed32BigEndian);
+                        Debug.Log("Suggested positional is: " + config.positional
+                            + " push-to-talk: " + config.push_to_talk
+                            + " version: " + config.version);
+                        break;
                     case MessageType.TextMessage:
                         TextMessage textMessage = Serializer.DeserializeWithLengthPrefix<TextMessage>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
@@ -201,9 +226,12 @@ namespace Mumble
                         Debug.Log("Text Tree Length = " + textMessage.tree_id.Count);
                         break;
                     case MessageType.UDPTunnel:
-                        //TODO this throws a "Invalid field in source data: 0
-                        var udpTunnel = Serializer.DeserializeWithLengthPrefix<UDPTunnel>(_ssl,
+                        var length = IPAddress.NetworkToHostOrder(_reader.ReadInt32());
+                        _muc.ReceiveUdpMessage(_reader.ReadBytes(length));
+                        /*
+                        //var udpTunnel = Serializer.DeserializeWithLengthPrefix<UDPTunnel>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
+                        */
                         break;
                     case MessageType.Ping:
                         var ping = Serializer.DeserializeWithLengthPrefix<MumbleProto.Ping>(_ssl,
@@ -224,8 +252,15 @@ namespace Mumble
             }
             catch (EndOfStreamException ex)
             {
-//                _logger.Error(ex);
+                Debug.LogError("EOS Exception: " + ex);
             }
+            catch (Exception e)
+            {
+                Debug.LogError("Unhandled error: " + e);
+            }
+
+            //Get the next response
+            ProcessTcpData();
         }
 
         private void ProcessCryptSetup(CryptSetup cryptSetup)
@@ -251,12 +286,17 @@ namespace Mumble
         {
             _ssl.Close();
             _tcpTimer.Close();
+            _processThread.Abort();
+            _reader.Close();
+            _writer.Close();
+            _tcpClient.Close();
         }
 
         internal void SendPing(object sender, ElapsedEventArgs elapsedEventArgs)
         {
             if (_validConnection)
             {
+                Debug.Log("Sending TCP ping");
                 var ping = new MumbleProto.Ping();
                 ping.timestamp = (ulong) (DateTime.UtcNow.Ticks - DateTime.Parse("01/01/1970 00:00:00").Ticks);
 //                _logger.Debug("Sending TCP ping with timestamp: " + ping.timestamp);

@@ -4,6 +4,7 @@ using MumbleProto;
 using Version = MumbleProto.Version;
 using UnityEngine;
 using System.Linq;
+using System.Threading;
 
 namespace Mumble
 {
@@ -15,10 +16,9 @@ namespace Mumble
         private MumbleTcpConnection _mtc;
         private MumbleUdpConnection _muc;
         private ManageAudioSendBuffer _manageSendBuffer;
-        //private OcbAes _ocbEncryption;
         private User oneUser;
 
-        public bool ConnectionSetupFinished { get; set; }
+        public bool ConnectionSetupFinished { get; internal set; }
 
         internal Version RemoteVersion { get; set; }
         internal CryptSetup CryptSetup { get; set; }
@@ -51,14 +51,13 @@ namespace Mumble
             }
             var host = new IPEndPoint(addresses[0], port);
             _muc = new MumbleUdpConnection(host, DealWithError, this);
-            _mtc = new MumbleTcpConnection(host, hostName, _muc.UpdateOcbServerNonce, DealWithError, this);
+            _mtc = new MumbleTcpConnection(host, hostName, _muc.UpdateOcbServerNonce, DealWithError, _muc, this);
 
             //Maybe do Lazy?
             _codec = new OpusCodec();
 
             oneUser = new User(17, _codec);
             _manageSendBuffer = new ManageAudioSendBuffer(_codec, _muc);
-            //_ocbEncryption = new OcbAes();
         }
 
         private void DealWithError(string message, bool fatal)
@@ -95,10 +94,6 @@ namespace Mumble
             _muc.Close();
             _manageSendBuffer.SendVoiceStop();
             Debug.Log("Closing all connections");
-        }
-        public void Process()
-        {
-            _mtc.ProcessTcpData();    
         }
 
         public void SendTextMessage(string textMessage)

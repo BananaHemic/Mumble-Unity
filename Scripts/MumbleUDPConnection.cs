@@ -37,7 +37,8 @@ namespace Mumble
 
         internal void Connect()
         {
-//            ocb = new OCBEncryption(_mc.CryptSetup);
+            //            ocb = new OCBEncryption(_mc.CryptSetup);
+            Debug.Log("Establishing UDP connection");
             _cryptState = new CryptState();
             _cryptState.CryptSetup = _mc.CryptSetup;
             _udpClient.Connect(_host);
@@ -45,33 +46,51 @@ namespace Mumble
             _udpTimer = new Timer(Constants.PING_INTERVAL);
             _udpTimer.Elapsed += RunPing;
             _udpTimer.Enabled = true;
+
+            SendPing();
+            _udpClient.BeginReceive(ReceiveUdpMessage, null);
         }
 
         private void RunPing(object sender, ElapsedEventArgs elapsedEventArgs)
         {
              SendPing();
-            _udpClient.BeginReceive(ReceiveUdpMessage, null);
         }
 
         private void ReceiveUdpMessage(IAsyncResult res)
         {
             IPEndPoint remoteIpEndPoint = _host;
             byte[] encrypted = _udpClient.EndReceive(res, ref remoteIpEndPoint);
-
+        }
+        internal void ReceiveUdpMessage(byte[] encrypted)
+        {
             byte[] message = _cryptState.Decrypt(encrypted, encrypted.Length);
 
 
             // figure out type of message
             int type = message[0] >> 5 & 0x7;
             //Debug.Log("UDP response received: " + Convert.ToString(message[0], 2).PadLeft(8, '0'));
-            //Debug.Log("UDP response type: " + (UDPType)type);
+            Debug.Log("UDP response type: " + (UDPType)type);
             //Debug.Log("UDP length: " + message.Length);
 
             //If we get an OPUS audio packet, de-encode it
-            if ((UDPType)type == UDPType.Opus)
-                UnpackOpusVoicePacket(message);
+            switch ((UDPType)type)
+            {
+                case UDPType.Opus:
+                    UnpackOpusVoicePacket(message);
+                    break;
+                case UDPType.Ping:
+                    OnPing(message);
+                    break;
+                default:
+                    Debug.LogError("Not implemented: " + ((UDPType)type));
+                    break;
+            }
 
             _udpClient.BeginReceive(ReceiveUdpMessage, null);
+        }
+        internal void OnPing(byte[] message)
+        {
+            Debug.Log("Would process ping");
         }
         private void UnpackOpusVoicePacket(byte[] packet)
         {
