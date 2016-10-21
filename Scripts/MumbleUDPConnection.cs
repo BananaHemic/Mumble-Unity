@@ -37,7 +37,6 @@ namespace Mumble
 
         internal void Connect()
         {
-            //            ocb = new OCBEncryption(_mc.CryptSetup);
             Debug.Log("Establishing UDP connection");
             _cryptState = new CryptState();
             _cryptState.CryptSetup = _mc.CryptSetup;
@@ -60,16 +59,21 @@ namespace Mumble
         {
             IPEndPoint remoteIpEndPoint = _host;
             byte[] encrypted = _udpClient.EndReceive(res, ref remoteIpEndPoint);
+            ReceiveUdpMessage(encrypted);
         }
-        internal void ReceiveUdpMessage(byte[] encrypted)
+        private void ReceiveUdpMessage(byte[] encrypted)
+        {
+            ProcessUdpMessage(encrypted);
+            _udpClient.BeginReceive(ReceiveUdpMessage, null);
+        }
+        internal void ProcessUdpMessage(byte[] encrypted)
         {
             byte[] message = _cryptState.Decrypt(encrypted, encrypted.Length);
-
 
             // figure out type of message
             int type = message[0] >> 5 & 0x7;
             //Debug.Log("UDP response received: " + Convert.ToString(message[0], 2).PadLeft(8, '0'));
-            Debug.Log("UDP response type: " + (UDPType)type);
+//            Debug.Log("UDP response type: " + (UDPType)type);
             //Debug.Log("UDP length: " + message.Length);
 
             //If we get an OPUS audio packet, de-encode it
@@ -86,15 +90,14 @@ namespace Mumble
                     break;
             }
 
-            _udpClient.BeginReceive(ReceiveUdpMessage, null);
         }
         internal void OnPing(byte[] message)
         {
-            Debug.Log("Would process ping");
+            //Debug.Log("Would process ping");
         }
-        private void UnpackOpusVoicePacket(byte[] packet)
+        internal void UnpackOpusVoicePacket(byte[] plainTextMessage)
         {
-            using (var reader = new UdpPacketReader(new MemoryStream(packet, 1, packet.Length - 1)))
+            using (var reader = new UdpPacketReader(new MemoryStream(plainTextMessage, 1, plainTextMessage.Length - 1)))
             {
                 UInt32 session = (uint)reader.ReadVarInt64();
                 Int64 sequence = reader.ReadVarInt64();

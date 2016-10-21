@@ -111,7 +111,7 @@ namespace Mumble
         }
         public void SendVoicePacket(float[] floatData)
         {
-            _manageSendBuffer.SendVoice(new ArraySegment<byte>(PcmUtils.Raw2Pcm(floatData)), SpeechTarget.Normal, 0);
+            _manageSendBuffer.SendVoice(floatData, SpeechTarget.Normal, 0);
         }
 
         public byte[] GetLatestClientNonce()

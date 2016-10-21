@@ -24,6 +24,7 @@
 //  
 
 using System;
+using UnityEngine;
 
 namespace Mumble
 {
@@ -37,10 +38,9 @@ namespace Mumble
         /// </summary>
         private IntPtr _decoder;
 
-        /// <summary>
-        /// Size of a sample, in bytes.
-        /// </summary>
-        private readonly int _sampleSize;
+        private readonly int _outputSampleRate;
+
+        private readonly int _outputChannelCount;
 
         /// <summary>
         /// Gets or sets if Forward Error Correction decoding is enabled.
@@ -58,11 +58,12 @@ namespace Mumble
             if (outputChannelCount != 1 && outputChannelCount != 2)
                 throw new ArgumentOutOfRangeException("outputChannelCount");
 
-            IntPtr error;
+            NativeMethods.OpusErrors error;
             _decoder = NativeMethods.opus_decoder_create(outputSampleRate, outputChannelCount, out error);
-            if ((NativeMethods.OpusErrors)error != NativeMethods.OpusErrors.Ok)
+            if (error != NativeMethods.OpusErrors.Ok)
                 throw new Exception(string.Format("Exception occured while creating decoder, {0}", ((NativeMethods.OpusErrors)error)));
-            _sampleSize = sizeof(ushort) * outputChannelCount;
+            _outputSampleRate = outputChannelCount;
+            _outputChannelCount = outputChannelCount;
         }
 
         ~OpusDecoder()
@@ -83,58 +84,35 @@ namespace Mumble
             }
         }
 
-        /// <summary>
-        /// Decodes audio samples.
-        /// </summary>
-        /// <param name="srcEncodedBuffer">Encoded data.</param>
-        /// <param name="srcOffset">The zero-based byte offset in srcEncodedBuffer at which to begin reading encoded data.</param>
-        /// <param name="srcLength">The number of bytes to read from srcEncodedBuffer.</param>
-        /// <param name="dstBuffer">An array of bytes. When this method returns, the buffer contains the specified byte array with the values starting at offset replaced with audio samples.</param>
-        /// <param name="dstOffset">The zero-based byte offset in dstBuffer at which to begin writing decoded audio samples.</param>
-        /// <returns>The number of bytes decoded and written to dstBuffer.</returns>
-        /// <remarks>Set srcEncodedBuffer to null to instruct the decoder that a packet was dropped.</remarks>
-        public unsafe int Decode(byte[] srcEncodedBuffer, int srcOffset, int srcLength, byte[] dstBuffer, int dstOffset)
+        public int Decode(byte[] packetData, float[] floatBuffer, int bufferLoadingIndex)
         {
-            var availableBytes = dstBuffer.Length - dstOffset;
-            var frameCount = availableBytes / _sampleSize;
-            int length;
-            fixed (byte* bdec = dstBuffer)
+            float[] decodedFloats = new float[2 * (int)(Constants.FRAME_SIZE * Constants.NUM_CHANNELS)];
+            int numSamplesDecoded = NativeMethods.opus_decode_(_decoder, packetData, decodedFloats, 2 * (int)(Constants.FRAME_SIZE * Constants.NUM_CHANNELS), _outputSampleRate, _outputChannelCount);
+            /*
+            Debug.Log("Post decode, starts with: " + decodedFloats[0]);
+            if(decodedFloats[0] != 0)
             {
-                var decodedPtr = (new IntPtr(bdec)).Add(dstOffset);// IntPtr.Add(new IntPtr(bdec), dstOffset);
-                if (srcEncodedBuffer != null)
+                for(int i = decodedFloats.Length -1; i >= 0; i--)
                 {
-                    fixed (byte* bsrc = srcEncodedBuffer)
+                    if(decodedFloats[i] != 0)
                     {
-                        var srcPtr = (new IntPtr(bsrc)).Add(srcOffset);// IntPtr.Add(new IntPtr(bsrc), srcOffset);
-                        length = NativeMethods.opus_decode(_decoder, srcPtr, srcLength, decodedPtr, frameCount, 0);
+                        Debug.LogWarning("We really decoded " + (i+1) + " samples from " + packetData.Length + " initial bytes");
+                        Debug.Log("Ends with: " + decodedFloats[i]);
+                        Debug.Log("2nd to last: " + decodedFloats[i - 1]);
+                        Debug.Log("Starts with: " + decodedFloats[0]);
+                        break;
                     }
                 }
-                else
-                {
-                    length = NativeMethods.opus_decode(_decoder, IntPtr.Zero, 0, decodedPtr, frameCount, Convert.ToInt32(EnableForwardErrorCorrection));
-                }
             }
-            if (length < 0)
-                throw new Exception("Decoding failed - " + ((NativeMethods.OpusErrors)length));
-            return length * _sampleSize;
+            */
+            Array.Copy(decodedFloats, 0, floatBuffer, bufferLoadingIndex, numSamplesDecoded);
+            return numSamplesDecoded;
         }
 
-        public static unsafe int GetSamples(byte[] srcEncodedBuffer, int srcOffset, int srcLength, int sampleRate)
+        public static int GetChannels(byte[] srcEncodedBuffer)
         {
-            fixed (byte* bsrc = srcEncodedBuffer)
-            {
-                var srcPtr = (new IntPtr(bsrc).Add(srcOffset));// IntPtr.Add(new IntPtr(bsrc), srcOffset);
-                return NativeMethods.opus_packet_get_nb_samples(srcPtr, srcLength, sampleRate);
-            }
-        }
 
-        public static unsafe int GetChannels(byte[] srcEncodedBuffer, int srcOffset)
-        {
-            fixed (byte* bsrc = srcEncodedBuffer)
-            {
-                var srcPtr = (new IntPtr(bsrc)).Add(srcOffset);// IntPtr.Add(new IntPtr(bsrc), srcOffset);
-                return NativeMethods.opus_packet_get_nb_channels(srcPtr);
-            }
+            return NativeMethods.opus_packet_get_nb_channels(srcEncodedBuffer);
         }
     }
 }

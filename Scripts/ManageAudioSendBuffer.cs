@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using UnityEngine;
 
 namespace Mumble
 {
@@ -28,7 +29,7 @@ namespace Mumble
                 IsBackground = true
             };
         }
-        public void SendVoice(ArraySegment<byte> pcm, SpeechTarget target, uint targetId)
+        public void SendVoice(float[] pcm, SpeechTarget target, uint targetId)
         {
             _encodingBuffer.Add(pcm, target, targetId);
 
@@ -46,46 +47,47 @@ namespace Mumble
             _isEncodingThreadRunning = true;
             while (_isEncodingThreadRunning)
             {
-                byte[] packet = null;
                 try
                 {
-                    packet = _encodingBuffer.Encode(_codec);
-                }
-                catch { }
-
-                if (packet != null)
-                {
-                    int maxSize = 480;
-
-                    //taken from JS port
-                    for (int currentOffset = 0; currentOffset < packet.Length;)
+                    ArraySegment<byte> packet = _encodingBuffer.Encode(_codec);
+                    
+                    if (packet != null)
                     {
-                        int currentBlockSize = Math.Min(packet.Length - currentOffset, maxSize);
+                        int maxSize = 480;
 
-                        byte type = (byte)4;
-                        //originaly [type = codec_type_id << 5 | whistep_chanel_id]. now we can talk only to normal chanel
-                        type = (byte)(type << 5);
-                        byte[] sequence = Var64.writeVarint64_alternative((UInt64)sequenceIndex);
+                        //taken from JS port
+                        for (int currentOffset = 0; currentOffset < packet.Count;)
+                        {
+                            int currentBlockSize = Math.Min(packet.Count - currentOffset, maxSize);
 
-                        // Client side voice header.
-                        byte[] voiceHeader = new byte[1 + sequence.Length];
-                        voiceHeader[0] = type;
-                        sequence.CopyTo(voiceHeader, 1);
+                            byte type = (byte)4;
+                            //originaly [type = codec_type_id << 5 | whistep_chanel_id]. now we can talk only to normal chanel
+                            type = (byte)(type << 5);
+                            byte[] sequence = Var64.writeVarint64_alternative((UInt64)sequenceIndex);
 
-                        byte[] header = Var64.writeVarint64_alternative((UInt64)currentBlockSize);
-                        byte[] packedData = new byte[voiceHeader.Length + header.Length + currentBlockSize];
+                            // Client side voice header.
+                            byte[] voiceHeader = new byte[1 + sequence.Length];
+                            voiceHeader[0] = type;
+                            sequence.CopyTo(voiceHeader, 1);
 
-                        //Packet:
-                        //[Header] [segment] [header] [packet]
-                        Array.Copy(voiceHeader, 0, packedData, 0, voiceHeader.Length);
-                        Array.Copy(header, 0, packedData, voiceHeader.Length, header.Length);
-                        Array.Copy(packet, currentOffset, packedData, voiceHeader.Length + header.Length, currentBlockSize);
+                            byte[] header = Var64.writeVarint64_alternative((UInt64)currentBlockSize);
+                            byte[] packedData = new byte[voiceHeader.Length + header.Length + currentBlockSize];
 
-                        FormatVoicePacketThenSend(packedData);
+                            //Packet:
+                            //[Header] [segment] [header] [packet]
+                            Array.Copy(voiceHeader, 0, packedData, 0, voiceHeader.Length);
+                            Array.Copy(header, 0, packedData, voiceHeader.Length, header.Length);
+                            Array.Copy(packet.Array, currentOffset + packet.Offset, packedData, voiceHeader.Length + header.Length, currentBlockSize);
 
-                        sequenceIndex++;
-                        currentOffset += currentBlockSize;
+                            FormatVoicePacketThenSend(packedData);
+
+                            sequenceIndex++;
+                            currentOffset += currentBlockSize;
+                        }
                     }
+                }
+                catch (Exception e){
+                    Debug.LogError("Error: " + e);
                 }
 
                 //beware! can take a lot of power, because infinite loop without sleep

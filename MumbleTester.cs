@@ -28,7 +28,8 @@ public class MumbleTester : MonoBehaviour {
     void OnApplicationQuit()
     {
         Debug.LogWarning("Shutting down connections");
-        _mumbleClient.Close();
+        if(_mumbleClient != null)
+            _mumbleClient.Close();
     }
 	void Update () {
 

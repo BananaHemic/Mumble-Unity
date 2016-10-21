@@ -1,4 +1,8 @@
-﻿using System;
+﻿/*
+ * 
+ * TODO This is decoding audio data on the main thread. We should make decoding happen in a separate thread
+ */
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,10 +14,9 @@ namespace Mumble {
     /// </summary>
     public class AudioDecodingBuffer
     {
-
         private int _decodedOffset;
         private int _decodedCount;
-        private readonly byte[] _decodedBuffer = new byte[Constants.SAMPLE_RATE * (Constants.SAMPLE_BITS / 8) * 1];
+        private readonly float[] _decodedBuffer = new float[Constants.SAMPLE_RATE * Constants.NUM_CHANNELS];
 
         private long _nextSequenceToDecode;
         private readonly List<BufferPacket> _encodedBuffer = new List<BufferPacket>();
@@ -25,13 +28,16 @@ namespace Mumble {
             _codec = codec;   
         }
 
-        public int Read(byte[] buffer, int offset, int count)
+        public int Read(float[] buffer, int offset, int count)
         {
-            //Debug.Log("We now have " + _encodedBuffer.Count + " packets");
+            //Debug.Log("We now have " + _encodedBuffer.Count + " encoded packets");
+
+            //
             int readCount = 0;
             while (readCount < count)
             {
-                readCount += ReadFromBuffer(buffer, offset + readCount, count - readCount);
+                if(_decodedCount > 0)
+                    readCount += ReadFromBuffer(buffer, offset + readCount, count - readCount);
                 //Try to decode some more data into the buffer
                 if (!FillBuffer())
                     break;
@@ -41,9 +47,7 @@ namespace Mumble {
             {
                 //Return silence
                 //Debug.Log("Loading silence");
-                
-                Array.Clear(buffer, 0, buffer.Length);
-                return count;
+                Array.Clear(buffer, offset, count);
             }
 
             return readCount;
@@ -62,7 +66,9 @@ namespace Mumble {
                 return;
 
             //Debug.Log("Adding encoded packet");
+            //data[50] = (byte)3;
 
+            //Array.Reverse(data);
             _encodedBuffer.Add(new BufferPacket
             {
                 Data = data,
@@ -92,10 +98,18 @@ namespace Mumble {
         /// <param name="offset"></param>
         /// <param name="count"></param>
         /// <returns></returns>
-        private int ReadFromBuffer(byte[] dst, int offset, int count)
+        private int ReadFromBuffer(float[] dst, int offset, int count)
         {
             //Copy as much data as we can from the buffer up to the limit
             int readCount = Math.Min(count, _decodedCount);
+            //Make sure the buffer is big enough
+            /*
+            Debug.Log("Reading " + readCount
+                + " from " + _decodedBuffer.Length
+                + " starting at " + _decodedOffset
+                + " into the location " + offset
+                + " with " + _decodedCount);
+                */
             Array.Copy(_decodedBuffer, _decodedOffset, dst, offset, readCount);
             _decodedCount -= readCount;
             _decodedOffset += readCount;
@@ -121,6 +135,15 @@ namespace Mumble {
             if (!packet.HasValue)
                 return false;
 
+            int numRead = _codec.Decode(packet.Value.Data, _decodedBuffer, _decodedOffset);
+            //Debug.Log("Just decoded: " + numRead + " samples");
+            //Debug.Log("Decoded data starts with: " + _decodedBuffer[_decodedOffset + 1]);
+
+            _nextSequenceToDecode = packet.Value.Sequence + numRead / Constants.FRAME_SIZE;
+
+            _decodedCount += numRead;
+            return true;
+
             ////todo: _nextSequenceToDecode calculation is wrong, which causes this to happen for almost every packet!
             ////Decode a null to indicate a dropped packet
             //if (packet.Value.Sequence != _nextSequenceToDecode)
@@ -138,7 +161,6 @@ namespace Mumble {
                 + " " + packet.Value.Data[7]
                 );
                 */
-            byte[] d = _codec.Decode(packet.Value.Data);
             /*
             Debug.Log("Post decode, packet starts with "
                 + " " + d[0]
@@ -151,11 +173,6 @@ namespace Mumble {
                 + " " + d[7]
                 );
                 */
-            _nextSequenceToDecode = packet.Value.Sequence + d.Length / Constants.FRAME_SIZE;
-
-            Array.Copy(d, 0, _decodedBuffer, _decodedOffset, d.Length);
-            _decodedCount += d.Length;
-            return true;
         }
 
         private struct BufferPacket

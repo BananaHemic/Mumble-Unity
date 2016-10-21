@@ -7,11 +7,13 @@ namespace Mumble
 {
     public class OpusCodec
     {
-        readonly OpusDecoder _decoder = new OpusDecoder((int)Constants.SAMPLE_RATE, 1) { EnableForwardErrorCorrection = true };
-        readonly OpusEncoder _encoder = new OpusEncoder((int)Constants.SAMPLE_RATE, 1) { EnableForwardErrorCorrection = true };
+        readonly OpusDecoder _decoder = new OpusDecoder((int)Constants.SAMPLE_RATE, Constants.NUM_CHANNELS) { EnableForwardErrorCorrection = true };
+        readonly OpusEncoder _encoder = new OpusEncoder((int)Constants.SAMPLE_RATE, Constants.NUM_CHANNELS) { EnableForwardErrorCorrection = true };
 
-        public byte[] Decode(byte[] encodedData)
+        public int Decode(byte[] encodedData, float[] floatBuffer, int bufferLoadingIndex)
         {
+            return _decoder.Decode(encodedData, floatBuffer, bufferLoadingIndex);
+            /*
             if (encodedData == null)
             {
                 _decoder.Decode(null, 0, 0, new byte[Constants.FRAME_SIZE], 0);
@@ -27,6 +29,7 @@ namespace Mumble
             if (dst.Length != length)
                 Array.Resize(ref dst, length);
             return dst;
+            */
         }
 
         public IEnumerable<int> PermittedEncodingFrameSizes
@@ -37,18 +40,21 @@ namespace Mumble
             }
         }
 
-        public byte[] Encode(ArraySegment<byte> pcm)
+        public ArraySegment<byte> Encode(float[] pcmData)
         {
+            return _encoder.Encode(pcmData);
+            /*
             var samples = pcm.Count / sizeof(ushort);
             var numberOfBytes = _encoder.FrameSizeInBytes(samples);
 
             byte[] dst = new byte[numberOfBytes];
-            int encodedBytes = _encoder.Encode(pcm.Array, pcm.Offset, dst, 0, samples);
+            int encodedBytes = _encoder.Encode(pcm);
 
             //without it packet will have huge zero-value-tale
             Array.Resize(ref dst, encodedBytes);
 
             return dst;
+            */
         }
     }
 }

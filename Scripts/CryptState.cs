@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Security.Cryptography;
 using MumbleProto;
+using UnityEngine;
 
 namespace Mumble
 {
@@ -151,6 +152,7 @@ namespace Mumble
         {
             if (length < 4)
             {
+                Debug.LogError("Length less than 4, decryption failed");
                 return null;
             }
 
@@ -187,6 +189,7 @@ namespace Mumble
                 }
                 else
                 {
+                    Debug.LogError("Crypt: 1");
                     return null;
                 }
             }
@@ -248,12 +251,14 @@ namespace Mumble
                 }
                 else
                 {
+                    Debug.LogError("Crypt: 2");
                     return null;
                 }
 
                 if (_decryptHistory[_cryptSetup.server_nonce[0] & 0xFF] == _cryptSetup.client_nonce[0])
                 {
                     Array.Copy(saveiv, 0, _cryptSetup.server_nonce, 0, AES_BLOCK_SIZE);
+                    Debug.LogError("Crypt: 3");
                     return null;
                 }
             }
@@ -265,6 +270,7 @@ namespace Mumble
             if (tag[0] != source[1] || tag[1] != source[2] || tag[2] != source[3])
             {
                 Array.Copy(saveiv, 0, _cryptSetup.server_nonce, 0, AES_BLOCK_SIZE);
+                Debug.LogError("Crypt: 4");
                 return null;
             }
             _decryptHistory[_cryptSetup.server_nonce[0] & 0xFF] = _cryptSetup.server_nonce[1];

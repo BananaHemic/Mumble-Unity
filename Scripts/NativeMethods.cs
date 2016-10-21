@@ -36,79 +36,191 @@ namespace Mumble
     /// </summary>
     internal class NativeMethods
     {
-        /*
-        static NativeMethods()
-        {
-            IntPtr image;
-
-            /*
-            if (PlatformDetails.IsMac)
-            {
-                image = LibraryLoader.Load(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Audio", "Codecs", "Opus", "Libs", "32bit", "libopus.dylib"));
-            }
-            // * /
-#if UNITY_STANDALONE
-            image = LibraryLoader.Load(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Audio", "Codecs", "Opus", "Libs", "64bit", "opus.dll"));
-#elif UNITY_ANDROID 
-            image = LibraryLoader.Load("libopus.so.0");
-            if (image.Equals(IntPtr.Zero))
-                image = LibraryLoader.Load(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Audio", "Codecs", "Opus", "Libs", "libopus.so"));
+#if UNITY_IPHONE && !UNITY_EDITOR
+        const string pluginName = "__Internal";
+#else
+        const string pluginName = "opus-1.3";
 #endif
-            if (image != IntPtr.Zero)
-            {
-                var type = typeof(NativeMethods);
-                foreach (var member in type.GetFields(BindingFlags.Static | BindingFlags.NonPublic))
-                {
-                    var methodName = member.Name;
-                    if (methodName == "opus_encoder_ctl_out") methodName = "opus_encoder_ctl";
-                    var fieldType = member.FieldType;
-                    var ptr = LibraryLoader.ResolveSymbol(image, methodName);
-                    if (ptr == IntPtr.Zero)
-                        throw new Exception(string.Format("Could not resolve symbol \"{0}\"", methodName));
-                    member.SetValue(null, Marshal.GetDelegateForFunctionPointer(ptr, fieldType));
-                }
-            }
-        }
-*/
 
-        // ReSharper disable InconsistentNaming
-        // ReSharper disable UnassignedField.Compiler
-        const string pluginName = "opus";
+        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern int opus_encoder_get_size(int numChannels);
 
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr opus_encoder_create(int sampleRate, int channelCount, int application, out IntPtr error);
+		[DllImport(pluginName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern int opus_decoder_get_size(int numChannels);
 
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void opus_encoder_destroy(IntPtr encoder);
+        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern OpusErrors opus_encoder_init(IntPtr encoder, int sampleRate, int channelCount, int application);
 
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int opus_encode(IntPtr encoder, IntPtr pcm, int frameSize, IntPtr data, int maxDataBytes);
+        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern OpusErrors opus_decoder_init(IntPtr decoder, int sampleRate, int channelCount);
 
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr opus_decoder_create(int sampleRate, int channelCount, out IntPtr error);
+        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern int opus_encode_float(IntPtr st, float[] pcm, int frame_size, byte[] data, int max_data_bytes);
 
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void opus_decoder_destroy(IntPtr decoder);
-
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int opus_decode(IntPtr decoder, IntPtr data, int len, IntPtr pcm, int frameSize, int decodeFec);
-
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int opus_packet_get_nb_channels(IntPtr data);
-
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int opus_packet_get_nb_samples(IntPtr data, int len, int sampleRate);
+        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        internal static extern int opus_packet_get_nb_channels(byte[] encodedData);
 
         //Control the encoder
+        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int opus_encoder_ctl(IntPtr encoder, Ctl request, out int value);
+
         [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int opus_encoder_ctl(IntPtr encoder, Ctl request, int value);
 
         [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int opus_encoder_ctl_out(IntPtr encoder, Ctl request, out int value);
+        private static extern IntPtr opus_decoder_create(int sampleRate, int channelCount, out IntPtr error);
 
-        // ReSharper restore UnassignedField.Compiler
-        // ReSharper restore InconsistentNaming
+        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int opus_decode(IntPtr decoder, IntPtr data, int len, IntPtr pcm, int frameSize, int decodeFec);
 
+        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int opus_decode_float(IntPtr decoder, IntPtr data, int len, IntPtr pcm, int frameSize, int decodeFec);
+
+        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void opus_decoder_destroy(IntPtr decoder);
+
+
+        #region internal methods
+        internal static IntPtr opus_encoder_create(int sampleRate, int channelCount, int application, out OpusErrors error)
+        {
+            int size = opus_encoder_get_size(channelCount);
+            IntPtr ptr = Marshal.AllocHGlobal(size);
+
+            error = opus_encoder_init(ptr, sampleRate, channelCount, application);
+            
+            if(error != OpusErrors.Ok)
+                if (ptr != IntPtr.Zero)
+                {
+                    destroy_opus(ptr);
+                    ptr = IntPtr.Zero;
+                }
+
+            return ptr;
+        }
+
+        internal static int opus_encode(IntPtr encoder, float[] pcmData, int frameSize, byte[] encodedData)
+        {
+            if(encoder == IntPtr.Zero)
+            {
+                Debug.LogError("Encoder empty??");
+                return 0;
+            }
+
+            int byteLength = opus_encode_float(encoder, pcmData, frameSize, encodedData, encodedData.Length);
+
+            if (byteLength <= 0)
+                Debug.LogError("Encoding error: " + (OpusErrors)byteLength);
+
+            return byteLength;
+        }
+        internal static void destroy_opus(IntPtr ptr)
+        {
+            Marshal.FreeHGlobal(ptr);
+        }
+        internal static IntPtr opus_decoder_create(int sampleRate, int channelCount, out OpusErrors error)
+        {
+            IntPtr p;
+            IntPtr res =  NativeMethods.opus_decoder_create(sampleRate, channelCount, out p);
+            error = (OpusErrors)p;
+            return res;
+            /*
+            int size = opus_decoder_get_size(channelCount);
+            IntPtr ptr = Marshal.AllocHGlobal(size);
+
+            error = opus_decoder_init(ptr, sampleRate, channelCount);
+
+            if(error != OpusErrors.Ok)
+                if (ptr != IntPtr.Zero)
+                {
+                    destroy_opus(ptr);
+                    ptr = IntPtr.Zero;
+                }
+
+            return ptr;
+            */
+        }
+        internal static int opus_decode_(IntPtr decoder, byte[] encodedData, float[] outputPcm, int frameSize, int decodeFec, int channelCount)
+        {
+            if (decoder == IntPtr.Zero)
+            {
+                Debug.LogError("Encoder empty??");
+                return 0;
+            }
+
+            if(encodedData == null)
+            {
+                Debug.LogError("Empty encoded packet?");
+                return 0;
+            }
+
+            byte[] dstBuffer = new byte[outputPcm.Length * sizeof(float)];
+            int dstOffset = 0;
+            var availableBytes = dstBuffer.Length - dstOffset;
+            int _sampleSize = sizeof(ushort);
+            var frameCount = availableBytes / _sampleSize;
+            int length;
+            int srcOffset = 0;
+            unsafe
+            {
+                fixed (byte* bdec = dstBuffer)
+                {
+                    var decodedPtr = (new IntPtr(bdec)).Add(dstOffset);// IntPtr.Add(new IntPtr(bdec), dstOffset);
+                    fixed (byte* bsrc = encodedData)
+                    {
+                        var srcPtr = (IntPtr)bsrc;
+                        length = NativeMethods.opus_decode(decoder, srcPtr, encodedData.Length, decodedPtr, outputPcm.Length, 0);
+                    }
+
+                }
+            }
+            Debug.Log("Got " + length + " samples " + dstBuffer.Length);
+
+            int byteSize = sizeof(ushort);
+            for (int i = 0; i < outputPcm.Length; i++)
+            {
+                if (Constants.IS_LITTLE_ENDIAN)
+                    Array.Reverse(dstBuffer, i * byteSize, byteSize);
+                outputPcm[i] = BitConverter.ToInt16(dstBuffer, i * byteSize);
+            }
+
+            for (int i = 0; i < outputPcm.Length; i++)
+            {
+                outputPcm[i] = outputPcm[i] / 32768;
+            }
+
+            Debug.Log("output: "
+                + outputPcm[0]);
+            Debug.Log("in bytes: " + dstBuffer[0]);
+
+            return length;
+            /*
+            int byteLength = opus_decode_float(decoder, encodedData, encodedData.Length, outputPcm, frameSize, decodeFec);
+            //Debug.Log("output PCM starts with: " + outputPcm[0]);
+
+            if (byteLength <= 0)
+                Debug.LogError("Encoding error: " + (OpusErrors)byteLength);
+
+            return byteLength;
+            
+            /*
+            short[] outputShorts = new short[outputPcm.Length];
+
+            int byteLength = opus_decode(decoder, encodedData, encodedData.Length, outputShorts, frameSize, decodeFec);
+
+            for(int i = 0; i < outputShorts.Length; i++)
+            {
+                outputPcm[i] = (float)outputShorts[i];
+            }
+            //Debug.Log("output PCM starts with: " + outputPcm[0]);
+
+            if (byteLength <= 0)
+                Debug.LogError("Encoding error: " + (OpusErrors)byteLength);
+
+            return byteLength;
+            */
+        }
+        #endregion
+        #region enums
         public enum Ctl
         {
             SetBitrateRequest = 4002,
@@ -116,7 +228,6 @@ namespace Mumble
             SetInbandFecRequest = 4012,
             GetInbandFecRequest = 4013
         }
-
         public enum OpusErrors
         {
             Ok = 0,
@@ -128,5 +239,6 @@ namespace Mumble
             InvalidState = -6,
             AllocFail = -7
         }
+        #endregion
     }
 }

@@ -1,20 +1,24 @@
 fileFormatVersion: 2
-guid: 97d00177458ac4144ad02e8fe6261336
-timeCreated: 1464559734
-licenseType: Free
+guid: 53d82122d772b754a945eaa56aa089a7
+timeCreated: 1477074032
+licenseType: Pro
 PluginImporter:
   serializedVersion: 1
   iconMap: {}
   executionOrder: {}
   isPreloaded: 0
   platformData:
+    Android:
+      enabled: 0
+      settings:
+        CPU: AnyCPU
     Any:
       enabled: 0
       settings: {}
     Editor:
       enabled: 1
       settings:
-        CPU: x86_64
+        CPU: x86
         DefaultValueInitialized: true
         OS: AnyOS
     Linux:

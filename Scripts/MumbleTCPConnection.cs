@@ -82,7 +82,7 @@ namespace Mumble
         {
             lock (_ssl)
             {
-                //if(mt != MessageType.Ping)
+                if(mt != MessageType.Ping)
                 Debug.Log("Sending " + mt + " message");
                 //_writer.Write(IPAddress.HostToNetworkOrder((Int16) mt));
                 //Debug.Log("Can SSL read? " + _ssl.CanRead);
@@ -150,14 +150,14 @@ namespace Mumble
             try
             {
                 var messageType = (MessageType) IPAddress.NetworkToHostOrder(_reader.ReadInt16());
-                Debug.Log("Processing data of type: " + messageType);
+                //Debug.Log("Processing data of type: " + messageType);
 
                 switch (messageType)
                 {
                     case MessageType.Version:
                         _mc.RemoteVersion = Serializer.DeserializeWithLengthPrefix<Version>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        Debug.Log("Server version: " + _mc.RemoteVersion.release);
+                        //Debug.Log("Server version: " + _mc.RemoteVersion.release);
                         var authenticate = new Authenticate
                         {
                             username = _username,
@@ -170,22 +170,22 @@ namespace Mumble
                         var cryptSetup = Serializer.DeserializeWithLengthPrefix<CryptSetup>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         ProcessCryptSetup(cryptSetup);
-                        Debug.Log("Got crypt");
+                        //Debug.Log("Got crypt");
                         break;
                     case MessageType.CodecVersion:
                         _mc.CodecVersion = Serializer.DeserializeWithLengthPrefix<CodecVersion>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        Debug.Log("Got codec version");
+                        //Debug.Log("Got codec version");
                         break;
                     case MessageType.ChannelState:
                         _mc.ChannelState = Serializer.DeserializeWithLengthPrefix<ChannelState>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        Debug.Log("Channel state ID = " + _mc.ChannelState.channel_id);
+                        //Debug.Log("Channel state ID = " + _mc.ChannelState.channel_id);
                         break;
                     case MessageType.PermissionQuery:
                         _mc.PermissionQuery = Serializer.DeserializeWithLengthPrefix<PermissionQuery>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        Debug.Log("Permission Query = " + _mc.PermissionQuery);
+                        //Debug.Log("Permission Query = " + _mc.PermissionQuery);
                         break;
                     case MessageType.UserState:
                         //This is called for every user in the room, I don't really understand why we'd be setting the
@@ -193,32 +193,34 @@ namespace Mumble
                         //TODO add support for multiple users
                         _mc.UserState = Serializer.DeserializeWithLengthPrefix<UserState>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        Debug.Log("User State Actor= " + _mc.UserState.actor);
-                        Debug.Log("User State Session= " + _mc.UserState.session);
+                       // Debug.Log("User State Actor= " + _mc.UserState.actor);
+                        //Debug.Log("User State Session= " + _mc.UserState.session);
                         break;
                     case MessageType.ServerSync:
                         _mc.ServerSync = Serializer.DeserializeWithLengthPrefix<ServerSync>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        Debug.Log("Server Sync Session= " + _mc.ServerSync.session);
+                        //Debug.Log("Server Sync Session= " + _mc.ServerSync.session);
                         _mc.ConnectionSetupFinished = true;
                         break;
                     case MessageType.ServerConfig:
                         _mc.ServerConfig = Serializer.DeserializeWithLengthPrefix<ServerConfig>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        Debug.Log("Sever config = " + _mc.ServerConfig);
-                        Debug.LogWarning("Connected!");
+                        //Debug.Log("Sever config = " + _mc.ServerConfig);
+                        //Debug.LogWarning("Connected!");
                         _validConnection = true; // handshake complete
                         break;
                     case MessageType.SuggestConfig:
                         var config = Serializer.DeserializeWithLengthPrefix<SuggestConfig>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        Debug.Log("Suggested positional is: " + config.positional
+                        /*Debug.Log("Suggested positional is: " + config.positional
                             + " push-to-talk: " + config.push_to_talk
                             + " version: " + config.version);
+                            */
                         break;
                     case MessageType.TextMessage:
                         TextMessage textMessage = Serializer.DeserializeWithLengthPrefix<TextMessage>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
+                        
                         Debug.Log("Text message = " + textMessage.message);
                         Debug.Log("Text actor = " + textMessage.actor);
                         Debug.Log("Text channel = " + textMessage.channel_id[0]);
@@ -227,7 +229,9 @@ namespace Mumble
                         break;
                     case MessageType.UDPTunnel:
                         var length = IPAddress.NetworkToHostOrder(_reader.ReadInt32());
-                        _muc.ReceiveUdpMessage(_reader.ReadBytes(length));
+                        Debug.Log("Received UDP tunnel of length: " + length);
+                        //At this point the message is already decrypted
+                        _muc.UnpackOpusVoicePacket(_reader.ReadBytes(length));
                         /*
                         //var udpTunnel = Serializer.DeserializeWithLengthPrefix<UDPTunnel>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
@@ -296,7 +300,7 @@ namespace Mumble
         {
             if (_validConnection)
             {
-                Debug.Log("Sending TCP ping");
+                //Debug.Log("Sending TCP ping");
                 var ping = new MumbleProto.Ping();
                 ping.timestamp = (ulong) (DateTime.UtcNow.Ticks - DateTime.Parse("01/01/1970 00:00:00").Ticks);
 //                _logger.Debug("Sending TCP ping with timestamp: " + ping.timestamp);
