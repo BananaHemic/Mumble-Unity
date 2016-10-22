@@ -124,7 +124,7 @@ namespace Mumble
             error = (OpusErrors)p;
             return res;
         }
-        internal static int opus_decode(IntPtr decoder, byte[] encodedData, float[] outputPcm, int frameSize, int decodeFec, int channelCount)
+        internal static int opus_decode(IntPtr decoder, byte[] encodedData, float[] outputPcm, int outputOffset, int frameSize, int decodeFec, int channelCount)
         {
             if (decoder == IntPtr.Zero)
             {
@@ -137,13 +137,12 @@ namespace Mumble
                 return 0;
             }
 
-            int dstOffset = 0;
             int length;
             unsafe
             {
                 fixed (float* bdec = outputPcm)
                 {
-                    var decodedPtr = (new IntPtr(bdec)).Add(dstOffset);// IntPtr.Add(new IntPtr(bdec), dstOffset);
+                    var decodedPtr = (new IntPtr(bdec)).Add(outputOffset);// IntPtr.Add(new IntPtr(bdec), dstOffset);
                     fixed (byte* bsrc = encodedData)
                     {
                         var srcPtr = (IntPtr)bsrc;
@@ -151,9 +150,6 @@ namespace Mumble
                     }
                 }
             }
-            Debug.Log("Got " + length + " samples " + outputPcm.Length);
-            Debug.Log("output: "
-                + outputPcm[0]);
             return length;
             /*
             int byteSize = sizeof(ushort);

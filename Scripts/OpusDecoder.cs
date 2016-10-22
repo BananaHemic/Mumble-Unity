@@ -86,8 +86,7 @@ namespace Mumble
 
         public int Decode(byte[] packetData, float[] floatBuffer, int bufferLoadingIndex)
         {
-            float[] decodedFloats = new float[2 * (int)(Constants.FRAME_SIZE * Constants.NUM_CHANNELS)];
-            int numSamplesDecoded = NativeMethods.opus_decode(_decoder, packetData, decodedFloats, 2 * (int)(Constants.FRAME_SIZE * Constants.NUM_CHANNELS), _outputSampleRate, _outputChannelCount);
+            int numSamplesDecoded = NativeMethods.opus_decode(_decoder, packetData, floatBuffer, bufferLoadingIndex, 2 * (int)(Constants.FRAME_SIZE * Constants.NUM_CHANNELS), _outputSampleRate, _outputChannelCount);
             /*
             Debug.Log("Post decode, starts with: " + decodedFloats[0]);
             if(decodedFloats[0] != 0)
@@ -105,7 +104,6 @@ namespace Mumble
                 }
             }
             */
-            Array.Copy(decodedFloats, 0, floatBuffer, bufferLoadingIndex, numSamplesDecoded);
             return numSamplesDecoded;
         }
 
