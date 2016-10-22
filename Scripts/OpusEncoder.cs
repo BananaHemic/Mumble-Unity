@@ -52,6 +52,61 @@ namespace Mumble
             2.5f, 5, 10,
             20, 40, 60
         };
+        /// <summary>
+        /// Permitted frame sizes in samples per channel.
+        /// </summary>
+        public int[] PermittedFrameSizes { get; private set; }
+
+        /// <summary>
+        /// Gets or sets the bitrate setting of the encoding.
+        /// </summary>
+        public int Bitrate
+        {
+            get
+            {
+                if (_encoder == IntPtr.Zero)
+                    throw new ObjectDisposedException("OpusEncoder");
+                int bitrate;
+                var ret = NativeMethods.opus_encoder_ctl(_encoder, NativeMethods.Ctl.GetBitrateRequest, out bitrate);
+                if (ret < 0)
+                    throw new Exception("Encoder error - " + ((NativeMethods.OpusErrors)ret));
+                return bitrate;
+            }
+            set
+            {
+                if (_encoder == IntPtr.Zero)
+                    throw new ObjectDisposedException("OpusEncoder");
+                var ret = NativeMethods.opus_encoder_ctl(_encoder, NativeMethods.Ctl.SetBitrateRequest, out value);
+                if (ret < 0)
+                    throw new Exception("Encoder error - " + ((NativeMethods.OpusErrors)ret));
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets if Forward Error Correction encoding is enabled.
+        /// </summary>
+        public bool EnableForwardErrorCorrection
+        {
+            get
+            {
+                if (_encoder == IntPtr.Zero)
+                    throw new ObjectDisposedException("OpusEncoder");
+                int fec;
+                var ret = NativeMethods.opus_encoder_ctl(_encoder, NativeMethods.Ctl.GetInbandFecRequest, out fec);
+                if (ret < 0)
+                    throw new Exception("Encoder error - " + ((NativeMethods.OpusErrors)ret));
+                return fec > 0;
+            }
+            set
+            {
+                if (_encoder == IntPtr.Zero)
+                    throw new ObjectDisposedException("OpusEncoder");
+                int req = Convert.ToInt32(value);
+                var ret = NativeMethods.opus_encoder_ctl(_encoder, NativeMethods.Ctl.SetInbandFecRequest, req);
+                if (ret < 0)
+                    throw new Exception("Encoder error - " + ((NativeMethods.OpusErrors)ret));
+            }
+        }
 
         /// <summary>
         /// Max number of bytes per packet
@@ -78,6 +133,7 @@ namespace Mumble
                 throw new ArgumentOutOfRangeException("srcChannelCount");
 
             NativeMethods.OpusErrors error;
+            //TODO use an enum instead of a number for application type
             var encoder = NativeMethods.opus_encoder_create(srcSamplingRate, srcChannelCount, 2048, out error);
             if (error != NativeMethods.OpusErrors.Ok)
             {
@@ -162,61 +218,6 @@ namespace Mumble
             return frameSizeInSamples * _sampleSize;
         }
 
-        /// <summary>
-        /// Permitted frame sizes in samples per channel.
-        /// </summary>
-        public int[] PermittedFrameSizes { get; private set; }
-
-        /// <summary>
-        /// Gets or sets the bitrate setting of the encoding.
-        /// </summary>
-        public int Bitrate
-        {
-            get
-            {
-                if (_encoder == IntPtr.Zero)
-                    throw new ObjectDisposedException("OpusEncoder");
-                int bitrate;
-                var ret = NativeMethods.opus_encoder_ctl(_encoder, NativeMethods.Ctl.GetBitrateRequest, out bitrate);
-                if (ret < 0)
-                    throw new Exception("Encoder error - " + ((NativeMethods.OpusErrors)ret));
-                return bitrate;
-            }
-            set
-            {
-                if (_encoder == IntPtr.Zero)
-                    throw new ObjectDisposedException("OpusEncoder");
-                var ret = NativeMethods.opus_encoder_ctl(_encoder, NativeMethods.Ctl.SetBitrateRequest, out value);
-                if (ret < 0)
-                    throw new Exception("Encoder error - " + ((NativeMethods.OpusErrors)ret));
-            }
-        }
-
-        /// <summary>
-        /// Gets or sets if Forward Error Correction encoding is enabled.
-        /// </summary>
-        public bool EnableForwardErrorCorrection
-        {
-            get
-            {
-                if (_encoder == IntPtr.Zero)
-                    throw new ObjectDisposedException("OpusEncoder");
-                int fec;
-                var ret = NativeMethods.opus_encoder_ctl(_encoder, NativeMethods.Ctl.GetInbandFecRequest, out fec);
-                if (ret < 0)
-                    throw new Exception("Encoder error - " + ((NativeMethods.OpusErrors)ret));
-                return fec > 0;
-            }
-            set
-            {
-                if (_encoder == IntPtr.Zero)
-                    throw new ObjectDisposedException("OpusEncoder");
-                int req = Convert.ToInt32(value);
-                var ret = NativeMethods.opus_encoder_ctl(_encoder, NativeMethods.Ctl.SetInbandFecRequest, req);
-                if (ret < 0)
-                    throw new Exception("Encoder error - " + ((NativeMethods.OpusErrors)ret));
-            }
-        }
 
         /// <summary>
         /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.

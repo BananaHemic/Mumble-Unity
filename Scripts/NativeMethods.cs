@@ -109,7 +109,10 @@ namespace Mumble
             int byteLength = opus_encode_float(encoder, pcmData, frameSize, encodedData, encodedData.Length);
 
             if (byteLength <= 0)
+            {
                 Debug.LogError("Encoding error: " + (OpusErrors)byteLength);
+                Debug.Log("Input = " + pcmData.Length);
+            }
 
             return byteLength;
         }
