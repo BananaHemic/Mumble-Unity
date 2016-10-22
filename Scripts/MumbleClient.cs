@@ -50,7 +50,7 @@ namespace Mumble
             //Maybe do Lazy?
             _codec = new OpusCodec();
             //Use 20ms samples
-            NumSamplesPerFrame = _codec.PermittedEncodingFrameSizes.ElementAt(_codec.PermittedEncodingFrameSizes.Count() - 2);
+            NumSamplesPerFrame = _codec.PermittedEncodingFrameSizes.ElementAt(_codec.PermittedEncodingFrameSizes.Count() - 3);
 
             oneUser = new User(17, _codec);
             _manageSendBuffer = new ManageAudioSendBuffer(_codec, _muc);
