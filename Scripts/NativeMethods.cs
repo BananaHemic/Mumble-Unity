@@ -123,58 +123,39 @@ namespace Mumble
             IntPtr res =  NativeMethods.opus_decoder_create(sampleRate, channelCount, out p);
             error = (OpusErrors)p;
             return res;
-            /*
-            int size = opus_decoder_get_size(channelCount);
-            IntPtr ptr = Marshal.AllocHGlobal(size);
-
-            error = opus_decoder_init(ptr, sampleRate, channelCount);
-
-            if(error != OpusErrors.Ok)
-                if (ptr != IntPtr.Zero)
-                {
-                    destroy_opus(ptr);
-                    ptr = IntPtr.Zero;
-                }
-
-            return ptr;
-            */
         }
-        internal static int opus_decode_(IntPtr decoder, byte[] encodedData, float[] outputPcm, int frameSize, int decodeFec, int channelCount)
+        internal static int opus_decode(IntPtr decoder, byte[] encodedData, float[] outputPcm, int frameSize, int decodeFec, int channelCount)
         {
             if (decoder == IntPtr.Zero)
             {
                 Debug.LogError("Encoder empty??");
                 return 0;
             }
-
             if(encodedData == null)
             {
                 Debug.LogError("Empty encoded packet?");
                 return 0;
             }
 
-            byte[] dstBuffer = new byte[outputPcm.Length * sizeof(float)];
             int dstOffset = 0;
-            var availableBytes = dstBuffer.Length - dstOffset;
-            int _sampleSize = sizeof(ushort);
-            var frameCount = availableBytes / _sampleSize;
             int length;
-            int srcOffset = 0;
             unsafe
             {
-                fixed (byte* bdec = dstBuffer)
+                fixed (float* bdec = outputPcm)
                 {
                     var decodedPtr = (new IntPtr(bdec)).Add(dstOffset);// IntPtr.Add(new IntPtr(bdec), dstOffset);
                     fixed (byte* bsrc = encodedData)
                     {
                         var srcPtr = (IntPtr)bsrc;
-                        length = NativeMethods.opus_decode(decoder, srcPtr, encodedData.Length, decodedPtr, outputPcm.Length, 0);
+                        length = NativeMethods.opus_decode_float(decoder, srcPtr, encodedData.Length, decodedPtr, outputPcm.Length, 0);
                     }
-
                 }
             }
-            Debug.Log("Got " + length + " samples " + dstBuffer.Length);
-
+            Debug.Log("Got " + length + " samples " + outputPcm.Length);
+            Debug.Log("output: "
+                + outputPcm[0]);
+            return length;
+            /*
             int byteSize = sizeof(ushort);
             for (int i = 0; i < outputPcm.Length; i++)
             {
