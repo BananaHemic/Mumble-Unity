@@ -32,7 +32,6 @@ namespace Mumble {
         {
             //Debug.Log("We now have " + _encodedBuffer.Count + " encoded packets");
 
-            //
             int readCount = 0;
             while (readCount < count)
             {

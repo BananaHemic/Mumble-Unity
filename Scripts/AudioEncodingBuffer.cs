@@ -42,11 +42,14 @@ namespace Mumble
 
         public ArraySegment<byte> Encode(OpusCodec codec)
         {
+            TargettedSpeech nextItemToSend;
+            lock (_unencodedBuffer)
+            {
+                if (_unencodedBuffer.Count == 0)
+                    return EmptyByteSegment;
 
-            if (_unencodedBuffer.Count == 0)
-                return EmptyByteSegment;
-
-            TargettedSpeech nextItemToSend = _unencodedBuffer.Dequeue();
+                nextItemToSend = _unencodedBuffer.Dequeue();
+            }
             return codec.Encode(nextItemToSend.Pcm);
         }
 

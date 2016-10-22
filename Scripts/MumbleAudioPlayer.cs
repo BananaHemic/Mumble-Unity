@@ -67,6 +67,7 @@ namespace Mumble {
             sum = sum / data.Length;
             sqrdSum = Mathf.Sqrt(sqrdSum) / data.Length;
 
+            /*
             Debug.Log("Read has average of: " + sum + " max of: " + max + " at: " + indexOfMax
                 + " sqrdAvg = " + sqrdSum + " number of zeros = " + numZeros);
             /*

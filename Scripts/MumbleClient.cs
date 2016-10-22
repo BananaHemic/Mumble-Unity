@@ -31,13 +31,7 @@ namespace Mumble
 
         private OpusCodec _codec;
 
-        public int NumSamplesPerFrame
-        {
-            get
-            {
-                return _codec.PermittedEncodingFrameSizes.ElementAt(0);
-            }
-        }
+        public int NumSamplesPerFrame { get; private set; }
 
         public MumbleClient(String hostName, int port)
         {
@@ -55,6 +49,8 @@ namespace Mumble
 
             //Maybe do Lazy?
             _codec = new OpusCodec();
+            //Use 20ms samples
+            NumSamplesPerFrame = _codec.PermittedEncodingFrameSizes.ElementAt(_codec.PermittedEncodingFrameSizes.Count() - 2);
 
             oneUser = new User(17, _codec);
             _manageSendBuffer = new ManageAudioSendBuffer(_codec, _muc);

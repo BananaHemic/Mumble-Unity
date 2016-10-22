@@ -54,7 +54,7 @@ namespace Mumble
         [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern OpusErrors opus_decoder_init(IntPtr decoder, int sampleRate, int channelCount);
 
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
         private static extern int opus_encode_float(IntPtr st, float[] pcm, int frame_size, byte[] data, int max_data_bytes);
 
         [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]

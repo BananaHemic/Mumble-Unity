@@ -7,15 +7,17 @@ using UnityEngine;
 
 namespace Mumble
 {
-    public class ManageAudioSendBuffer
+    public class ManageAudioSendBuffer : IDisposable
     {
-        private bool _isEncodingThreadRunning;
-        private AudioEncodingBuffer _encodingBuffer;
-        private Thread _encodingThread;
-        private UInt32 sequenceIndex;
-        private OpusCodec _codec;
-        private MumbleUdpConnection _udpConnection;
+        const int SleepTimeMs = 10;
 
+        private readonly OpusCodec _codec;
+        private readonly MumbleUdpConnection _udpConnection;
+        private readonly AudioEncodingBuffer _encodingBuffer;
+        private readonly Thread _encodingThread;
+
+        private bool _isEncodingThreadRunning;
+        private UInt32 sequenceIndex;
         
 
         public ManageAudioSendBuffer(OpusCodec codec, MumbleUdpConnection udpConnection)
@@ -29,6 +31,10 @@ namespace Mumble
                 IsBackground = true
             };
         }
+        ~ManageAudioSendBuffer()
+        {
+            Dispose();
+        }
         public void SendVoice(float[] pcm, SpeechTarget target, uint targetId)
         {
             _encodingBuffer.Add(pcm, target, targetId);
@@ -39,8 +45,12 @@ namespace Mumble
         public void SendVoiceStop()
         {
             _encodingBuffer.Stop();
-            _encodingThread.Abort();
             sequenceIndex = 0;
+        }
+        public void Dispose()
+        {
+            if(_encodingThread != null)
+                _encodingThread.Abort();
         }
         private void EncodingThreadEntry()
         {
@@ -50,54 +60,50 @@ namespace Mumble
                 try
                 {
                     ArraySegment<byte> packet = _encodingBuffer.Encode(_codec);
-                    
-                    if (packet != null)
+
+                    if (packet == null)
                     {
-                        int maxSize = 480;
+                        Thread.Sleep(SleepTimeMs);
+                        continue;
+                    }
+                    
+                    int maxSize = 480;
 
-                        //taken from JS port
-                        for (int currentOffset = 0; currentOffset < packet.Count;)
-                        {
-                            int currentBlockSize = Math.Min(packet.Count - currentOffset, maxSize);
+                    //taken from JS port
+                    for (int currentOffset = 0; currentOffset < packet.Count;)
+                    {
+                        int currentBlockSize = Math.Min(packet.Count - currentOffset, maxSize);
 
-                            byte type = (byte)4;
-                            //originaly [type = codec_type_id << 5 | whistep_chanel_id]. now we can talk only to normal chanel
-                            type = (byte)(type << 5);
-                            byte[] sequence = Var64.writeVarint64_alternative((UInt64)sequenceIndex);
+                        byte type = (byte)4;
+                        //originaly [type = codec_type_id << 5 | whistep_chanel_id]. now we can talk only to normal chanel
+                        type = (byte)(type << 5);
+                        byte[] sequence = Var64.writeVarint64_alternative((UInt64)sequenceIndex);
 
-                            // Client side voice header.
-                            byte[] voiceHeader = new byte[1 + sequence.Length];
-                            voiceHeader[0] = type;
-                            sequence.CopyTo(voiceHeader, 1);
+                        // Client side voice header.
+                        //TODO we can remove this alloc if we're clever
+                        byte[] voiceHeader = new byte[1 + sequence.Length];
+                        voiceHeader[0] = type;
+                        sequence.CopyTo(voiceHeader, 1);
 
-                            byte[] header = Var64.writeVarint64_alternative((UInt64)currentBlockSize);
-                            byte[] packedData = new byte[voiceHeader.Length + header.Length + currentBlockSize];
+                        byte[] header = Var64.writeVarint64_alternative((UInt64)currentBlockSize);
+                        byte[] packedData = new byte[voiceHeader.Length + header.Length + currentBlockSize];
 
-                            //Packet:
-                            //[Header] [segment] [header] [packet]
-                            Array.Copy(voiceHeader, 0, packedData, 0, voiceHeader.Length);
-                            Array.Copy(header, 0, packedData, voiceHeader.Length, header.Length);
-                            Array.Copy(packet.Array, currentOffset + packet.Offset, packedData, voiceHeader.Length + header.Length, currentBlockSize);
+                        //Packet:
+                        //[Header] [segment] [header] [packet]
+                        Array.Copy(voiceHeader, 0, packedData, 0, voiceHeader.Length);
+                        Array.Copy(header, 0, packedData, voiceHeader.Length, header.Length);
+                        Array.Copy(packet.Array, currentOffset + packet.Offset, packedData, voiceHeader.Length + header.Length, currentBlockSize);
 
-                            FormatVoicePacketThenSend(packedData);
+                        _udpConnection.SendVoicePacket(packedData);
 
-                            sequenceIndex++;
-                            currentOffset += currentBlockSize;
-                        }
+                        sequenceIndex++;
+                        currentOffset += currentBlockSize;
                     }
                 }
                 catch (Exception e){
                     Debug.LogError("Error: " + e);
                 }
-
-                //beware! can take a lot of power, because infinite loop without sleep
             }
-        }
-        //TODO can I remove this?
-        public void FormatVoicePacketThenSend(byte[] packedData)
-        {
-            //TODO format (?)
-            _udpConnection.SendVoicePacket(packedData);
         }
     }
 }
