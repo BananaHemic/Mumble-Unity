@@ -51,6 +51,7 @@ namespace Mumble
         {
             if(_encodingThread != null)
                 _encodingThread.Abort();
+            _isEncodingThreadRunning = false;
         }
         private void EncodingThreadEntry()
         {

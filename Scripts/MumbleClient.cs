@@ -88,7 +88,7 @@ namespace Mumble
             //TODO actually tell the server we're not online, right now we rely on the connection expiring
             _mtc.Close();
             _muc.Close();
-            _manageSendBuffer.SendVoiceStop();
+            _manageSendBuffer.Dispose();
             Debug.Log("Closing all connections");
         }
 
