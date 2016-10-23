@@ -6,8 +6,9 @@ namespace Mumble
     public class SendMumbleAudio : MonoBehaviour
     {
         public int MicNumberToUse;
+        public AudioClip TestingClipToUse;
 
-        const int NumRecordingSeconds = 1;
+        const int NumRecordingSeconds = 24;
         const int NumSamples = NumRecordingSeconds * Constants.SAMPLE_RATE;
 
         private MumbleClient _mumbleClient;
@@ -47,10 +48,23 @@ namespace Mumble
 
             while(totalSamples - _totalNumSamplesSent >= _mumbleClient.NumSamplesPerFrame)
             {
-                print("Sending sample of size: " + _mumbleClient.NumSamplesPerFrame);
+
+                //print("Sending sample of size: " + _mumbleClient.NumSamplesPerFrame);
                 //TODO use a big buffer that we load parts into
                 float[] tempSampleStore = new float[_mumbleClient.NumSamplesPerFrame];
-                _sendAudioClip.GetData(tempSampleStore, _totalNumSamplesSent % NumSamples);
+
+                if (!MumbleClient.UseSyntheticMic)
+                    _sendAudioClip.GetData(tempSampleStore, _totalNumSamplesSent % NumSamples);
+                else {
+                    TestingClipToUse.GetData(tempSampleStore, _totalNumSamplesSent % NumSamples);
+                    /*
+                    for (int i = 0; i < tempSampleStore.Length; i++)
+                    {
+                        tempSampleStore[i] = Mathf.Sin(i * 100f);
+                    }
+                    */
+                }
+
                 _mumbleClient.SendVoicePacket(tempSampleStore);
                 _totalNumSamplesSent += _mumbleClient.NumSamplesPerFrame;
             }
@@ -65,11 +79,13 @@ namespace Mumble
                 _sendAudioClip = Microphone.Start(_currentMic, true, NumRecordingSeconds, Constants.SAMPLE_RATE);
                 _previousPosition = 0;
                 _numTimesLooped = 0;
+                _totalNumSamplesSent = 0;
                 isRecording = true;
             }
             if (Input.GetKeyUp(KeyCode.Space))
             {
                 Microphone.End(_currentMic);
+                _mumbleClient.StopSendingVoice();
                 isRecording = false;
             }
             if (isRecording)

@@ -13,12 +13,19 @@ namespace Mumble
 
     public class MumbleClient
     {
+        /// This sets if we're going to listen to our own audio
+        public static readonly bool UseLocalLoopBack = false;
+        // This sets if we send synthetic audio instead of a mic audio
+        public static readonly bool UseSyntheticMic = true;
+
+        public bool ConnectionSetupFinished { get; internal set; }
+
+
         private MumbleTcpConnection _mtc;
         private MumbleUdpConnection _muc;
         private ManageAudioSendBuffer _manageSendBuffer;
         private User oneUser;
 
-        public bool ConnectionSetupFinished { get; internal set; }
 
         internal Version RemoteVersion { get; set; }
         internal CryptSetup CryptSetup { get; set; }
@@ -50,7 +57,7 @@ namespace Mumble
             //Maybe do Lazy?
             _codec = new OpusCodec();
             //Use 20ms samples
-            NumSamplesPerFrame = _codec.PermittedEncodingFrameSizes.ElementAt(_codec.PermittedEncodingFrameSizes.Count() - 3);
+            NumSamplesPerFrame = _codec.PermittedEncodingFrameSizes.ElementAt(_codec.PermittedEncodingFrameSizes.Count() - 4);
 
             oneUser = new User(17, _codec);
             _manageSendBuffer = new ManageAudioSendBuffer(_codec, _muc);
@@ -109,7 +116,13 @@ namespace Mumble
         {
             _manageSendBuffer.SendVoice(floatData, SpeechTarget.Normal, 0);
         }
-
+        /// <summary>
+        /// Tell the encoder to send the last audio packet, then reset the sequence number
+        /// </summary>
+        public void StopSendingVoice()
+        {
+            _manageSendBuffer.SendVoiceStopSignal();
+        }
         public byte[] GetLatestClientNonce()
         {
             return _muc.GetLatestClientNonce();

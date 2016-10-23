@@ -5,8 +5,8 @@
  * We now assume that each mic packet placed into the buffer is an acceptable size
  */
 using System;
-using System.Linq;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace Mumble
 {
@@ -17,6 +17,8 @@ namespace Mumble
         private readonly Queue<TargettedSpeech> _unencodedBuffer = new Queue<TargettedSpeech>();
 
         public readonly ArraySegment<byte> EmptyByteSegment = new ArraySegment<byte> { };
+
+        private bool _isWaitingToSendLastPacket = false;
 
         /// <summary>
         /// Add some raw PCM data to the buffer to send
@@ -36,21 +38,43 @@ namespace Mumble
         {
             lock (_unencodedBuffer)
             {
-                _unencodedBuffer.Enqueue(new TargettedSpeech(stop: true));
+                //If we still have an item in the queue, mark the last one as last
+                _isWaitingToSendLastPacket = true;
+                if (_unencodedBuffer.Count == 0)
+                {
+                    Debug.LogWarning("Adding stop packet");
+                    _unencodedBuffer.Enqueue(new TargettedSpeech(stop: true));
+                }
+                else
+                    Debug.LogWarning("Marking last packet");
             }
         }
 
-        public ArraySegment<byte> Encode(OpusCodec codec)
+        public ArraySegment<byte> Encode(OpusCodec codec, out bool isStop, out bool isEmpty)
         {
-            TargettedSpeech nextItemToSend;
+            isStop = false;
+            isEmpty = false;
+            float[] nextPcmToSend = null;
             lock (_unencodedBuffer)
             {
+                if (_unencodedBuffer.Count == 1 && _isWaitingToSendLastPacket)
+                {
+                    isStop = true;
+                    _isWaitingToSendLastPacket = false;
+                }
                 if (_unencodedBuffer.Count == 0)
-                    return EmptyByteSegment;
-
-                nextItemToSend = _unencodedBuffer.Dequeue();
+                    isEmpty = true;
+                else
+                    nextPcmToSend = _unencodedBuffer.Dequeue().Pcm;
             }
-            return codec.Encode(nextItemToSend.Pcm);
+            //Debug.Log("Will encode: " + nextItemToSend.Pcm.Length);
+            if (nextPcmToSend == null || nextPcmToSend.Length == 0)
+                isEmpty = true;
+
+            if(isEmpty)
+                return EmptyByteSegment;
+
+            return codec.Encode(nextPcmToSend);
         }
 
         /// <summary>
@@ -62,7 +86,7 @@ namespace Mumble
             public readonly SpeechTarget Target;
             public readonly uint TargetId;
 
-            public readonly bool IsStop;
+            public bool IsStop;
 
             public TargettedSpeech(float[] pcm, SpeechTarget target, uint targetId)
             {

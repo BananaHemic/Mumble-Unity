@@ -42,10 +42,9 @@ namespace Mumble
             if (!_encodingThread.IsAlive)
                 _encodingThread.Start();
         }
-        public void SendVoiceStop()
+        public void SendVoiceStopSignal()
         {
             _encodingBuffer.Stop();
-            sequenceIndex = 0;
         }
         public void Dispose()
         {
@@ -60,17 +59,22 @@ namespace Mumble
             {
                 try
                 {
-                    ArraySegment<byte> packet = _encodingBuffer.Encode(_codec);
+                    bool isLastPacket;
+                    bool isEmpty;
+                    ArraySegment<byte> packet = _encodingBuffer.Encode(_codec, out isLastPacket, out isEmpty);
 
-                    if (packet == null)
+                    if (isEmpty)
                     {
-                        Thread.Sleep(SleepTimeMs);
+                        //Thread.Sleep(SleepTimeMs);
                         continue;
                     }
+                    if (isLastPacket)
+                        Debug.LogError("Found last packet");
                     
                     int maxSize = 480;
 
-                    //taken from JS port
+                    //Debug.Log("Packet count = " + packet.Count);
+
                     for (int currentOffset = 0; currentOffset < packet.Count;)
                     {
                         int currentBlockSize = Math.Min(packet.Count - currentOffset, maxSize);
@@ -80,26 +84,41 @@ namespace Mumble
                         type = (byte)(type << 5);
                         byte[] sequence = Var64.writeVarint64_alternative((UInt64)sequenceIndex);
 
-                        // Client side voice header.
-                        //TODO we can remove this alloc if we're clever
-                        byte[] voiceHeader = new byte[1 + sequence.Length];
-                        voiceHeader[0] = type;
-                        sequence.CopyTo(voiceHeader, 1);
 
-                        byte[] header = Var64.writeVarint64_alternative((UInt64)currentBlockSize);
-                        byte[] packedData = new byte[voiceHeader.Length + header.Length + currentBlockSize];
+                        // First header for type & sequence length
+                        //TODO we can remove this alloc if we're clever
+                        byte[] packetHeader = new byte[1 + sequence.Length];
+                        packetHeader[0] = type;
+                        sequence.CopyTo(packetHeader, 1);
+
+                        //Debug.Log("size should be = " + currentBlockSize);
+                        //Write header to show how long the encoded data is
+                        byte[] opusHeader = Var64.writeVarint64_alternative((UInt64)currentBlockSize);
+                        //Mark the leftmost bit if this is the last packet
+                        if (isLastPacket)
+                        {
+                            opusHeader[0] = (byte)(opusHeader[0] | 128);
+                            Debug.LogWarning("Adding end flag");
+                        }
+                        byte[] packedData = new byte[packetHeader.Length + opusHeader.Length + currentBlockSize];
 
                         //Packet:
-                        //[Header] [segment] [header] [packet]
-                        Array.Copy(voiceHeader, 0, packedData, 0, voiceHeader.Length);
-                        Array.Copy(header, 0, packedData, voiceHeader.Length, header.Length);
-                        Array.Copy(packet.Array, currentOffset + packet.Offset, packedData, voiceHeader.Length + header.Length, currentBlockSize);
+                        //[Header] [segment] [opus header] [packet]
+                        Array.Copy(packetHeader, 0, packedData, 0, packetHeader.Length);
+                        Array.Copy(opusHeader, 0, packedData, packetHeader.Length, opusHeader.Length);
+                        Array.Copy(packet.Array, currentOffset, packedData, packetHeader.Length + opusHeader.Length, currentBlockSize);
 
-                        _udpConnection.SendVoicePacket(packedData);
+                        if (MumbleClient.UseLocalLoopBack)
+                        	_udpConnection.UnpackOpusVoicePacket(packedData);
+                        else
+                            _udpConnection.SendVoicePacket(packedData);
 
                         sequenceIndex++;
                         currentOffset += currentBlockSize;
                     }
+                    //If we've hit a stop packet, then reset the seq number
+                    if (isLastPacket)
+                        sequenceIndex = 0;
                 }
                 catch (Exception e){
                     Debug.LogError("Error: " + e);

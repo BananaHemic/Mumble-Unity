@@ -73,7 +73,7 @@ namespace Mumble
             // figure out type of message
             int type = message[0] >> 5 & 0x7;
             //Debug.Log("UDP response received: " + Convert.ToString(message[0], 2).PadLeft(8, '0'));
-//            Debug.Log("UDP response type: " + (UDPType)type);
+            //Debug.Log("UDP response type: " + (UDPType)type);
             //Debug.Log("UDP length: " + message.Length);
 
             //If we get an OPUS audio packet, de-encode it
@@ -89,7 +89,6 @@ namespace Mumble
                     Debug.LogError("Not implemented: " + ((UDPType)type));
                     break;
             }
-
         }
         internal void OnPing(byte[] message)
         {
@@ -97,21 +96,45 @@ namespace Mumble
         }
         internal void UnpackOpusVoicePacket(byte[] plainTextMessage)
         {
+            byte typeByte = plainTextMessage[0];
+            int type = typeByte >> 5 & 0x7;
+            int target = typeByte & 31;
+            //Debug.Log("byte = " + typeByte + " type = " + type + " target = " + target);
             using (var reader = new UdpPacketReader(new MemoryStream(plainTextMessage, 1, plainTextMessage.Length - 1)))
             {
-                UInt32 session = (uint)reader.ReadVarInt64();
+                UInt32 session;
+                if(!MumbleClient.UseLocalLoopBack)
+                    session = (uint)reader.ReadVarInt64();
                 Int64 sequence = reader.ReadVarInt64();
 
                 //We assume we mean OPUS
                 int size = (int)reader.ReadVarInt64();
+                //Debug.Log("Size " + size);
+                bool isLast = (size & 8192) == 8192;
+                if (isLast)
+                    Debug.Log("Found last byte in seq");
+
+                //Apply a bitmask to remove the bit that marks if this is the last packet
                 size &= 0x1fff;
 
-                //Debug.Log("Packet size is " + size);
+                //Debug.Log("Received sess: " + session);
+                //Debug.Log(" seq: " + sequence + " size = " + size + " packetLen: " + plainTextMessage.Length);
 
                 if (size == 0)
                     return;
 
                 byte[] data = reader.ReadBytes(size);
+
+                /*
+                Debug.Log("terminating with: "
+                    + data[data.Length - 6] + " "
+                    + data[data.Length - 5] + " "
+                    + data[data.Length - 4] + " "
+                    + data[data.Length - 3] + " "
+                    + data[data.Length - 2] + " "
+                    + data[data.Length - 1] + " "
+                    );
+                    */
 
                 if (data == null)
                     return;
@@ -143,7 +166,7 @@ namespace Mumble
         }
         internal void SendVoicePacket(byte[] voicePacket)
         {
-            Debug.Log("Sending UDP packet! Length = " + voicePacket.Length);
+            //Debug.Log("Sending UDP packet! Length = " + voicePacket.Length);
             byte[] encrypted = _cryptState.Encrypt(voicePacket, voicePacket.Length);
 
             _udpClient.Send(encrypted, encrypted.Length);
