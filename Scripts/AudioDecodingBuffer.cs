@@ -62,7 +62,10 @@ namespace Mumble {
         {
             //If the next seq we expect to decode comes after this packet we've already missed our opportunity!
             if (_nextSequenceToDecode > sequence)
+            {
+                Debug.LogWarning("Dropping packet number: " + sequence);
                 return;
+            }
 
             //Debug.Log("Adding encoded packet");
             //data[50] = (byte)3;
