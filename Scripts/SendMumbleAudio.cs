@@ -7,6 +7,8 @@ namespace Mumble
     {
         public int MicNumberToUse;
         public AudioClip TestingClipToUse;
+        public bool AlwaysSendAudio;
+        public KeyCode PushToTalkKeycode;
 
         const int NumRecordingSeconds = 24;
         const int NumSamples = NumRecordingSeconds * Constants.SAMPLE_RATE;
@@ -35,6 +37,8 @@ namespace Mumble
                 print("Device:  " + _currentMic + " has freq: " + minFreq + " to " + maxFreq);
             }
             _currentMic = Microphone.devices[MicNumberToUse];
+            if (AlwaysSendAudio)
+                StartSendingAudio();
         }
         void SendVoiceIfReady()
         {
@@ -69,25 +73,29 @@ namespace Mumble
                 _totalNumSamplesSent += _mumbleClient.NumSamplesPerFrame;
             }
         }
+        void StartSendingAudio()
+        {
+            _sendAudioClip = Microphone.Start(_currentMic, true, NumRecordingSeconds, Constants.SAMPLE_RATE);
+            _previousPosition = 0;
+            _numTimesLooped = 0;
+            _totalNumSamplesSent = 0;
+            isRecording = true;
+        }
+        void StopSendingAudio()
+        {
+            Microphone.End(_currentMic);
+            _mumbleClient.StopSendingVoice();
+            isRecording = false;
+        }
         void Update()
         {
             if (_mumbleClient == null || !_mumbleClient.ConnectionSetupFinished)
                 return;
 
-            if (Input.GetKeyDown(KeyCode.Space))
-            {
-                _sendAudioClip = Microphone.Start(_currentMic, true, NumRecordingSeconds, Constants.SAMPLE_RATE);
-                _previousPosition = 0;
-                _numTimesLooped = 0;
-                _totalNumSamplesSent = 0;
-                isRecording = true;
-            }
-            if (Input.GetKeyUp(KeyCode.Space))
-            {
-                Microphone.End(_currentMic);
-                _mumbleClient.StopSendingVoice();
-                isRecording = false;
-            }
+            if (Input.GetKeyDown(PushToTalkKeycode))
+                StartSendingAudio();
+            if (Input.GetKeyUp(PushToTalkKeycode))
+                StopSendingAudio();
             if (isRecording)
                 SendVoiceIfReady();
         }
