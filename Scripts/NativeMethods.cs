@@ -74,7 +74,7 @@ namespace Mumble
         private static extern int opus_decode(IntPtr decoder, IntPtr data, int len, IntPtr pcm, int frameSize, int decodeFec);
 
         [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int opus_decode_float(IntPtr decoder, IntPtr data, int len, IntPtr pcm, int frameSize, int decodeFec);
+        private static extern int opus_decode_float(IntPtr decoder, byte[] data, int len, float[] pcm, int frameSize, int decodeFec);
 
         [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void opus_decoder_destroy(IntPtr decoder);
@@ -127,77 +127,27 @@ namespace Mumble
             error = (OpusErrors)p;
             return res;
         }
-        internal static int opus_decode(IntPtr decoder, byte[] encodedData, float[] outputPcm, int outputOffset, int frameSize, int decodeFec, int channelCount)
+        internal static int opus_decode(IntPtr decoder, byte[] encodedData, float[] outputPcm, int frameSize, int decodeFec, int channelCount)
         {
             if (decoder == IntPtr.Zero)
             {
                 Debug.LogError("Encoder empty??");
                 return 0;
             }
+            //TODO use null to signify empty packet
             if(encodedData == null)
             {
                 Debug.LogError("Empty encoded packet?");
                 return 0;
             }
 
-            int length;
-            unsafe
-            {
-                fixed (float* bdec = outputPcm)
-                {
-                    var decodedPtr = (new IntPtr(bdec)).Add(outputOffset);// IntPtr.Add(new IntPtr(bdec), dstOffset);
-                    fixed (byte* bsrc = encodedData)
-                    {
-                        var srcPtr = (IntPtr)bsrc;
-                        length = NativeMethods.opus_decode_float(decoder, srcPtr, encodedData.Length, decodedPtr, outputPcm.Length, 0);
-                    }
-                }
-            }
-            return length;
-            /*
-            int byteSize = sizeof(ushort);
-            for (int i = 0; i < outputPcm.Length; i++)
-            {
-                if (Constants.IS_LITTLE_ENDIAN)
-                    Array.Reverse(dstBuffer, i * byteSize, byteSize);
-                outputPcm[i] = BitConverter.ToInt16(dstBuffer, i * byteSize);
-            }
+            //TODO Why is decode freq 0?
+            int length = NativeMethods.opus_decode_float(decoder, encodedData, encodedData.Length, outputPcm, outputPcm.Length / channelCount, decodeFec);
 
-            for (int i = 0; i < outputPcm.Length; i++)
-            {
-                outputPcm[i] = outputPcm[i] / 32768;
-            }
-
-            Debug.Log("output: "
-                + outputPcm[0]);
-            Debug.Log("in bytes: " + dstBuffer[0]);
+            if (length <= 0)
+                Debug.LogError("Encoding error: " + (OpusErrors)length);
 
             return length;
-            /*
-            int byteLength = opus_decode_float(decoder, encodedData, encodedData.Length, outputPcm, frameSize, decodeFec);
-            //Debug.Log("output PCM starts with: " + outputPcm[0]);
-
-            if (byteLength <= 0)
-                Debug.LogError("Encoding error: " + (OpusErrors)byteLength);
-
-            return byteLength;
-            
-            /*
-            short[] outputShorts = new short[outputPcm.Length];
-
-            int byteLength = opus_decode(decoder, encodedData, encodedData.Length, outputShorts, frameSize, decodeFec);
-
-            for(int i = 0; i < outputShorts.Length; i++)
-            {
-                outputPcm[i] = (float)outputShorts[i];
-            }
-            //Debug.Log("output PCM starts with: " + outputPcm[0]);
-
-            if (byteLength <= 0)
-                Debug.LogError("Encoding error: " + (OpusErrors)byteLength);
-
-            return byteLength;
-            */
         }
         #endregion
         #region enums

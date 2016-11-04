@@ -10,9 +10,9 @@ namespace Mumble
         readonly OpusDecoder _decoder = new OpusDecoder((int)Constants.SAMPLE_RATE, Constants.NUM_CHANNELS) { EnableForwardErrorCorrection = true };
         readonly OpusEncoder _encoder = new OpusEncoder((int)Constants.SAMPLE_RATE, Constants.NUM_CHANNELS) { EnableForwardErrorCorrection = true };
 
-        public int Decode(byte[] encodedData, float[] floatBuffer, int bufferLoadingIndex)
+        public int Decode(byte[] encodedData, float[] floatBuffer)
         {
-            return _decoder.Decode(encodedData, floatBuffer, bufferLoadingIndex);
+            return _decoder.Decode(encodedData, floatBuffer);
             /*
             if (encodedData == null)
             {

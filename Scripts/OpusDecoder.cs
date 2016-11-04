@@ -84,9 +84,9 @@ namespace Mumble
             }
         }
 
-        public int Decode(byte[] packetData, float[] floatBuffer, int bufferLoadingIndex)
+        public int Decode(byte[] packetData, float[] floatBuffer)
         {
-            return NativeMethods.opus_decode(_decoder, packetData, floatBuffer, bufferLoadingIndex, 2 * (int)(Constants.FRAME_SIZE * Constants.NUM_CHANNELS), _outputSampleRate, _outputChannelCount);
+            return NativeMethods.opus_decode(_decoder, packetData, floatBuffer, 2 * (int)(Constants.FRAME_SIZE * Constants.NUM_CHANNELS), 0, _outputChannelCount);
         }
 
         public static int GetChannels(byte[] srcEncodedBuffer)
