@@ -86,7 +86,7 @@ namespace Mumble {
         private int ReadFromBuffer(float[] dst, int offset, int count)
         {
             int currentBuffer = _readingOffset / SubBufferSize;
-            int numDecodedInCurrentBuffer = _decodedCount;// SubBufferSize - _decodedCount % SubBufferSize;
+            int numDecodedInCurrentBuffer = _decodedCount % _numSamplesInBuffer[currentBuffer];// SubBufferSize - _decodedCount % SubBufferSize;
             int currentBufferOffset = _numSamplesInBuffer[currentBuffer] - numDecodedInCurrentBuffer;
 
             //Copy as much data as we can from the buffer up to the limit

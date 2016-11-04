@@ -15,7 +15,9 @@ namespace Mumble
         public const int PING_INTERVAL = 5000;//5 seconds
         //TODO experiment with this
         public const int USE_FORWARD_ERROR_CORRECTION = 0;
-        public const int MAX_FRAMES_PER_PACKET = 6;//Should probably be 12, but I'm hesitant to double the buffer for everyone to support a rare case
+        //Should probably be 12, but I'm hesitant to double the buffer for everyone to support a rare case
+        //TODO make the buffer size scale
+        public const int MAX_FRAMES_PER_PACKET = 6;
         public const int NUM_CHANNELS = 1;
     }
 }
