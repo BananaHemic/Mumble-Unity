@@ -127,7 +127,7 @@ namespace Mumble
             error = (OpusErrors)p;
             return res;
         }
-        internal static int opus_decode(IntPtr decoder, byte[] encodedData, float[] outputPcm, int frameSize, int decodeFec, int channelCount)
+        internal static int opus_decode(IntPtr decoder, byte[] encodedData, float[] outputPcm, int frameSize, int channelCount)
         {
             if (decoder == IntPtr.Zero)
             {
@@ -141,8 +141,7 @@ namespace Mumble
                 return 0;
             }
 
-            //TODO Why is decode freq 0?
-            int length = NativeMethods.opus_decode_float(decoder, encodedData, encodedData.Length, outputPcm, outputPcm.Length / channelCount, decodeFec);
+            int length = NativeMethods.opus_decode_float(decoder, encodedData, encodedData.Length, outputPcm, outputPcm.Length / channelCount, Constants.USE_FORWARD_ERROR_CORRECTION);
 
             if (length <= 0)
                 Debug.LogError("Encoding error: " + (OpusErrors)length);

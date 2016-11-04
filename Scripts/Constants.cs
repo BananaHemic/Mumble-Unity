@@ -13,6 +13,8 @@ namespace Mumble
         public const float MAX_LATENCY_SECONDS = 0.5f;
         public const bool IS_LITTLE_ENDIAN = false;
         public const int PING_INTERVAL = 5000;//5 seconds
+        //TODO experiment with this
+        public const int USE_FORWARD_ERROR_CORRECTION = 0;
         public const int NUM_CHANNELS = 1;
     }
 }

@@ -1,6 +1,11 @@
 ﻿/*
+ * AudioDecodingBuffer
+ * Buffers up encoded audio packets and provides a constant stream of sound (silence if there is no more audio to decode)
+ * This works by having a buffer with N sub-buffers, each of the size of a PCM frame. When Read, this copys the buffer data into the passed array
+ * and, if there are no more decoded data, calls Opus to decode the sample
  * 
  * TODO This is decoding audio data on the main thread. We should make decoding happen in a separate thread
+ * TODO Use the sequence number in error correcting
  */
 using System;
 using System.Collections.Generic;
@@ -8,16 +13,22 @@ using System.Text;
 using UnityEngine;
 
 namespace Mumble {
-    /// <summary>
-    /// Buffers up encoded audio packets and provides a constant stream of sound (silence if there is no more audio to decode)
-    /// </summary>
     public class AudioDecodingBuffer
     {
+        /// <summary>
+        /// How many samples have been decoded
+        /// </summary>
         private int _decodedCount;
+        /// <summary>
+        /// How far along the decoded buffer, in units of numbers of samples,
+        /// have currently been read
+        /// </summary>
         private int _readingOffset;
-        private int _nextBufferToReadInto;
+        /// <summary>
+        /// The index of the next sub-buffer to decode into
+        /// </summary>
+        private int _nextBufferToDecodeInto;
         private float[][] _decodedBuffer = new float[NumDecodedSubBuffers][];
-
         private long _nextSequenceToDecode;
         private readonly List<BufferPacket> _encodedBuffer = new List<BufferPacket>();
         private readonly OpusCodec _codec;
@@ -30,11 +41,11 @@ namespace Mumble {
         }
         float[] NextBufferToDecodeInto()
         {
-            int nextSubBufferToFill = _nextBufferToReadInto++;
-            if (_nextBufferToReadInto == NumDecodedSubBuffers)
-                _nextBufferToReadInto = 0;
-            //Debug.Log("Next buffer num: " + nextSubBufferToFill);
-            //Debug.Log("Next buffer is: " + _decodedBuffer[nextSubBufferToFill]);
+            int nextSubBufferToFill = _nextBufferToDecodeInto++;
+            //Make sure we don't go over our max number of buffers
+            if (_nextBufferToDecodeInto == NumDecodedSubBuffers)
+                _nextBufferToDecodeInto = 0;
+
             if (_decodedBuffer[nextSubBufferToFill] == null)
                 _decodedBuffer[nextSubBufferToFill] = new float[SubBufferSize];
 
@@ -43,8 +54,8 @@ namespace Mumble {
         public int Read(float[] buffer, int offset, int count)
         {
             //Debug.Log("We now have " + _encodedBuffer.Count + " encoded packets");
+            //Debug.LogWarning("Will read");
 
-            Debug.LogWarning("Will read");
             int readCount = 0;
             while (readCount < count)
             {
@@ -54,13 +65,9 @@ namespace Mumble {
                     break;
             }
 
+            //Return silence if there was no data available
             if (readCount == 0)
-            {
-                //Return silence
-                //Debug.Log("Loading silence");
                 Array.Clear(buffer, offset, count);
-            }
-
             return readCount;
         }
 
@@ -95,6 +102,7 @@ namespace Mumble {
 
             //Copy as much data as we can from the buffer up to the limit
             int readCount = Math.Min(count, numDecodedInCurrentBuffer);
+            /*
             Debug.Log("Reading " + readCount
                 + " starting at " + currentBufferOffset
                 + " starting at overall " + _readingOffset
@@ -103,13 +111,9 @@ namespace Mumble {
                 + " with in curr buff " + numDecodedInCurrentBuffer
                 + " out of " + _decodedBuffer[currentBuffer].Length
                 + " with " + _decodedCount);
+                */
             if (readCount == 0)
                 return 0;
-            int numZerosRead = 0;
-            for (int i = 0; i < readCount; i++)
-                if (_decodedBuffer[currentBuffer][currentBufferOffset + i] == 0)
-                    numZerosRead++;
-            Debug.Log("Loaded " + numZerosRead + " zeros");
 
             Array.Copy(_decodedBuffer[currentBuffer], currentBufferOffset, dst, offset, readCount);
             _decodedCount -= readCount;
@@ -132,32 +136,10 @@ namespace Mumble {
             if (!packet.HasValue)
                 return false;
 
-            float[] ray = NextBufferToDecodeInto();
-            //Debug.Log("Decode into " + ray + " len " + ray.Length);
-            int numRead = _codec.Decode(packet.Value.Data, ray);
-
-            /*
-            int numZero = 0;
-            for (int i = 0; i < numRead; i++) {
-                if (_decodedBuffer[_nextSubBufferToFill + _decodedCount + i] == 0)
-                    numZero++;
-            }
-            int numPacketZero = 0;
-            for (int i = 0; i < packet.Value.Data.Length; i++) {
-                if (packet.Value.Data[i] == 0)
-                    numPacketZero++;
-            }
-
-            Debug.Log("Decoded " + numZero + " zero! Out of " + numRead
-                + " from " + packet.Value.Data.Length + " with " + numPacketZero + " zeros in the packet"
-                + " starting at " + (_nextSubBufferToFill + _decodedCount));
-            */
-            //Debug.Log("Just decoded: " + numRead + " samples");
-            //Debug.Log("Decoded data starts with: " + _decodedBuffer[_decodedOffset + 1]);
+            int numRead = _codec.Decode(packet.Value.Data, NextBufferToDecodeInto());
+            _decodedCount += numRead;
 
             _nextSequenceToDecode = packet.Value.Sequence + numRead / Constants.FRAME_SIZE;
-
-            _decodedCount += numRead;
             return true;
 
             ////todo: _nextSequenceToDecode calculation is wrong, which causes this to happen for almost every packet!
