@@ -47,29 +47,47 @@ namespace Mumble
             {
                 IsBackground = true
             };
-            
         }
 
         internal void StartClient(string username, string password)
         {
-            ConnectViaTcp();
-            uint major = 1;
-            uint minor = 2;
-            uint patch = 8;
+            _username = username;
+            _password = password;
+            _tcpClient.BeginConnect(_host.Address, _host.Port, new AsyncCallback(OnTcpConnected), null);
+        }
+        private void OnTcpConnected(IAsyncResult connectionResult)
+        {
+            if (!_tcpClient.Connected)
+                throw new Exception("Failed to connect");
 
+            NetworkStream networkStream = _tcpClient.GetStream();
+            _ssl = new SslStream(networkStream, false, ValidateCertificate);
+            _ssl.AuthenticateAsClient(_hostname);
+            _reader = new BinaryReader(_ssl);
+            _writer = new BinaryWriter(_ssl);
+
+            DateTime startWait = DateTime.Now;
+            while (!_ssl.IsAuthenticated)
+            {
+                if (DateTime.Now - startWait > TimeSpan.FromSeconds(2))
+                    throw new TimeoutException("Time out waiting for SSL authentication");
+            }
+            SendVersion();
+            StartPingTimer();
+        }
+        private void SendVersion()
+        {
             var version = new Version
             {
-                release = "UnityMumble",
-                version = (major << 16) | (minor << 8) | (patch),
+                release = MumbleClient.ReleaseName,
+                version = (MumbleClient.Major << 16) | (MumbleClient.Minor << 8) | (MumbleClient.Patch),
                 os = Environment.OSVersion.ToString(),
                 os_version = Environment.OSVersion.VersionString,
             };
-            Debug.Log("version = " + version.version);
             SendMessage(MessageType.Version, version);
-
-            _username = username;
-            _password = password;
-
+        }
+        private void StartPingTimer()
+        {
             // Keepalive, if the Mumble server doesn't get a message 
             // for 30 seconds it will close the connection
             _tcpTimer = new System.Timers.Timer(Constants.PING_INTERVAL);
@@ -85,10 +103,6 @@ namespace Mumble
                 if(mt != MessageType.Ping)
                 Debug.Log("Sending " + mt + " message");
                 //_writer.Write(IPAddress.HostToNetworkOrder((Int16) mt));
-                //Debug.Log("Can SSL read? " + _ssl.CanRead);
-                //Debug.Log("Can SSL write? " + _ssl.CanWrite);
-                //Debug.Log("Is authenticated? " + _ssl.IsAuthenticated);
-                //Debug.Log("Is encrypted? " + _ssl.IsEncrypted);
                 //Serializer.SerializeWithLengthPrefix(_ssl, message, PrefixStyle.Fixed32BigEndian);
 
                 if (mt == MessageType.TextMessage && message is TextMessage)
@@ -117,27 +131,6 @@ namespace Mumble
             }
         }
 
-        internal void ConnectViaTcp()
-        {
-//            _tcpClient.BeginConnect()
-            _tcpClient.Connect(_host); 
-            NetworkStream networkStream = _tcpClient.GetStream();
-            _ssl = new SslStream(networkStream, false, ValidateCertificate);
-            _ssl.AuthenticateAsClient(_hostname);
-            _reader = new BinaryReader(_ssl);
-            _writer = new BinaryWriter(_ssl);
-
-            DateTime startWait = DateTime.Now;
-            while (!_ssl.IsAuthenticated)
-            {
-                if (DateTime.Now - startWait > TimeSpan.FromSeconds(2))
-                {
-//                    _logger.Error("Time out waiting for SSL authentication");
-                    throw new TimeoutException("Time out waiting for SSL authentication");
-                }
-            }
-//            _logger.Debug("TCP connection established");
-        }
 
         private bool ValidateCertificate(object sender, X509Certificate certificate, X509Chain chain,
             SslPolicyErrors errors)
@@ -206,7 +199,7 @@ namespace Mumble
                         _mc.ServerConfig = Serializer.DeserializeWithLengthPrefix<ServerConfig>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         //Debug.Log("Sever config = " + _mc.ServerConfig);
-                        //Debug.LogWarning("Connected!");
+                        Debug.LogWarning("Connected!");
                         _validConnection = true; // handshake complete
                         break;
                     case MessageType.SuggestConfig:

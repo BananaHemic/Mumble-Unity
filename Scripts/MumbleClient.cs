@@ -16,7 +16,7 @@ namespace Mumble
         /// This sets if we're going to listen to our own audio
         public static readonly bool UseLocalLoopBack = false;
         // This sets if we send synthetic audio instead of a mic audio
-        public static readonly bool UseSyntheticMic = true;
+        public static readonly bool UseSyntheticMic = false;
 
         public bool ConnectionSetupFinished { get; internal set; }
 
@@ -39,6 +39,12 @@ namespace Mumble
         private OpusCodec _codec;
 
         public int NumSamplesPerFrame { get; private set; }
+
+        //The Mumble version of this integration
+        public const string ReleaseName = "MumbleUnity";
+        public const uint Major = 1;
+        public const uint Minor = 2;
+        public const uint Patch = 8;
 
         public MumbleClient(String hostName, int port)
         {
@@ -81,18 +87,15 @@ namespace Mumble
 
         public void Connect(string username, string password)
         {
-//            logger.Debug("Connecting via TCP");
             _mtc.StartClient(username, password);
         }
 
         internal void ConnectUdp()
         {
-//            logger.Debug("Connecting via UDP");
             _muc.Connect();
         }
         public void Close()
         {
-            //TODO actually tell the server we're not online, right now we rely on the connection expiring
             _mtc.Close();
             _muc.Close();
             _manageSendBuffer.Dispose();
