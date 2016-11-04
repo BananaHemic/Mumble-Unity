@@ -240,8 +240,6 @@ namespace Mumble
                     case MessageType.Ping:
                         var ping = Serializer.DeserializeWithLengthPrefix<MumbleProto.Ping>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-//                        _logger.Debug("Received ping: " + ping.timestamp + ", udp: " + ping.udp_packets + ", tcp:" +
-//                                     ping.tcp_packets);
                         break;
                     case MessageType.Reject:
                         var reject = Serializer.DeserializeWithLengthPrefix<Reject>(_ssl,

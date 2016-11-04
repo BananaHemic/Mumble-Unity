@@ -7,7 +7,6 @@ namespace Mumble
 {
         public class User: IEquatable<User>
     {
-        //private readonly BasicMumbleProtocol _owner;
         private readonly OpusCodec _codec;
 
         public UInt32 Id { get; private set; }
@@ -37,8 +36,6 @@ namespace Mumble
 
         public string Name { get; set; }
         public string Comment { get; set; }
-
-        //private readonly CodecSet _codecs = new CodecSet();
 
         public User(uint id, OpusCodec codec)
         {

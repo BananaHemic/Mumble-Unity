@@ -4,7 +4,6 @@
  */
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using UnityEngine;
 
@@ -52,31 +51,6 @@ namespace Mumble {
             return readCount;
         }
 
-        /// <summary>
-        /// Add a new packet of encoded data
-        /// </summary>
-        /// <param name="sequence">Sequence number of this packet</param>
-        /// <param name="data">The encoded audio packet</param>
-        /// <param name="codec">The codec to use to decode this packet</param>
-        public void AddEncodedPacket(long sequence, byte[] data)
-        {
-            //If the next seq we expect to decode comes after this packet we've already missed our opportunity!
-            if (_nextSequenceToDecode > sequence)
-            {
-                Debug.LogWarning("Dropping packet number: " + sequence);
-                return;
-            }
-
-            //Debug.Log("Adding encoded packet");
-            //data[50] = (byte)3;
-
-            //Array.Reverse(data);
-            _encodedBuffer.Add(new BufferPacket
-            {
-                Data = data,
-                Sequence = sequence
-            });
-        }
 
         private BufferPacket? GetNextEncodedData()
         {
@@ -150,31 +124,27 @@ namespace Mumble {
             ////Decode a null to indicate a dropped packet
             //if (packet.Value.Sequence != _nextSequenceToDecode)
             //    _codec.Decode(null);
+        }
+        /// <summary>
+        /// Add a new packet of encoded data
+        /// </summary>
+        /// <param name="sequence">Sequence number of this packet</param>
+        /// <param name="data">The encoded audio packet</param>
+        /// <param name="codec">The codec to use to decode this packet</param>
+        public void AddEncodedPacket(long sequence, byte[] data)
+        {
+            //If the next seq we expect to decode comes after this packet we've already missed our opportunity!
+            if (_nextSequenceToDecode > sequence)
+            {
+                Debug.LogWarning("Dropping packet number: " + sequence);
+                return;
+            }
 
-            /*
-            Debug.Log("packet data starts with "
-                + " " + packet.Value.Data[0]
-                + " " + packet.Value.Data[1]
-                + " " + packet.Value.Data[2]
-                + " " + packet.Value.Data[3]
-                + " " + packet.Value.Data[4]
-                + " " + packet.Value.Data[5]
-                + " " + packet.Value.Data[6]
-                + " " + packet.Value.Data[7]
-                );
-                */
-            /*
-            Debug.Log("Post decode, packet starts with "
-                + " " + d[0]
-                + " " + d[1]
-                + " " + d[2]
-                + " " + d[3]
-                + " " + d[4]
-                + " " + d[5]
-                + " " + d[6]
-                + " " + d[7]
-                );
-                */
+            _encodedBuffer.Add(new BufferPacket
+            {
+                Data = data,
+                Sequence = sequence
+            });
         }
 
         private struct BufferPacket

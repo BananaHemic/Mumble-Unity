@@ -97,9 +97,8 @@ namespace Mumble
         internal void UnpackOpusVoicePacket(byte[] plainTextMessage)
         {
             byte typeByte = plainTextMessage[0];
-            int type = typeByte >> 5 & 0x7;
             int target = typeByte & 31;
-            //Debug.Log("byte = " + typeByte + " type = " + type + " target = " + target);
+
             using (var reader = new UdpPacketReader(new MemoryStream(plainTextMessage, 1, plainTextMessage.Length - 1)))
             {
                 UInt32 session;
