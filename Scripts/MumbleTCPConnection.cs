@@ -92,7 +92,7 @@ namespace Mumble
             // for 30 seconds it will close the connection
             _tcpTimer = new System.Timers.Timer(Constants.PING_INTERVAL);
             _tcpTimer.Elapsed += SendPing;
-            _tcpTimer.Enabled = true;
+            _tcpTimer.Enabled = true; 
             _processThread.Start();
         }
 
@@ -131,7 +131,7 @@ namespace Mumble
             }
         }
 
-
+        //TODO implement actual certificate validation
         private bool ValidateCertificate(object sender, X509Certificate certificate, X509Chain chain,
             SslPolicyErrors errors)
         {
@@ -143,7 +143,7 @@ namespace Mumble
             try
             {
                 var messageType = (MessageType) IPAddress.NetworkToHostOrder(_reader.ReadInt16());
-                //Debug.Log("Processing data of type: " + messageType);
+                Debug.Log("Processing data of type: " + messageType);
 
                 switch (messageType)
                 {
@@ -181,18 +181,17 @@ namespace Mumble
                         //Debug.Log("Permission Query = " + _mc.PermissionQuery);
                         break;
                     case MessageType.UserState:
-                        //This is called for every user in the room, I don't really understand why we'd be setting the
-                        //Mumble Client User State each time...
+                        //This is called for every user in the room
                         //TODO add support for multiple users
                         _mc.UserState = Serializer.DeserializeWithLengthPrefix<UserState>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                       // Debug.Log("User State Actor= " + _mc.UserState.actor);
-                        //Debug.Log("User State Session= " + _mc.UserState.session);
+                        Debug.Log("User State Actor= " + _mc.UserState.actor);
+                        Debug.Log("User State Session= " + _mc.UserState.session);
                         break;
                     case MessageType.ServerSync:
                         _mc.ServerSync = Serializer.DeserializeWithLengthPrefix<ServerSync>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        //Debug.Log("Server Sync Session= " + _mc.ServerSync.session);
+                        Debug.Log("Server Sync Session= " + _mc.ServerSync.session);
                         _mc.ConnectionSetupFinished = true;
                         break;
                     case MessageType.ServerConfig:
@@ -203,12 +202,10 @@ namespace Mumble
                         _validConnection = true; // handshake complete
                         break;
                     case MessageType.SuggestConfig:
+                        //Contains suggested configuratio options from the server
+                        //like whether to send positional data, client version, etc.
                         var config = Serializer.DeserializeWithLengthPrefix<SuggestConfig>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        /*Debug.Log("Suggested positional is: " + config.positional
-                            + " push-to-talk: " + config.push_to_talk
-                            + " version: " + config.version);
-                            */
                         break;
                     case MessageType.TextMessage:
                         TextMessage textMessage = Serializer.DeserializeWithLengthPrefix<TextMessage>(_ssl,
@@ -240,18 +237,22 @@ namespace Mumble
                         _validConnection = false;
                         _errorCallback("Mumble server reject: " + reject.reason, true);
                         break;
+                    case MessageType.UserRemove:
+                        var removal = Serializer.DeserializeWithLengthPrefix<UserRemove>(_ssl,
+                            PrefixStyle.Fixed32BigEndian);
+                        Debug.Log("Removing " + removal.actor);
+                        break;
                     default:
                         _errorCallback("Message type " + messageType + " not implemented", true);
                         break;
                 }
             }
-            catch (EndOfStreamException ex)
+            catch (Exception ex)
             {
-                Debug.LogError("EOS Exception: " + ex);
-            }
-            catch (Exception e)
-            {
-                Debug.LogError("Unhandled error: " + e);
+                if(ex is EndOfStreamException)
+                    Debug.LogError("EOS Exception: " + ex);
+                else
+                    Debug.LogError("Unhandled error: " + ex);
             }
 
             //Get the next response
@@ -267,18 +268,14 @@ namespace Mumble
                 _mc.ConnectUdp();
             }
             else if(cryptSetup.server_nonce != null)
-            {
                 _updateOcbServerNonce(cryptSetup.server_nonce);
-            }
             else
-            {
                 SendMessage(MessageType.CryptSetup, new CryptSetup { client_nonce = _mc.GetLatestClientNonce() });
-
-            }
         }
 
         internal void Close()
         {
+            Debug.Log("Closing");
             _ssl.Close();
             _tcpTimer.Close();
             _processThread.Abort();
@@ -291,10 +288,9 @@ namespace Mumble
         {
             if (_validConnection)
             {
-                //Debug.Log("Sending TCP ping");
                 var ping = new MumbleProto.Ping();
                 ping.timestamp = (ulong) (DateTime.UtcNow.Ticks - DateTime.Parse("01/01/1970 00:00:00").Ticks);
-//                _logger.Debug("Sending TCP ping with timestamp: " + ping.timestamp);
+                Debug.Log("Sending ping");
                 SendMessage(MessageType.Ping, new MumbleProto.Ping());
             }
         }
