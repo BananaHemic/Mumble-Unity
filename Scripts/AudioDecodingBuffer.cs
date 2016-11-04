@@ -28,28 +28,17 @@ namespace Mumble {
         /// The index of the next sub-buffer to decode into
         /// </summary>
         private int _nextBufferToDecodeInto;
-        private float[][] _decodedBuffer = new float[NumDecodedSubBuffers][];
+        private readonly float[][] _decodedBuffer = new float[NumDecodedSubBuffers][];
+        private readonly int[] _numSamplesInBuffer = new int[NumDecodedSubBuffers];
         private long _nextSequenceToDecode;
         private readonly List<BufferPacket> _encodedBuffer = new List<BufferPacket>();
         private readonly OpusCodec _codec;
         const int NumDecodedSubBuffers = (int)(Constants.MAX_LATENCY_SECONDS * (Constants.SAMPLE_RATE / Constants.FRAME_SIZE));
-        const int SubBufferSize = Constants.FRAME_SIZE;
+        const int SubBufferSize = Constants.FRAME_SIZE * Constants.MAX_FRAMES_PER_PACKET;
 
         public AudioDecodingBuffer(OpusCodec codec)
         {
             _codec = codec;
-        }
-        float[] NextBufferToDecodeInto()
-        {
-            int nextSubBufferToFill = _nextBufferToDecodeInto++;
-            //Make sure we don't go over our max number of buffers
-            if (_nextBufferToDecodeInto == NumDecodedSubBuffers)
-                _nextBufferToDecodeInto = 0;
-
-            if (_decodedBuffer[nextSubBufferToFill] == null)
-                _decodedBuffer[nextSubBufferToFill] = new float[SubBufferSize];
-
-            return _decodedBuffer[nextSubBufferToFill];
         }
         public int Read(float[] buffer, int offset, int count)
         {
@@ -98,11 +87,11 @@ namespace Mumble {
         {
             int currentBuffer = _readingOffset / SubBufferSize;
             int numDecodedInCurrentBuffer = _decodedCount;// SubBufferSize - _decodedCount % SubBufferSize;
-            int currentBufferOffset = SubBufferSize - numDecodedInCurrentBuffer;
+            int currentBufferOffset = _numSamplesInBuffer[currentBuffer] - numDecodedInCurrentBuffer;
 
             //Copy as much data as we can from the buffer up to the limit
             int readCount = Math.Min(count, numDecodedInCurrentBuffer);
-            /*
+            
             Debug.Log("Reading " + readCount
                 + " starting at " + currentBufferOffset
                 + " starting at overall " + _readingOffset
@@ -111,13 +100,17 @@ namespace Mumble {
                 + " with in curr buff " + numDecodedInCurrentBuffer
                 + " out of " + _decodedBuffer[currentBuffer].Length
                 + " with " + _decodedCount);
-                */
+                
             if (readCount == 0)
                 return 0;
 
             Array.Copy(_decodedBuffer[currentBuffer], currentBufferOffset, dst, offset, readCount);
             _decodedCount -= readCount;
             _readingOffset += readCount;
+
+            //If we hit the end of a subbuffer, move the offset by all the empty samples
+            if (readCount == numDecodedInCurrentBuffer)
+                _readingOffset += SubBufferSize - _numSamplesInBuffer[currentBuffer];
 
             //If we hit the end of the buffer, lap over
             if (_readingOffset == SubBufferSize * NumDecodedSubBuffers)
@@ -136,10 +129,21 @@ namespace Mumble {
             if (!packet.HasValue)
                 return false;
 
-            int numRead = _codec.Decode(packet.Value.Data, NextBufferToDecodeInto());
-            _decodedCount += numRead;
+            if (_decodedBuffer[_nextBufferToDecodeInto] == null)
+                _decodedBuffer[_nextBufferToDecodeInto] = new float[SubBufferSize];
 
+            int numRead = _codec.Decode(packet.Value.Data, _decodedBuffer[_nextBufferToDecodeInto]);
+
+            if (numRead < 0)
+                return false;
+
+            _decodedCount += numRead;
+            _numSamplesInBuffer[_nextBufferToDecodeInto] = numRead;
             _nextSequenceToDecode = packet.Value.Sequence + numRead / Constants.FRAME_SIZE;
+            _nextBufferToDecodeInto++;
+            //Make sure we don't go over our max number of buffers
+            if (_nextBufferToDecodeInto == NumDecodedSubBuffers)
+                _nextBufferToDecodeInto = 0;
             return true;
 
             ////todo: _nextSequenceToDecode calculation is wrong, which causes this to happen for almost every packet!

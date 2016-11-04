@@ -161,7 +161,7 @@ namespace Mumble
         {
             Ok = 0,
             BadArgument = -1,
-            BufferToSmall = -2,
+            BufferTooSmall = -2,
             InternalError = -3,
             InvalidPacket = -4,
             NotImplemented = -5,
