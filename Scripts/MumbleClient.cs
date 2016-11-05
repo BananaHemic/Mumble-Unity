@@ -3,8 +3,9 @@ using System.Net;
 using MumbleProto;
 using Version = MumbleProto.Version;
 using UnityEngine;
-using System.Linq;
 using System.Threading;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Mumble
 {
@@ -20,17 +21,16 @@ namespace Mumble
 
         public bool ConnectionSetupFinished { get; internal set; }
 
-
         private MumbleTcpConnection _mtc;
         private MumbleUdpConnection _muc;
         private ManageAudioSendBuffer _manageSendBuffer;
-        private User oneUser;
-
+        private Dictionary<uint, UserState> AllUsers = new Dictionary<uint, UserState>();
+        private readonly AudioDecodingBuffer _audioDecodingBuffer;
 
         internal Version RemoteVersion { get; set; }
         internal CryptSetup CryptSetup { get; set; }
         internal ChannelState ChannelState { get; set; }
-        internal UserState UserState { get; set; }
+        internal UserState OurUserState { get; set; }
         internal ServerSync ServerSync { get; set; }
         internal CodecVersion CodecVersion { get; set; }
         internal PermissionQuery PermissionQuery { get; set; }
@@ -65,10 +65,17 @@ namespace Mumble
             //Use 20ms samples
             NumSamplesPerFrame = _codec.PermittedEncodingFrameSizes.ElementAt(_codec.PermittedEncodingFrameSizes.Count() - 4);
 
-            oneUser = new User(17, _codec);
             _manageSendBuffer = new ManageAudioSendBuffer(_codec, _muc);
+            _audioDecodingBuffer = new AudioDecodingBuffer(_codec);
         }
-
+        internal void AddUser(UserState newUserState)
+        {
+            AllUsers.Add(newUserState.session, newUserState);
+        }
+        internal void RemoveUser(uint removedUserSession)
+        {
+            AllUsers.Remove(removedUserSession);
+        }
         private void DealWithError(string message, bool fatal)
         {
             if (fatal)
@@ -99,7 +106,7 @@ namespace Mumble
             _mtc.Close();
             _muc.Close();
             _manageSendBuffer.Dispose();
-            Debug.Log("Closing all connections");
+            _manageSendBuffer = null;
         }
 
         public void SendTextMessage(string textMessage)
@@ -119,6 +126,15 @@ namespace Mumble
         {
             _manageSendBuffer.SendVoice(floatData, SpeechTarget.Normal, 0);
         }
+        public void ReceiveEncodedVoice(byte[] data, long sequence)
+        {
+            Debug.Log("Adding packet");
+            _audioDecodingBuffer.AddEncodedPacket(sequence, data);
+        }
+        public void LoadArrayWithVoiceData(float[] pcmArray, int offset, int length)
+        {
+            _audioDecodingBuffer.Read(pcmArray, offset, length);
+        }
         /// <summary>
         /// Tell the encoder to send the last audio packet, then reset the sequence number
         /// </summary>
@@ -129,10 +145,6 @@ namespace Mumble
         public byte[] GetLatestClientNonce()
         {
             return _muc.GetLatestClientNonce();
-        }
-        public User GetUserAtTarget(int target)
-        {
-            return oneUser;
         }
     }
 }

@@ -124,22 +124,10 @@ namespace Mumble
 
                 byte[] data = reader.ReadBytes(size);
 
-                /*
-                Debug.Log("terminating with: "
-                    + data[data.Length - 6] + " "
-                    + data[data.Length - 5] + " "
-                    + data[data.Length - 4] + " "
-                    + data[data.Length - 3] + " "
-                    + data[data.Length - 2] + " "
-                    + data[data.Length - 1] + " "
-                    );
-                    */
-
                 if (data == null)
                     return;
 
-                //Use session here
-                _mc.GetUserAtTarget(17).ReceiveEncodedVoice(data, sequence);
+                _mc.ReceiveEncodedVoice(data, sequence);
             }
         }
         internal void SendPing()
@@ -149,9 +137,7 @@ namespace Mumble
             var dgram = new byte[9];
             timeBytes.CopyTo(dgram, 1);
             dgram[0] = (1 << 5);
-//            logger.Debug("Sending UDP ping with timestamp: " + unixTimeStamp);
             var encryptedData = _cryptState.Encrypt(dgram, timeBytes.Length + 1);
-            //            var encryptedData = ocb.Encrypt(dgram, timeBytes.Length + 1);
 
             //Debug.Log("Sending UDP ping");
             _udpClient.Send(encryptedData, encryptedData.Length);

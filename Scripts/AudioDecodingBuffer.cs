@@ -43,7 +43,7 @@ namespace Mumble {
         public int Read(float[] buffer, int offset, int count)
         {
             //Debug.Log("We now have " + _encodedBuffer.Count + " encoded packets");
-            Debug.LogWarning("Will read");
+            //Debug.LogWarning("Will read");
 
             int readCount = 0;
             while (readCount < count)
@@ -53,11 +53,11 @@ namespace Mumble {
                 else if (!FillBuffer())
                     break;
             }
-            Debug.LogWarning("Done reading");
+
             //Return silence if there was no data available
             if (readCount == 0)
             {
-                Debug.Log("Returning silence");
+                //Debug.Log("Returning silence");
                 Array.Clear(buffer, offset, count);
             }
             return readCount;

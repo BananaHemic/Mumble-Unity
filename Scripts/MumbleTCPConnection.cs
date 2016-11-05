@@ -143,7 +143,7 @@ namespace Mumble
             try
             {
                 var messageType = (MessageType) IPAddress.NetworkToHostOrder(_reader.ReadInt16());
-                Debug.Log("Processing data of type: " + messageType);
+                //Debug.Log("Processing data of type: " + messageType);
 
                 switch (messageType)
                 {
@@ -183,10 +183,12 @@ namespace Mumble
                     case MessageType.UserState:
                         //This is called for every user in the room
                         //TODO add support for multiple users
-                        _mc.UserState = Serializer.DeserializeWithLengthPrefix<UserState>(_ssl,
+                        _mc.OurUserState = Serializer.DeserializeWithLengthPrefix<UserState>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        Debug.Log("User State Actor= " + _mc.UserState.actor);
-                        Debug.Log("User State Session= " + _mc.UserState.session);
+                        Debug.Log("User State Actor= " + _mc.OurUserState.actor);
+                        Debug.Log("User State Session= " + _mc.OurUserState.session);
+                        Debug.Log("User State User ID= " + _mc.OurUserState.user_id);
+                        Debug.Log("User State User ID= " + _mc.OurUserState.plugin_identity);
                         break;
                     case MessageType.ServerSync:
                         _mc.ServerSync = Serializer.DeserializeWithLengthPrefix<ServerSync>(_ssl,
@@ -213,7 +215,7 @@ namespace Mumble
                         
                         Debug.Log("Text message = " + textMessage.message);
                         Debug.Log("Text actor = " + textMessage.actor);
-                        Debug.Log("Text channel = " + textMessage.channel_id[0]);
+                        //Debug.Log("Text channel = " + textMessage.channel_id[0]);
                         Debug.Log("Text session Length = " + textMessage.session.Count);
                         Debug.Log("Text Tree Length = " + textMessage.tree_id.Count);
                         break;
@@ -240,7 +242,8 @@ namespace Mumble
                     case MessageType.UserRemove:
                         var removal = Serializer.DeserializeWithLengthPrefix<UserRemove>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        Debug.Log("Removing " + removal.actor);
+                        Debug.Log("Removing " + removal.session);
+                        _mc.RemoveUser(removal.session);
                         break;
                     default:
                         _errorCallback("Message type " + messageType + " not implemented", true);
@@ -275,7 +278,6 @@ namespace Mumble
 
         internal void Close()
         {
-            Debug.Log("Closing");
             _ssl.Close();
             _tcpTimer.Close();
             _processThread.Abort();
@@ -290,7 +292,7 @@ namespace Mumble
             {
                 var ping = new MumbleProto.Ping();
                 ping.timestamp = (ulong) (DateTime.UtcNow.Ticks - DateTime.Parse("01/01/1970 00:00:00").Ticks);
-                Debug.Log("Sending ping");
+                //Debug.Log("Sending ping");
                 SendMessage(MessageType.Ping, new MumbleProto.Ping());
             }
         }

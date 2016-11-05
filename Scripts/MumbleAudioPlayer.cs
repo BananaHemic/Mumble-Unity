@@ -6,10 +6,9 @@ namespace Mumble {
     [RequireComponent(typeof(AudioSource))]
     public class MumbleAudioPlayer : MonoBehaviour {
 
+        private MumbleClient _mumbleClient;
         private AudioSource Source;
         private AudioClip _clip;
-        private MumbleClient _mumbleClient;
-        private User _mumbleUser;
         private int _position = 0;
 
         const int SampleLengthSeconds = 1;
@@ -21,17 +20,16 @@ namespace Mumble {
             Source.clip = _clip;
             Source.Play();
         }
-        public void SetMumbleClient(MumbleClient mumbleClient)
+        public void Initialize(MumbleClient mumbleClient)
         {
             _mumbleClient = mumbleClient;
-            _mumbleUser = _mumbleClient.GetUserAtTarget(17);
         }
         void OnAudioRead(float[] data)
         {
-            if (_mumbleClient == null || _mumbleUser == null || !_mumbleClient.ConnectionSetupFinished)
+            if (_mumbleClient == null || !_mumbleClient.ConnectionSetupFinished)
                 return;
 
-            _mumbleUser.Voice.Read(data, 0, data.Length);
+            _mumbleClient.LoadArrayWithVoiceData(data, 0, data.Length);
         }
         void OnAudioPositionSet(int position)
         {
