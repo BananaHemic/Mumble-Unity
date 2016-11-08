@@ -67,13 +67,13 @@ namespace Mumble
                 else
                     nextPcmToSend = _unencodedBuffer.Dequeue().Pcm;
             }
-            //Debug.Log("Will encode: " + nextItemToSend.Pcm.Length);
             if (nextPcmToSend == null || nextPcmToSend.Length == 0)
                 isEmpty = true;
 
-            if(isEmpty)
+            if (isEmpty)
                 return EmptyByteSegment;
 
+            //Debug.Log("Will encode: " + nextPcmToSend.Length);
             return codec.Encode(nextPcmToSend);
         }
 

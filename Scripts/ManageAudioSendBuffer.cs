@@ -103,9 +103,9 @@ namespace Mumble
                         //Debug.Log("waiting");
                         Thread.Sleep(1);
                     }
-                    Debug.Log("seq: " + sequenceIndex + " | " + finalPacket.Length);
+                    //Debug.Log("seq: " + sequenceIndex + " | " + finalPacket.Length);
                     _udpConnection.SendVoicePacket(finalPacket);
-                    sequenceIndex += 2;
+                    sequenceIndex += Constants.NUM_FRAMES_PER_OUTGOING_PACKET;
                     //If we've hit a stop packet, then reset the seq number
                     if (isLastPacket)
                         sequenceIndex = 0;

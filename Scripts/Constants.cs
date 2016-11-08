@@ -18,7 +18,8 @@ namespace Mumble
         //Should probably be 12, but I'm hesitant to double the buffer for everyone to support a rare case
         //TODO make the buffer size scale
         public const int MAX_FRAMES_PER_PACKET = 6;
-        public const int NUM_FRAMES_PER_OUTGOING_PACKET = 1;
+        //How many 10ms samples to include in each packet
+        public const int NUM_FRAMES_PER_OUTGOING_PACKET = 2;
         public const int NUM_CHANNELS = 1;
         //How many bytes can go into a single UDP packet
         public const int MAX_BYTES_PER_PACKET = 480;

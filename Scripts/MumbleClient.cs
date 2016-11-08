@@ -5,7 +5,6 @@ using Version = MumbleProto.Version;
 using UnityEngine;
 using System.Threading;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Mumble
 {
@@ -49,7 +48,7 @@ namespace Mumble
 
         private OpusCodec _codec;
 
-        public int NumSamplesPerFrame { get; private set; }
+        public readonly int NumSamplesPerFrame = Constants.NUM_FRAMES_PER_OUTGOING_PACKET * Constants.FRAME_SIZE;
 
         //The Mumble version of this integration
         public const string ReleaseName = "MumbleUnity";
@@ -75,11 +74,8 @@ namespace Mumble
                 debugVals = new DebugValues();
             _debugValues = debugVals;
 
-
             //Maybe do Lazy?
             _codec = new OpusCodec();
-            //Use 10ms samples
-            NumSamplesPerFrame = _codec.PermittedEncodingFrameSizes.ElementAt(_codec.PermittedEncodingFrameSizes.Count() - 4);
 
             _manageSendBuffer = new ManageAudioSendBuffer(_codec, _muc);
             _audioDecodingBuffer = new AudioDecodingBuffer(_codec);
