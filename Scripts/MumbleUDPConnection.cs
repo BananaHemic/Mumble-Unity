@@ -11,22 +11,19 @@ namespace Mumble
     {
         private readonly IPEndPoint _host;
         private readonly UdpClient _udpClient;
-        private readonly MumbleClient _mc;
-        private readonly MumbleError _errorCallback;
+        private readonly MumbleClient _mumbleClient;
         private CryptState _cryptState;
         private Timer _udpTimer;
+        private bool _isConnected = false;
+        internal volatile bool _isSending = false;
+        internal volatile int NumPacketsSent = 0;
+        internal volatile int NumPacketsRecv = 0;
 
-        internal MumbleUdpConnection(IPEndPoint host, MumbleError errorCallback, MumbleClient mc)
+        internal MumbleUdpConnection(IPEndPoint host, MumbleClient mc)
         {
             _host = host;
-            _errorCallback = errorCallback;
             _udpClient = new UdpClient();
-            _mc = mc;
-        }
-
-        internal MumbleError ErrorCallback
-        {
-            get { return _errorCallback; }
+            _mumbleClient = mc;
         }
 
         internal void UpdateOcbServerNonce(byte[] serverNonce)
@@ -39,8 +36,9 @@ namespace Mumble
         {
             Debug.Log("Establishing UDP connection");
             _cryptState = new CryptState();
-            _cryptState.CryptSetup = _mc.CryptSetup;
+            _cryptState.CryptSetup = _mumbleClient.CryptSetup;
             _udpClient.Connect(_host);
+            _isConnected = true;
 
             _udpTimer = new Timer(Constants.PING_INTERVAL);
             _udpTimer.Elapsed += RunPing;
@@ -54,17 +52,18 @@ namespace Mumble
         {
              SendPing();
         }
-
+        private void ReceiveUdpMessage(byte[] encrypted)
+        {
+            NumPacketsRecv++;
+            ProcessUdpMessage(encrypted);
+            _udpClient.BeginReceive(ReceiveUdpMessage, null);
+        }
         private void ReceiveUdpMessage(IAsyncResult res)
         {
+            //Debug.Log("Received message");
             IPEndPoint remoteIpEndPoint = _host;
             byte[] encrypted = _udpClient.EndReceive(res, ref remoteIpEndPoint);
             ReceiveUdpMessage(encrypted);
-        }
-        private void ReceiveUdpMessage(byte[] encrypted)
-        {
-            ProcessUdpMessage(encrypted);
-            _udpClient.BeginReceive(ReceiveUdpMessage, null);
         }
         internal void ProcessUdpMessage(byte[] encrypted)
         {
@@ -102,7 +101,7 @@ namespace Mumble
             using (var reader = new UdpPacketReader(new MemoryStream(plainTextMessage, 1, plainTextMessage.Length - 1)))
             {
                 UInt32 session;
-                if(!MumbleClient.UseLocalLoopBack)
+                if(!_mumbleClient.UseLocalLoopBack)
                     session = (uint)reader.ReadVarInt64();
                 Int64 sequence = reader.ReadVarInt64();
 
@@ -117,17 +116,20 @@ namespace Mumble
                 size &= 0x1fff;
 
                 //Debug.Log("Received sess: " + session);
-                //Debug.Log(" seq: " + sequence + " size = " + size + " packetLen: " + plainTextMessage.Length);
+                Debug.Log(" seq: " + sequence + " size = " + size + " packetLen: " + plainTextMessage.Length);
 
                 if (size == 0)
                     return;
 
                 byte[] data = reader.ReadBytes(size);
 
-                if (data == null)
+                if (data == null || data.Length != size)
+                {
+                    Debug.LogError("empty or wrong sized packet");
                     return;
+                }
 
-                _mc.ReceiveEncodedVoice(data, sequence);
+                _mumbleClient.ReceiveEncodedVoice(data, sequence);
             }
         }
         internal void SendPing()
@@ -139,8 +141,16 @@ namespace Mumble
             dgram[0] = (1 << 5);
             var encryptedData = _cryptState.Encrypt(dgram, timeBytes.Length + 1);
 
-            //Debug.Log("Sending UDP ping");
-            _udpClient.Send(encryptedData, encryptedData.Length);
+            if (!_isConnected)
+            {
+                Debug.LogError("Not yet connected");
+                return;
+            }
+
+            while (_isSending)
+                System.Threading.Thread.Sleep(1);
+            _isSending = true;
+            _udpClient.BeginSend(encryptedData, encryptedData.Length, new AsyncCallback(OnSent), null);
         }
 
         internal void Close()
@@ -151,10 +161,32 @@ namespace Mumble
         }
         internal void SendVoicePacket(byte[] voicePacket)
         {
-            //Debug.Log("Sending UDP packet! Length = " + voicePacket.Length);
-            byte[] encrypted = _cryptState.Encrypt(voicePacket, voicePacket.Length);
+            if (!_isConnected)
+            {
+                Debug.LogError("Not yet connected");
+                return;
+            }
+            try
+            {
+                if (_mumbleClient.UseLocalLoopBack)
+                    UnpackOpusVoicePacket(voicePacket);
+                //Debug.Log("Sending UDP packet! Length = " + voicePacket.Length);
+                byte[] encrypted = _cryptState.Encrypt(voicePacket, voicePacket.Length);
 
-            _udpClient.Send(encrypted, encrypted.Length);
+                lock (_udpClient)
+                {
+                    _isSending = true;
+                    _udpClient.BeginSend(encrypted, encrypted.Length, new AsyncCallback(OnSent), null);
+                }
+                NumPacketsSent++;
+            }catch(Exception e)
+            {
+                Debug.LogError("Error sending packet: " + e);
+            }
+        }
+        void OnSent(IAsyncResult result)
+        {
+            _isSending = false;
         }
         internal byte[] GetLatestClientNonce()
         {
