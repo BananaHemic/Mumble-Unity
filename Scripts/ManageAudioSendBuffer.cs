@@ -55,6 +55,11 @@ namespace Mumble
         private void EncodingThreadEntry()
         {
             _isEncodingThreadRunning = true;
+            ArraySegment<byte>[] currentPackedData = new ArraySegment<byte>[Constants.NUM_FRAMES_PER_OUTGOING_PACKET];
+            int numFramesInCurrentPackedData = 0;
+            int numAudioBytes = 0;
+            uint seqOfFirstPacket = 0;
+
             while (_isEncodingThreadRunning)
             {
                 try
@@ -66,24 +71,31 @@ namespace Mumble
                     if (isEmpty)
                     {
                         //Thread.Sleep(SleepTimeMs);
+                        //Debug.LogWarning("Empty Packet");
                         continue;
                     }
                     if (isLastPacket)
-                        Debug.LogError("Found last packet");
-                    
-                    int maxSize = 480;
+                        Debug.Log("Will send last packet");
 
-                    //Debug.Log("Packet count = " + packet.Count);
+                    if (packet.Array.Length == 0 || packet.Count == 0)
+                        Debug.LogError("Empty packet?");
 
-                    for (int currentOffset = 0; currentOffset < packet.Count;)
+                    if (numFramesInCurrentPackedData == 0)
+                        seqOfFirstPacket = sequenceIndex;
+
+                    numAudioBytes += packet.Count;
+                    Debug.Log("Loading into " + numFramesInCurrentPackedData);
+                    currentPackedData[numFramesInCurrentPackedData] = packet;
+                    numFramesInCurrentPackedData++;
+
+                    //If we have enough bytes, send it out
+                    if (numFramesInCurrentPackedData == Constants.NUM_FRAMES_PER_OUTGOING_PACKET)
                     {
-                        int currentBlockSize = Math.Min(packet.Count - currentOffset, maxSize);
-
+                        //Make the header
                         byte type = (byte)4;
                         //originaly [type = codec_type_id << 5 | whistep_chanel_id]. now we can talk only to normal chanel
                         type = (byte)(type << 5);
-                        byte[] sequence = Var64.writeVarint64_alternative((UInt64)sequenceIndex);
-
+                        byte[] sequence = Var64.writeVarint64_alternative((UInt64)seqOfFirstPacket);
 
                         // First header for type & sequence length
                         //TODO we can remove this alloc if we're clever
@@ -91,31 +103,42 @@ namespace Mumble
                         packetHeader[0] = type;
                         sequence.CopyTo(packetHeader, 1);
 
-                        //Debug.Log("size should be = " + currentBlockSize);
                         //Write header to show how long the encoded data is
-                        byte[] opusHeader = Var64.writeVarint64_alternative((UInt64)currentBlockSize);
+                        byte[] opusHeader = Var64.writeVarint64_alternative((UInt64)numAudioBytes);
                         //Mark the leftmost bit if this is the last packet
                         if (isLastPacket)
                         {
                             opusHeader[0] = (byte)(opusHeader[0] | 128);
                             Debug.LogWarning("Adding end flag");
                         }
-                        byte[] packedData = new byte[packetHeader.Length + opusHeader.Length + currentBlockSize];
 
+                        byte[] header = new byte[packetHeader.Length + opusHeader.Length];
+                        Array.Copy(packetHeader, 0, header, 0, packetHeader.Length);
+                        Array.Copy(opusHeader, 0, header, packetHeader.Length, opusHeader.Length);
+                        byte[] finalPacket = new byte[header.Length + numAudioBytes];
                         //Packet:
                         //[Header] [segment] [opus header] [packet]
-                        Array.Copy(packetHeader, 0, packedData, 0, packetHeader.Length);
-                        Array.Copy(opusHeader, 0, packedData, packetHeader.Length, opusHeader.Length);
-                        Array.Copy(packet.Array, currentOffset, packedData, packetHeader.Length + opusHeader.Length, currentBlockSize);
+                        Array.Copy(header, finalPacket, header.Length);
+                        int currentOffset = header.Length;
+                        foreach (ArraySegment<byte> ray in currentPackedData)
+                        {
+                            //Debug.Log("Copying " + ray.Count + " into " + finalPacket.Length + " starting at " + currentOffset);
+                            Array.Copy(ray.Array, ray.Offset, finalPacket, currentOffset, ray.Count);
+                            currentOffset += ray.Count;
+                        }
+                        //Clear the previous vars
+                        numFramesInCurrentPackedData = 0;
+                        numAudioBytes = 0;
 
-                        if (MumbleClient.UseLocalLoopBack)
-                        	_udpConnection.UnpackOpusVoicePacket(packedData);
-                        else
-                            _udpConnection.SendVoicePacket(packedData);
-
-                        sequenceIndex++;
-                        currentOffset += currentBlockSize;
+                        while (_udpConnection._isSending)
+                        {
+                            //Debug.Log("waiting");
+                            Thread.Sleep(1);
+                        }
+                        Debug.Log("seq: " + seqOfFirstPacket + " | " + finalPacket.Length);
+                        _udpConnection.SendVoicePacket(finalPacket);
                     }
+                    sequenceIndex += 2;
                     //If we've hit a stop packet, then reset the seq number
                     if (isLastPacket)
                         sequenceIndex = 0;
