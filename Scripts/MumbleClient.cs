@@ -9,21 +9,32 @@ using System.Linq;
 
 namespace Mumble
 {
-    public delegate void MumbleError(string message, bool fatal = false);
     public delegate void UpdateOcbServerNonce(byte[] cryptSetup);
+    [Serializable]
+    public class DebugValues {
+        [Header("Whether to stream the audio back to Unity directly")]
+        public bool UseLocalLoopback;
+        [Header("Whether to use a synthetic audio source of an audio sample")]
+        public bool UseSyntheticSource;
+        [Header("Create a graph in the editor displaying the IO")]
+        public bool EnableEditorIOGraph;
+    }
 
     public class MumbleClient
     {
         /// This sets if we're going to listen to our own audio
-        public static readonly bool UseLocalLoopBack = false;
+        public bool UseLocalLoopBack { get { return _debugValues.UseLocalLoopback; } }
         // This sets if we send synthetic audio instead of a mic audio
-        public static readonly bool UseSyntheticMic = false;
-
+        public bool UseSyntheticSource { get { return _debugValues.UseSyntheticSource; } }
+        public int NumUDPPacketsSent { get { return _muc.NumPacketsSent; } }
+        public int NumUDPPacketsReceieved { get { return _muc.NumPacketsRecv; } }
+        public long NumUDPPacketsLost { get { return _audioDecodingBuffer.NumPacketsLost; } }
         public bool ConnectionSetupFinished { get; internal set; }
 
         private MumbleTcpConnection _mtc;
         private MumbleUdpConnection _muc;
         private ManageAudioSendBuffer _manageSendBuffer;
+        private DebugValues _debugValues;
         private Dictionary<uint, UserState> AllUsers = new Dictionary<uint, UserState>();
         private readonly AudioDecodingBuffer _audioDecodingBuffer;
 
@@ -46,7 +57,7 @@ namespace Mumble
         public const uint Minor = 2;
         public const uint Patch = 8;
 
-        public MumbleClient(String hostName, int port)
+        public MumbleClient(string hostName, int port, DebugValues debugVals=null)
         {
             IPAddress[] addresses = Dns.GetHostAddresses(hostName);
             if (addresses.Length == 0)
@@ -57,12 +68,17 @@ namespace Mumble
                     );
             }
             var host = new IPEndPoint(addresses[0], port);
-            _muc = new MumbleUdpConnection(host, DealWithError, this);
-            _mtc = new MumbleTcpConnection(host, hostName, _muc.UpdateOcbServerNonce, DealWithError, _muc, this);
+            _muc = new MumbleUdpConnection(host, this);
+            _mtc = new MumbleTcpConnection(host, hostName, _muc.UpdateOcbServerNonce, _muc, this);
+
+            if (debugVals == null)
+                debugVals = new DebugValues();
+            _debugValues = debugVals;
+
 
             //Maybe do Lazy?
             _codec = new OpusCodec();
-            //Use 20ms samples
+            //Use 10ms samples
             NumSamplesPerFrame = _codec.PermittedEncodingFrameSizes.ElementAt(_codec.PermittedEncodingFrameSizes.Count() - 4);
 
             _manageSendBuffer = new ManageAudioSendBuffer(_codec, _muc);
@@ -76,22 +92,6 @@ namespace Mumble
         {
             AllUsers.Remove(removedUserSession);
         }
-        private void DealWithError(string message, bool fatal)
-        {
-            if (fatal)
-            {
-                Console.WriteLine("Fatal error: " + message);
-                Console.ReadLine();
-                _mtc.Close();
-                _muc.Close();
-                Environment.Exit(1);
-            }
-            else
-            {
-                Console.WriteLine("Recovering from: " + message);
-            }
-        }
-
         public void Connect(string username, string password)
         {
             _mtc.StartClient(username, password);
@@ -128,7 +128,7 @@ namespace Mumble
         }
         public void ReceiveEncodedVoice(byte[] data, long sequence)
         {
-            Debug.Log("Adding packet");
+            //Debug.Log("Adding packet");
             _audioDecodingBuffer.AddEncodedPacket(sequence, data);
         }
         public void LoadArrayWithVoiceData(float[] pcmArray, int offset, int length)

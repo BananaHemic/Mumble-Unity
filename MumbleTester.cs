@@ -1,11 +1,17 @@
 ﻿using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 using System.Collections;
+using System.Collections.Generic;
 using Mumble;
+using System;
 
 public class MumbleTester : MonoBehaviour {
 
-    public MumbleAudioPlayer[] MumbleAudioPlayers;
-    public SendMumbleAudio AudioSender;
+    public MumbleAudioPlayer MyMumbleAudioPlayer;
+    public SendMumbleAudio MyMumbleAudioSender;
+    public DebugValues DebuggingVariables;
 
     private MumbleClient _mumbleClient;
     public string hostName = "1.2.3.4";
@@ -15,15 +21,21 @@ public class MumbleTester : MonoBehaviour {
 
 	void Start () {
 
-        _mumbleClient = new MumbleClient(hostName, port);
+        _mumbleClient = new MumbleClient(hostName, port, DebuggingVariables);
         _mumbleClient.Connect(_username, _password);
-        
-        foreach(MumbleAudioPlayer audioPlayer in MumbleAudioPlayers)
+
+        MyMumbleAudioPlayer.Initialize(_mumbleClient);
+        MyMumbleAudioSender.Initialize(_mumbleClient);
+
+#if UNITY_EDITOR
+        if (DebuggingVariables.EnableEditorIOGraph)
         {
-            audioPlayer.SetMumbleClient(_mumbleClient);
+            EditorGraph editorGraph = EditorWindow.GetWindow<EditorGraph>();
+            editorGraph.Show();
+            StartCoroutine(UpdateEditorGraph());
         }
-        AudioSender.Initialize(_mumbleClient);
-	}
+#endif
+    }
 	
     void OnApplicationQuit()
     {
@@ -31,16 +43,28 @@ public class MumbleTester : MonoBehaviour {
         if(_mumbleClient != null)
             _mumbleClient.Close();
     }
-	void Update () {
+    IEnumerator UpdateEditorGraph()
+    {
+        long numPacketsReceived = 0;
+        long numPacketsSent = 0;
+        long numPacketsLost = 0;
 
-        if (Input.GetKeyDown(KeyCode.P))
+        while (true)
         {
-            //_mumbleClient.Process();
+            yield return new WaitForSeconds(0.1f);
+            long numSentThisSample = _mumbleClient.NumUDPPacketsSent - numPacketsSent;
+            long numRecvThisSample = _mumbleClient.NumUDPPacketsReceieved - numPacketsReceived;
+            long numLostThisSample = _mumbleClient.NumUDPPacketsLost - numPacketsLost;
+            //Debug.Log(numSentThisSample);
+            Graph.channel[0].Feed(-numSentThisSample);
+            Graph.channel[1].Feed(-numRecvThisSample);
+            Graph.channel[2].Feed(-numLostThisSample);
+            numPacketsSent += numSentThisSample;
+            numPacketsReceived += numRecvThisSample;
+            numPacketsLost += numLostThisSample;
         }
-        if (Input.GetKeyDown(KeyCode.I))
-        {
-            print("Is Connected: " + _mumbleClient.ConnectionSetupFinished);
-        }
+    }
+	void Update () {
         if (Input.GetKeyDown(KeyCode.S))
         {
             _mumbleClient.SendTextMessage("This is an example message from Unity");
