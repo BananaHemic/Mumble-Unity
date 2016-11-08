@@ -52,12 +52,11 @@ namespace Mumble
 
             while(totalSamples - _totalNumSamplesSent >= _mumbleClient.NumSamplesPerFrame)
             {
-
                 //print("Sending sample of size: " + _mumbleClient.NumSamplesPerFrame);
                 //TODO use a big buffer that we load parts into
                 float[] tempSampleStore = new float[_mumbleClient.NumSamplesPerFrame];
 
-                if (!MumbleClient.UseSyntheticMic)
+                if (!_mumbleClient.UseSyntheticSource)
                     _sendAudioClip.GetData(tempSampleStore, _totalNumSamplesSent % NumSamples);
                 else {
                     TestingClipToUse.GetData(tempSampleStore, _totalNumSamplesSent % NumSamples);
