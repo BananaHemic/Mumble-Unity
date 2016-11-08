@@ -16,7 +16,6 @@ namespace Mumble
     public class MumbleTcpConnection
     {
         private readonly UpdateOcbServerNonce _updateOcbServerNonce;
-        private readonly MumbleError _errorCallback;
         private readonly IPEndPoint _host;
         private readonly string _hostname;
 
@@ -32,7 +31,7 @@ namespace Mumble
         private string _username;
         private string _password;
 
-        internal MumbleTcpConnection(IPEndPoint host, string hostname, UpdateOcbServerNonce updateOcbServerNonce,  MumbleError errorCallback,
+        internal MumbleTcpConnection(IPEndPoint host, string hostname, UpdateOcbServerNonce updateOcbServerNonce,
             MumbleUdpConnection muc, MumbleClient mc)
         {
             _host = host;
@@ -41,7 +40,6 @@ namespace Mumble
             _muc = muc;
             _tcpClient = new TcpClient();
             _updateOcbServerNonce = updateOcbServerNonce;
-            _errorCallback = errorCallback;
             
             _processThread = new Thread(ProcessTcpData)
             {
@@ -143,7 +141,7 @@ namespace Mumble
             try
             {
                 var messageType = (MessageType) IPAddress.NetworkToHostOrder(_reader.ReadInt16());
-                //Debug.Log("Processing data of type: " + messageType);
+                Debug.Log("Processing data of type: " + messageType);
 
                 switch (messageType)
                 {
@@ -237,7 +235,7 @@ namespace Mumble
                         var reject = Serializer.DeserializeWithLengthPrefix<Reject>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         _validConnection = false;
-                        _errorCallback("Mumble server reject: " + reject.reason, true);
+                        Debug.LogError("Mumble server reject: " + reject.reason);
                         break;
                     case MessageType.UserRemove:
                         var removal = Serializer.DeserializeWithLengthPrefix<UserRemove>(_ssl,
@@ -246,16 +244,17 @@ namespace Mumble
                         _mc.RemoveUser(removal.session);
                         break;
                     default:
-                        _errorCallback("Message type " + messageType + " not implemented", true);
+                        Debug.LogError("Message type " + messageType + " not implemented");
                         break;
                 }
             }
             catch (Exception ex)
             {
                 if(ex is EndOfStreamException)
-                    Debug.LogError("EOS Exception: " + ex);
+                    Debug.LogError("EOS Exception: " + ex);//This happens when we connect again with the same username
                 else
                     Debug.LogError("Unhandled error: " + ex);
+                return;
             }
 
             //Get the next response
