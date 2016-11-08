@@ -15,6 +15,7 @@ using UnityEngine;
 namespace Mumble {
     public class AudioDecodingBuffer
     {
+        public long NumPacketsLost { get; private set; }
         /// <summary>
         /// How many samples have been decoded
         /// </summary>
@@ -96,7 +97,8 @@ namespace Mumble {
 
             //Copy as much data as we can from the buffer up to the limit
             int readCount = Math.Min(count, numDecodedInCurrentBuffer);
-            
+           
+            /* 
             Debug.Log("Reading " + readCount
                 + "| starting at " + currentBufferOffset
                 + "| starting at overall " + _readingOffset
@@ -108,7 +110,7 @@ namespace Mumble {
                 
             if (readCount == 0)
                 return 0;
-
+            */
             Array.Copy(_decodedBuffer[currentBuffer], currentBufferOffset, dst, offset, readCount);
             _decodedCount -= readCount;
             _readingOffset += readCount;
@@ -133,6 +135,17 @@ namespace Mumble {
             var packet = GetNextEncodedData();
             if (!packet.HasValue)
                 return false;
+            //todo: _nextSequenceToDecode calculation is wrong, which causes this to happen for almost every packet!
+            //Decode a null to indicate a dropped packet
+            if (packet.Value.Sequence != _nextSequenceToDecode && _nextSequenceToDecode != 0)
+            {
+                Debug.LogWarning("dropped packet, recv: " + packet.Value.Sequence + ", expected " + _nextSequenceToDecode);
+                NumPacketsLost += packet.Value.Sequence - _nextSequenceToDecode;
+            }
+            else
+            {
+                Debug.Log("decoding " + packet.Value.Sequence);
+            }
 
             if (_decodedBuffer[_nextBufferToDecodeInto] == null)
                 _decodedBuffer[_nextBufferToDecodeInto] = new float[SubBufferSize];
@@ -151,10 +164,6 @@ namespace Mumble {
                 _nextBufferToDecodeInto = 0;
             return true;
 
-            ////todo: _nextSequenceToDecode calculation is wrong, which causes this to happen for almost every packet!
-            ////Decode a null to indicate a dropped packet
-            //if (packet.Value.Sequence != _nextSequenceToDecode)
-            //    _codec.Decode(null);
         }
         /// <summary>
         /// Add a new packet of encoded data
@@ -164,12 +173,14 @@ namespace Mumble {
         /// <param name="codec">The codec to use to decode this packet</param>
         public void AddEncodedPacket(long sequence, byte[] data)
         {
+            /* TODO this messes up when we hit configure in the desktop mumble app. The sequence number drops to 0
             //If the next seq we expect to decode comes after this packet we've already missed our opportunity!
             if (_nextSequenceToDecode > sequence)
             {
-                Debug.LogWarning("Dropping packet number: " + sequence);
+                Debug.LogWarning("Dropping packet number: " + sequence + " we're decoding number " + _nextSequenceToDecode);
                 return;
             }
+            */
 
             lock (_encodedBuffer)
             {
