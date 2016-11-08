@@ -55,10 +55,6 @@ namespace Mumble
         private void EncodingThreadEntry()
         {
             _isEncodingThreadRunning = true;
-            ArraySegment<byte>[] currentPackedData = new ArraySegment<byte>[Constants.NUM_FRAMES_PER_OUTGOING_PACKET];
-            int numFramesInCurrentPackedData = 0;
-            int numAudioBytes = 0;
-            uint seqOfFirstPacket = 0;
 
             while (_isEncodingThreadRunning)
             {
@@ -80,64 +76,35 @@ namespace Mumble
                     if (packet.Array.Length == 0 || packet.Count == 0)
                         Debug.LogError("Empty packet?");
 
-                    if (numFramesInCurrentPackedData == 0)
-                        seqOfFirstPacket = sequenceIndex;
+                    //Make the header
+                    byte type = (byte)4;
+                    //originaly [type = codec_type_id << 5 | whistep_chanel_id]. now we can talk only to normal chanel
+                    type = (byte)(type << 5);
+                    byte[] sequence = Var64.writeVarint64_alternative((UInt64)sequenceIndex);
 
-                    numAudioBytes += packet.Count;
-                    Debug.Log("Loading into " + numFramesInCurrentPackedData);
-                    currentPackedData[numFramesInCurrentPackedData] = packet;
-                    numFramesInCurrentPackedData++;
-
-                    //If we have enough bytes, send it out
-                    if (numFramesInCurrentPackedData == Constants.NUM_FRAMES_PER_OUTGOING_PACKET)
+                    //Write header to show how long the encoded data is
+                    byte[] opusHeader = Var64.writeVarint64_alternative((UInt64)packet.Count);
+                    //Mark the leftmost bit if this is the last packet
+                    if (isLastPacket)
                     {
-                        //Make the header
-                        byte type = (byte)4;
-                        //originaly [type = codec_type_id << 5 | whistep_chanel_id]. now we can talk only to normal chanel
-                        type = (byte)(type << 5);
-                        byte[] sequence = Var64.writeVarint64_alternative((UInt64)seqOfFirstPacket);
-
-                        // First header for type & sequence length
-                        //TODO we can remove this alloc if we're clever
-                        byte[] packetHeader = new byte[1 + sequence.Length];
-                        packetHeader[0] = type;
-                        sequence.CopyTo(packetHeader, 1);
-
-                        //Write header to show how long the encoded data is
-                        byte[] opusHeader = Var64.writeVarint64_alternative((UInt64)numAudioBytes);
-                        //Mark the leftmost bit if this is the last packet
-                        if (isLastPacket)
-                        {
-                            opusHeader[0] = (byte)(opusHeader[0] | 128);
-                            Debug.LogWarning("Adding end flag");
-                        }
-
-                        byte[] header = new byte[packetHeader.Length + opusHeader.Length];
-                        Array.Copy(packetHeader, 0, header, 0, packetHeader.Length);
-                        Array.Copy(opusHeader, 0, header, packetHeader.Length, opusHeader.Length);
-                        byte[] finalPacket = new byte[header.Length + numAudioBytes];
-                        //Packet:
-                        //[Header] [segment] [opus header] [packet]
-                        Array.Copy(header, finalPacket, header.Length);
-                        int currentOffset = header.Length;
-                        foreach (ArraySegment<byte> ray in currentPackedData)
-                        {
-                            //Debug.Log("Copying " + ray.Count + " into " + finalPacket.Length + " starting at " + currentOffset);
-                            Array.Copy(ray.Array, ray.Offset, finalPacket, currentOffset, ray.Count);
-                            currentOffset += ray.Count;
-                        }
-                        //Clear the previous vars
-                        numFramesInCurrentPackedData = 0;
-                        numAudioBytes = 0;
-
-                        while (_udpConnection._isSending)
-                        {
-                            //Debug.Log("waiting");
-                            Thread.Sleep(1);
-                        }
-                        Debug.Log("seq: " + seqOfFirstPacket + " | " + finalPacket.Length);
-                        _udpConnection.SendVoicePacket(finalPacket);
+                        opusHeader[0] = (byte)(opusHeader[0] | 128);
+                        Debug.LogWarning("Adding end flag");
                     }
+                    //Packet:
+                    //[type/target] [sequence] [opus length header] [packet data]
+                    byte[] finalPacket = new byte[1 + sequence.Length + opusHeader.Length + packet.Count];
+                    finalPacket[0] = type;
+                    Array.Copy(sequence, 0, finalPacket, 1, sequence.Length);
+                    Array.Copy(opusHeader, 0, finalPacket, 1 + sequence.Length, opusHeader.Length);
+                    Array.Copy(packet.Array, packet.Offset, finalPacket, 1 + sequence.Length + opusHeader.Length, packet.Count);
+
+                    while (_udpConnection._isSending)
+                    {
+                        //Debug.Log("waiting");
+                        Thread.Sleep(1);
+                    }
+                    Debug.Log("seq: " + sequenceIndex + " | " + finalPacket.Length);
+                    _udpConnection.SendVoicePacket(finalPacket);
                     sequenceIndex += 2;
                     //If we've hit a stop packet, then reset the seq number
                     if (isLastPacket)
