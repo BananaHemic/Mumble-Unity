@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using UnityEngine;
 
@@ -15,15 +13,16 @@ namespace Mumble
         private readonly MumbleUdpConnection _udpConnection;
         private readonly AudioEncodingBuffer _encodingBuffer;
         private readonly Thread _encodingThread;
+        private readonly List<PcmArray> _pcmArrays;
 
         private bool _isEncodingThreadRunning;
         private UInt32 sequenceIndex;
-        
 
         public ManageAudioSendBuffer(OpusCodec codec, MumbleUdpConnection udpConnection)
         {
             _udpConnection = udpConnection;
             _codec = codec;
+            _pcmArrays = new List<PcmArray>();
             _encodingBuffer = new AudioEncodingBuffer();
 
             _encodingThread = new Thread(EncodingThreadEntry)
@@ -35,7 +34,27 @@ namespace Mumble
         {
             Dispose();
         }
-        public void SendVoice(float[] pcm, SpeechTarget target, uint targetId)
+        public PcmArray GetAvailablePcmArray()
+        {
+            foreach(PcmArray ray in _pcmArrays)
+            {
+                if (ray.IsAvailable)
+                {
+                    ray.IsAvailable = false;
+                    return ray;
+                }
+            }
+            PcmArray newArray = new PcmArray(MumbleConstants.NUM_SAMPLES_PER_PACKET, _pcmArrays.Count);
+            _pcmArrays.Add(newArray);
+
+            //Debug.Log("New buffer length is: " + _pcmArrays.Count);
+            return newArray;
+        }
+        public void ReleasePcmArray(int indexOfFreedArray)
+        {
+            _pcmArrays[indexOfFreedArray].IsAvailable = true;
+        }
+        public void SendVoice(PcmArray pcm, SpeechTarget target, uint targetId)
         {
             _encodingBuffer.Add(pcm, target, targetId);
 
@@ -114,6 +133,21 @@ namespace Mumble
                     Debug.LogError("Error: " + e);
                 }
             }
+        }
+    }
+    /// <summary>
+    /// Small class to help this script re-use float arrays after their data has become encoded
+    /// </summary>
+    public class PcmArray
+    {
+        public bool IsAvailable = true;
+        public readonly int Index;
+        public float[] Pcm;
+
+        public PcmArray(int pcmLength, int index)
+        {
+            Pcm = new float[pcmLength];
+            Index = index;
         }
     }
 }
