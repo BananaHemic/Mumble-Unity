@@ -141,7 +141,7 @@ namespace Mumble
                 return 0;
             }
 
-            int length = NativeMethods.opus_decode_float(decoder, encodedData, encodedData.Length, outputPcm, outputPcm.Length / channelCount, Constants.USE_FORWARD_ERROR_CORRECTION);
+            int length = NativeMethods.opus_decode_float(decoder, encodedData, encodedData.Length, outputPcm, outputPcm.Length / channelCount, MumbleConstants.USE_FORWARD_ERROR_CORRECTION);
 
             if (length <= 0)
                 Debug.LogError("Encoding error: " + (OpusErrors)length);

@@ -11,7 +11,7 @@ namespace Mumble
         public KeyCode PushToTalkKeycode;
 
         const int NumRecordingSeconds = 24;
-        const int NumSamples = NumRecordingSeconds * Constants.SAMPLE_RATE;
+        const int NumSamples = NumRecordingSeconds * MumbleConstants.SAMPLE_RATE;
 
         private MumbleClient _mumbleClient;
         private AudioClip _sendAudioClip;
@@ -74,7 +74,7 @@ namespace Mumble
         }
         void StartSendingAudio()
         {
-            _sendAudioClip = Microphone.Start(_currentMic, true, NumRecordingSeconds, Constants.SAMPLE_RATE);
+            _sendAudioClip = Microphone.Start(_currentMic, true, NumRecordingSeconds, MumbleConstants.SAMPLE_RATE);
             _previousPosition = 0;
             _numTimesLooped = 0;
             _totalNumSamplesSent = 0;

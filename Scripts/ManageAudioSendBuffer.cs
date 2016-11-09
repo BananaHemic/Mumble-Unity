@@ -105,7 +105,7 @@ namespace Mumble
                     }
                     //Debug.Log("seq: " + sequenceIndex + " | " + finalPacket.Length);
                     _udpConnection.SendVoicePacket(finalPacket);
-                    sequenceIndex += Constants.NUM_FRAMES_PER_OUTGOING_PACKET;
+                    sequenceIndex += MumbleConstants.NUM_FRAMES_PER_OUTGOING_PACKET;
                     //If we've hit a stop packet, then reset the seq number
                     if (isLastPacket)
                         sequenceIndex = 0;

@@ -12,8 +12,6 @@ namespace Mumble
 {
     public class AudioEncodingBuffer
     {
-        
-        //TODO! Be careful, we need to lock every use of this guy
         private readonly Queue<TargettedSpeech> _unencodedBuffer = new Queue<TargettedSpeech>();
 
         public readonly ArraySegment<byte> EmptyByteSegment = new ArraySegment<byte> { };

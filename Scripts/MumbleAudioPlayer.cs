@@ -16,7 +16,7 @@ namespace Mumble {
 
         void Start() {
             Source = GetComponent<AudioSource>();
-            _clip = AudioClip.Create("Received Audio", Constants.SAMPLE_RATE * SampleLengthSeconds, Constants.NUM_CHANNELS, Constants.SAMPLE_RATE, isStreamingAudio, OnAudioRead, OnAudioPositionSet);
+            _clip = AudioClip.Create("Received Audio", MumbleConstants.SAMPLE_RATE * SampleLengthSeconds, MumbleConstants.NUM_CHANNELS, MumbleConstants.SAMPLE_RATE, isStreamingAudio, OnAudioRead, OnAudioPositionSet);
             Source.clip = _clip;
             Source.Play();
         }

@@ -40,7 +40,7 @@ namespace Mumble
             _udpClient.Connect(_host);
             _isConnected = true;
 
-            _udpTimer = new Timer(Constants.PING_INTERVAL);
+            _udpTimer = new Timer(MumbleConstants.PING_INTERVAL);
             _udpTimer.Elapsed += RunPing;
             _udpTimer.Enabled = true;
 

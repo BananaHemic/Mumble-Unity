@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Mumble
 {
-    public class Constants
+    public class MumbleConstants
     {
         public const int SAMPLE_RATE = 48000;
         public const int FRAME_SIZE = SAMPLE_RATE / 100;

@@ -48,7 +48,7 @@ namespace Mumble
 
         private OpusCodec _codec;
 
-        public readonly int NumSamplesPerFrame = Constants.NUM_FRAMES_PER_OUTGOING_PACKET * Constants.FRAME_SIZE;
+        public readonly int NumSamplesPerFrame = MumbleConstants.NUM_FRAMES_PER_OUTGOING_PACKET * MumbleConstants.FRAME_SIZE;
 
         //The Mumble version of this integration
         public const string ReleaseName = "MumbleUnity";

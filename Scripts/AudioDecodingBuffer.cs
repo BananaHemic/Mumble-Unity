@@ -34,8 +34,8 @@ namespace Mumble {
         private long _nextSequenceToDecode;
         private readonly List<BufferPacket> _encodedBuffer = new List<BufferPacket>();
         private readonly OpusCodec _codec;
-        const int NumDecodedSubBuffers = (int)(Constants.MAX_LATENCY_SECONDS * (Constants.SAMPLE_RATE / Constants.FRAME_SIZE));
-        const int SubBufferSize = Constants.FRAME_SIZE * Constants.MAX_FRAMES_PER_PACKET;
+        const int NumDecodedSubBuffers = (int)(MumbleConstants.MAX_LATENCY_SECONDS * (MumbleConstants.SAMPLE_RATE / MumbleConstants.FRAME_SIZE));
+        const int SubBufferSize = MumbleConstants.FRAME_SIZE * MumbleConstants.MAX_FRAMES_PER_PACKET;
 
         public AudioDecodingBuffer(OpusCodec codec)
         {
@@ -135,8 +135,7 @@ namespace Mumble {
             var packet = GetNextEncodedData();
             if (!packet.HasValue)
                 return false;
-            //todo: _nextSequenceToDecode calculation is wrong, which causes this to happen for almost every packet!
-            //Decode a null to indicate a dropped packet
+            //TODO Decode a null to indicate a dropped packet
             if (packet.Value.Sequence != _nextSequenceToDecode && _nextSequenceToDecode != 0)
             {
                 Debug.LogWarning("dropped packet, recv: " + packet.Value.Sequence + ", expected " + _nextSequenceToDecode);
@@ -157,7 +156,7 @@ namespace Mumble {
 
             _decodedCount += numRead;
             _numSamplesInBuffer[_nextBufferToDecodeInto] = numRead;
-            _nextSequenceToDecode = packet.Value.Sequence + numRead / Constants.FRAME_SIZE;
+            _nextSequenceToDecode = packet.Value.Sequence + numRead / MumbleConstants.FRAME_SIZE;
             _nextBufferToDecodeInto++;
             //Make sure we don't go over our max number of buffers
             if (_nextBufferToDecodeInto == NumDecodedSubBuffers)
