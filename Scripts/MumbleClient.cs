@@ -25,13 +25,13 @@ namespace Mumble
         public bool UseLocalLoopBack { get { return _debugValues.UseLocalLoopback; } }
         // This sets if we send synthetic audio instead of a mic audio
         public bool UseSyntheticSource { get { return _debugValues.UseSyntheticSource; } }
-        public int NumUDPPacketsSent { get { return _muc.NumPacketsSent; } }
-        public int NumUDPPacketsReceieved { get { return _muc.NumPacketsRecv; } }
+        public int NumUDPPacketsSent { get { return _udpConnection.NumPacketsSent; } }
+        public int NumUDPPacketsReceieved { get { return _udpConnection.NumPacketsRecv; } }
         public long NumUDPPacketsLost { get { return _audioDecodingBuffer.NumPacketsLost; } }
         public bool ConnectionSetupFinished { get; internal set; }
 
-        private MumbleTcpConnection _mtc;
-        private MumbleUdpConnection _muc;
+        private MumbleTcpConnection _tcpConnection;
+        private MumbleUdpConnection _udpConnection;
         private ManageAudioSendBuffer _manageSendBuffer;
         private DebugValues _debugValues;
         private Dictionary<uint, UserState> AllUsers = new Dictionary<uint, UserState>();
@@ -67,8 +67,8 @@ namespace Mumble
                     );
             }
             var host = new IPEndPoint(addresses[0], port);
-            _muc = new MumbleUdpConnection(host, this);
-            _mtc = new MumbleTcpConnection(host, hostName, _muc.UpdateOcbServerNonce, _muc, this);
+            _udpConnection = new MumbleUdpConnection(host, this);
+            _tcpConnection = new MumbleTcpConnection(host, hostName, _udpConnection.UpdateOcbServerNonce, _udpConnection, this);
 
             if (debugVals == null)
                 debugVals = new DebugValues();
@@ -77,7 +77,7 @@ namespace Mumble
             //Maybe do Lazy?
             _codec = new OpusCodec();
 
-            _manageSendBuffer = new ManageAudioSendBuffer(_codec, _muc);
+            _manageSendBuffer = new ManageAudioSendBuffer(_codec, _udpConnection);
             _audioDecodingBuffer = new AudioDecodingBuffer(_codec);
         }
         internal void AddUser(UserState newUserState)
@@ -90,17 +90,17 @@ namespace Mumble
         }
         public void Connect(string username, string password)
         {
-            _mtc.StartClient(username, password);
+            _tcpConnection.StartClient(username, password);
         }
 
         internal void ConnectUdp()
         {
-            _muc.Connect();
+            _udpConnection.Connect();
         }
         public void Close()
         {
-            _mtc.Close();
-            _muc.Close();
+            _tcpConnection.Close();
+            _udpConnection.Close();
             _manageSendBuffer.Dispose();
             _manageSendBuffer = null;
         }
@@ -116,7 +116,7 @@ namespace Mumble
             msg.actor = ServerSync.session;
             Debug.Log("Now session length = " + msg.session.Count);
 
-            _mtc.SendMessage(MessageType.TextMessage, msg);
+            _tcpConnection.SendMessage(MessageType.TextMessage, msg);
         }
         public void SendVoicePacket(float[] floatData)
         {
@@ -140,7 +140,7 @@ namespace Mumble
         }
         public byte[] GetLatestClientNonce()
         {
-            return _muc.GetLatestClientNonce();
+            return _udpConnection.GetLatestClientNonce();
         }
     }
 }

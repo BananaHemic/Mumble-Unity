@@ -19,11 +19,11 @@ namespace Mumble
         private readonly IPEndPoint _host;
         private readonly string _hostname;
 
-        private readonly MumbleClient _mc;
+        private readonly MumbleClient _mumbleClient;
         private readonly TcpClient _tcpClient;
         private BinaryReader _reader;
         private SslStream _ssl;
-        private MumbleUdpConnection _muc;
+        private MumbleUdpConnection _udpConnection;
         private bool _validConnection;
         private BinaryWriter _writer;
         private System.Timers.Timer _tcpTimer;
@@ -32,12 +32,12 @@ namespace Mumble
         private string _password;
 
         internal MumbleTcpConnection(IPEndPoint host, string hostname, UpdateOcbServerNonce updateOcbServerNonce,
-            MumbleUdpConnection muc, MumbleClient mc)
+            MumbleUdpConnection udpConnection, MumbleClient mumbleClient)
         {
             _host = host;
             _hostname = hostname;
-            _mc = mc;
-            _muc = muc;
+            _mumbleClient = mumbleClient;
+            _udpConnection = udpConnection;
             _tcpClient = new TcpClient();
             _updateOcbServerNonce = updateOcbServerNonce;
             
@@ -146,7 +146,7 @@ namespace Mumble
                 switch (messageType)
                 {
                     case MessageType.Version:
-                        _mc.RemoteVersion = Serializer.DeserializeWithLengthPrefix<Version>(_ssl,
+                        _mumbleClient.RemoteVersion = Serializer.DeserializeWithLengthPrefix<Version>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         //Debug.Log("Server version: " + _mc.RemoteVersion.release);
                         var authenticate = new Authenticate
@@ -164,38 +164,38 @@ namespace Mumble
                         //Debug.Log("Got crypt");
                         break;
                     case MessageType.CodecVersion:
-                        _mc.CodecVersion = Serializer.DeserializeWithLengthPrefix<CodecVersion>(_ssl,
+                        _mumbleClient.CodecVersion = Serializer.DeserializeWithLengthPrefix<CodecVersion>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         //Debug.Log("Got codec version");
                         break;
                     case MessageType.ChannelState:
-                        _mc.ChannelState = Serializer.DeserializeWithLengthPrefix<ChannelState>(_ssl,
+                        _mumbleClient.ChannelState = Serializer.DeserializeWithLengthPrefix<ChannelState>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         //Debug.Log("Channel state ID = " + _mc.ChannelState.channel_id);
                         break;
                     case MessageType.PermissionQuery:
-                        _mc.PermissionQuery = Serializer.DeserializeWithLengthPrefix<PermissionQuery>(_ssl,
+                        _mumbleClient.PermissionQuery = Serializer.DeserializeWithLengthPrefix<PermissionQuery>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         //Debug.Log("Permission Query = " + _mc.PermissionQuery);
                         break;
                     case MessageType.UserState:
                         //This is called for every user in the room
                         //TODO add support for multiple users
-                        _mc.OurUserState = Serializer.DeserializeWithLengthPrefix<UserState>(_ssl,
+                        _mumbleClient.OurUserState = Serializer.DeserializeWithLengthPrefix<UserState>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        Debug.Log("User State Actor= " + _mc.OurUserState.actor);
-                        Debug.Log("User State Session= " + _mc.OurUserState.session);
-                        Debug.Log("User State User ID= " + _mc.OurUserState.user_id);
-                        Debug.Log("User State User ID= " + _mc.OurUserState.plugin_identity);
+                        Debug.Log("User State Actor= " + _mumbleClient.OurUserState.actor);
+                        Debug.Log("User State Session= " + _mumbleClient.OurUserState.session);
+                        Debug.Log("User State User ID= " + _mumbleClient.OurUserState.user_id);
+                        Debug.Log("User State User ID= " + _mumbleClient.OurUserState.plugin_identity);
                         break;
                     case MessageType.ServerSync:
-                        _mc.ServerSync = Serializer.DeserializeWithLengthPrefix<ServerSync>(_ssl,
+                        _mumbleClient.ServerSync = Serializer.DeserializeWithLengthPrefix<ServerSync>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        Debug.Log("Server Sync Session= " + _mc.ServerSync.session);
-                        _mc.ConnectionSetupFinished = true;
+                        Debug.Log("Server Sync Session= " + _mumbleClient.ServerSync.session);
+                        _mumbleClient.ConnectionSetupFinished = true;
                         break;
                     case MessageType.ServerConfig:
-                        _mc.ServerConfig = Serializer.DeserializeWithLengthPrefix<ServerConfig>(_ssl,
+                        _mumbleClient.ServerConfig = Serializer.DeserializeWithLengthPrefix<ServerConfig>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         //Debug.Log("Sever config = " + _mc.ServerConfig);
                         Debug.LogWarning("Connected!");
@@ -221,7 +221,7 @@ namespace Mumble
                         var length = IPAddress.NetworkToHostOrder(_reader.ReadInt32());
                         Debug.Log("Received UDP tunnel of length: " + length);
                         //At this point the message is already decrypted
-                        _muc.UnpackOpusVoicePacket(_reader.ReadBytes(length));
+                        _udpConnection.UnpackOpusVoicePacket(_reader.ReadBytes(length));
                         /*
                         //var udpTunnel = Serializer.DeserializeWithLengthPrefix<UDPTunnel>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
@@ -241,7 +241,7 @@ namespace Mumble
                         var removal = Serializer.DeserializeWithLengthPrefix<UserRemove>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         Debug.Log("Removing " + removal.session);
-                        _mc.RemoveUser(removal.session);
+                        _mumbleClient.RemoveUser(removal.session);
                         break;
                     default:
                         Debug.LogError("Message type " + messageType + " not implemented");
@@ -265,14 +265,14 @@ namespace Mumble
         {
             if (cryptSetup.key != null && cryptSetup.client_nonce != null && cryptSetup.server_nonce != null)
             {
-                _mc.CryptSetup = cryptSetup;
+                _mumbleClient.CryptSetup = cryptSetup;
                 SendMessage(MessageType.CryptSetup, new CryptSetup {client_nonce = cryptSetup.client_nonce});
-                _mc.ConnectUdp();
+                _mumbleClient.ConnectUdp();
             }
             else if(cryptSetup.server_nonce != null)
                 _updateOcbServerNonce(cryptSetup.server_nonce);
             else
-                SendMessage(MessageType.CryptSetup, new CryptSetup { client_nonce = _mc.GetLatestClientNonce() });
+                SendMessage(MessageType.CryptSetup, new CryptSetup { client_nonce = _mumbleClient.GetLatestClientNonce() });
         }
 
         internal void Close()

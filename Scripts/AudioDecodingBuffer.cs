@@ -107,9 +107,6 @@ namespace Mumble {
                 + "| with in curr buff " + numDecodedInCurrentBuffer
                 + "| out of " + _decodedBuffer[currentBuffer].Length
                 + "| with " + _decodedCount);
-                
-            if (readCount == 0)
-                return 0;
             */
             Array.Copy(_decodedBuffer[currentBuffer], currentBufferOffset, dst, offset, readCount);
             _decodedCount -= readCount;

@@ -19,11 +19,11 @@ namespace Mumble
         internal volatile int NumPacketsSent = 0;
         internal volatile int NumPacketsRecv = 0;
 
-        internal MumbleUdpConnection(IPEndPoint host, MumbleClient mc)
+        internal MumbleUdpConnection(IPEndPoint host, MumbleClient mumbleClient)
         {
             _host = host;
             _udpClient = new UdpClient();
-            _mumbleClient = mc;
+            _mumbleClient = mumbleClient;
         }
 
         internal void UpdateOcbServerNonce(byte[] serverNonce)
