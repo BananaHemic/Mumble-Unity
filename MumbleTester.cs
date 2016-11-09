@@ -1,11 +1,15 @@
-﻿using UnityEngine;
+﻿/*
+ * This is the front facing script to control how MumbleUnity works.
+ * It's expected that, to fit in properly with your application,
+ * You'll want to change this class (and possible SendMumbleAudio)
+ * in order to work the way you want it to
+ */
+using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 using System.Collections;
-using System.Collections.Generic;
 using Mumble;
-using System;
 
 public class MumbleTester : MonoBehaviour {
 
@@ -52,13 +56,15 @@ public class MumbleTester : MonoBehaviour {
         while (true)
         {
             yield return new WaitForSeconds(0.1f);
+
             long numSentThisSample = _mumbleClient.NumUDPPacketsSent - numPacketsSent;
             long numRecvThisSample = _mumbleClient.NumUDPPacketsReceieved - numPacketsReceived;
             long numLostThisSample = _mumbleClient.NumUDPPacketsLost - numPacketsLost;
-            //Debug.Log(numSentThisSample);
+
             Graph.channel[0].Feed(-numSentThisSample);
             Graph.channel[1].Feed(-numRecvThisSample);
             Graph.channel[2].Feed(-numLostThisSample);
+
             numPacketsSent += numSentThisSample;
             numPacketsReceived += numRecvThisSample;
             numPacketsLost += numLostThisSample;
