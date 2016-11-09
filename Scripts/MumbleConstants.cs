@@ -12,7 +12,7 @@ namespace Mumble
         public const int SAMPLE_BITS = 16;
         public const float MAX_LATENCY_SECONDS = 0.1f;
         public const bool IS_LITTLE_ENDIAN = false;
-        public const int PING_INTERVAL = 5000;//5 seconds
+        public const int PING_INTERVAL_MS = 5000;//5 seconds
         //TODO experiment with this
         public const int USE_FORWARD_ERROR_CORRECTION = 0;
         //Should probably be 12, but I'm hesitant to double the buffer for everyone to support a rare case
@@ -23,5 +23,7 @@ namespace Mumble
         public const int NUM_CHANNELS = 1;
         //How many bytes can go into a single UDP packet
         public const int MAX_BYTES_PER_PACKET = 480;
+        //How many pcm samples we should stuff into a single packet
+        public const int NUM_SAMPLES_PER_PACKET = NUM_FRAMES_PER_OUTGOING_PACKET * FRAME_SIZE;
     }
 }

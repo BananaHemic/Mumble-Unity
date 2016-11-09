@@ -3,7 +3,6 @@ using System.Net;
 using MumbleProto;
 using Version = MumbleProto.Version;
 using UnityEngine;
-using System.Threading;
 using System.Collections.Generic;
 
 namespace Mumble
@@ -21,7 +20,7 @@ namespace Mumble
 
     public class MumbleClient
     {
-        /// This sets if we're going to listen to our own audio
+        // This sets if we're going to listen to our own audio
         public bool UseLocalLoopBack { get { return _debugValues.UseLocalLoopback; } }
         // This sets if we send synthetic audio instead of a mic audio
         public bool UseSyntheticSource { get { return _debugValues.UseSyntheticSource; } }
@@ -47,8 +46,6 @@ namespace Mumble
         internal ServerConfig ServerConfig { get; set; }
 
         private OpusCodec _codec;
-
-        public readonly int NumSamplesPerFrame = MumbleConstants.NUM_FRAMES_PER_OUTGOING_PACKET * MumbleConstants.FRAME_SIZE;
 
         //The Mumble version of this integration
         public const string ReleaseName = "MumbleUnity";
@@ -79,6 +76,10 @@ namespace Mumble
 
             _manageSendBuffer = new ManageAudioSendBuffer(_codec, _udpConnection);
             _audioDecodingBuffer = new AudioDecodingBuffer(_codec);
+        }
+        internal PcmArray GetAvailablePcmArray()
+        {
+            return _manageSendBuffer.GetAvailablePcmArray();
         }
         internal void AddUser(UserState newUserState)
         {
@@ -111,14 +112,13 @@ namespace Mumble
             {
                 message = textMessage,
             };
-            //msg.session.Add(ServerSync.session);
             msg.channel_id.Add(ChannelState.channel_id);
             msg.actor = ServerSync.session;
             Debug.Log("Now session length = " + msg.session.Count);
 
             _tcpConnection.SendMessage(MessageType.TextMessage, msg);
         }
-        public void SendVoicePacket(float[] floatData)
+        public void SendVoicePacket(PcmArray floatData)
         {
             _manageSendBuffer.SendVoice(floatData, SpeechTarget.Normal, 0);
         }

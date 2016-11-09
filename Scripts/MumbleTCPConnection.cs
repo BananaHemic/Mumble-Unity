@@ -88,7 +88,7 @@ namespace Mumble
         {
             // Keepalive, if the Mumble server doesn't get a message 
             // for 30 seconds it will close the connection
-            _tcpTimer = new System.Timers.Timer(MumbleConstants.PING_INTERVAL);
+            _tcpTimer = new System.Timers.Timer(MumbleConstants.PING_INTERVAL_MS);
             _tcpTimer.Elapsed += SendPing;
             _tcpTimer.Enabled = true; 
             _processThread.Start();
@@ -141,7 +141,7 @@ namespace Mumble
             try
             {
                 var messageType = (MessageType) IPAddress.NetworkToHostOrder(_reader.ReadInt16());
-                Debug.Log("Processing data of type: " + messageType);
+                //Debug.Log("Processing data of type: " + messageType);
 
                 switch (messageType)
                 {
@@ -198,7 +198,7 @@ namespace Mumble
                         _mumbleClient.ServerConfig = Serializer.DeserializeWithLengthPrefix<ServerConfig>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         //Debug.Log("Sever config = " + _mc.ServerConfig);
-                        Debug.LogWarning("Connected!");
+                        Debug.Log("Connected!");
                         _validConnection = true; // handshake complete
                         break;
                     case MessageType.SuggestConfig:

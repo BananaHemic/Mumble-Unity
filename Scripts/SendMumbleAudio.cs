@@ -50,16 +50,16 @@ namespace Mumble
             int totalSamples = _numTimesLooped * NumSamples + currentPosition;
             _previousPosition = currentPosition;
 
-            while(totalSamples - _totalNumSamplesSent >= _mumbleClient.NumSamplesPerFrame)
+            while(totalSamples - _totalNumSamplesSent >= MumbleConstants.NUM_SAMPLES_PER_PACKET)
             {
                 //print("Sending sample of size: " + _mumbleClient.NumSamplesPerFrame);
                 //TODO use a big buffer that we load parts into
-                float[] tempSampleStore = new float[_mumbleClient.NumSamplesPerFrame];
+                PcmArray newData = _mumbleClient.GetAvailablePcmArray();
 
                 if (!_mumbleClient.UseSyntheticSource)
-                    _sendAudioClip.GetData(tempSampleStore, _totalNumSamplesSent % NumSamples);
+                    _sendAudioClip.GetData(newData.Pcm, _totalNumSamplesSent % NumSamples);
                 else {
-                    TestingClipToUse.GetData(tempSampleStore, _totalNumSamplesSent % NumSamples);
+                    TestingClipToUse.GetData(newData.Pcm, _totalNumSamplesSent % NumSamples);
                     /*
                     for (int i = 0; i < tempSampleStore.Length; i++)
                     {
@@ -68,8 +68,8 @@ namespace Mumble
                     */
                 }
 
-                _mumbleClient.SendVoicePacket(tempSampleStore);
-                _totalNumSamplesSent += _mumbleClient.NumSamplesPerFrame;
+                _mumbleClient.SendVoicePacket(newData);
+                _totalNumSamplesSent += MumbleConstants.NUM_SAMPLES_PER_PACKET;
             }
         }
         void StartSendingAudio()

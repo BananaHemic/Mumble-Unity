@@ -24,7 +24,7 @@ namespace Mumble
         /// <param name="pcm"></param>
         /// <param name="target"></param>
         /// <param name="targetId"></param>
-        public void Add(float[] pcm, SpeechTarget target, uint targetId)
+        public void Add(PcmArray pcm, SpeechTarget target, uint targetId)
         {
             lock (_unencodedBuffer)
             {
@@ -52,7 +52,7 @@ namespace Mumble
         {
             isStop = false;
             isEmpty = false;
-            float[] nextPcmToSend = null;
+            PcmArray nextPcmToSend = null;
             lock (_unencodedBuffer)
             {
                 if (_unencodedBuffer.Count == 1 && _isWaitingToSendLastPacket)
@@ -63,16 +63,19 @@ namespace Mumble
                 if (_unencodedBuffer.Count == 0)
                     isEmpty = true;
                 else
-                    nextPcmToSend = _unencodedBuffer.Dequeue().Pcm;
+                {
+                    nextPcmToSend = _unencodedBuffer.Dequeue().PcmData;
+                    nextPcmToSend.IsAvailable = true;
+                }
             }
-            if (nextPcmToSend == null || nextPcmToSend.Length == 0)
+            if (nextPcmToSend == null || nextPcmToSend.Pcm.Length == 0)
                 isEmpty = true;
 
             if (isEmpty)
                 return EmptyByteSegment;
 
             //Debug.Log("Will encode: " + nextPcmToSend.Length);
-            return codec.Encode(nextPcmToSend);
+            return codec.Encode(nextPcmToSend.Pcm);
         }
 
         /// <summary>
@@ -80,26 +83,25 @@ namespace Mumble
         /// </summary>
         private struct TargettedSpeech
         {
-            public readonly float[] Pcm;
+            public readonly PcmArray PcmData;
             public readonly SpeechTarget Target;
             public readonly uint TargetId;
 
             public bool IsStop;
 
-            public TargettedSpeech(float[] pcm, SpeechTarget target, uint targetId)
+            public TargettedSpeech(PcmArray pcm, SpeechTarget target, uint targetId)
             {
                 TargetId = targetId;
                 Target = target;
-                Pcm = pcm;
+                PcmData = pcm;
 
                 IsStop = false;
             }
-
+            
             public TargettedSpeech(bool stop = true)
             {
                 IsStop = stop;
-
-                Pcm = new float[0];
+                PcmData = null;
                 Target = SpeechTarget.Normal;
                 TargetId = 0;
             }
