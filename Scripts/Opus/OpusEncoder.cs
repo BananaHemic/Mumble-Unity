@@ -67,18 +67,18 @@ namespace Mumble
                 if (_encoder == IntPtr.Zero)
                     throw new ObjectDisposedException("OpusEncoder");
                 int bitrate;
-                var ret = NativeMethods.opus_encoder_ctl(_encoder, NativeMethods.Ctl.GetBitrateRequest, out bitrate);
+                var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.GetBitrateRequest, out bitrate);
                 if (ret < 0)
-                    throw new Exception("Encoder error - " + ((NativeMethods.OpusErrors)ret));
+                    throw new Exception("Encoder error - " + ((OpusErrors)ret));
                 return bitrate;
             }
             set
             {
                 if (_encoder == IntPtr.Zero)
                     throw new ObjectDisposedException("OpusEncoder");
-                var ret = NativeMethods.opus_encoder_ctl(_encoder, NativeMethods.Ctl.SetBitrateRequest, out value);
+                var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.SetBitrateRequest, out value);
                 if (ret < 0)
-                    throw new Exception("Encoder error - " + ((NativeMethods.OpusErrors)ret));
+                    throw new Exception("Encoder error - " + ((OpusErrors)ret));
             }
         }
 
@@ -92,9 +92,9 @@ namespace Mumble
                 if (_encoder == IntPtr.Zero)
                     throw new ObjectDisposedException("OpusEncoder");
                 int fec;
-                var ret = NativeMethods.opus_encoder_ctl(_encoder, NativeMethods.Ctl.GetInbandFecRequest, out fec);
+                var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.GetInbandFecRequest, out fec);
                 if (ret < 0)
-                    throw new Exception("Encoder error - " + ((NativeMethods.OpusErrors)ret));
+                    throw new Exception("Encoder error - " + ((OpusErrors)ret));
                 return fec > 0;
             }
             set
@@ -102,9 +102,9 @@ namespace Mumble
                 if (_encoder == IntPtr.Zero)
                     throw new ObjectDisposedException("OpusEncoder");
                 int req = Convert.ToInt32(value);
-                var ret = NativeMethods.opus_encoder_ctl(_encoder, NativeMethods.Ctl.SetInbandFecRequest, req);
+                var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.SetInbandFecRequest, req);
                 if (ret < 0)
-                    throw new Exception("Encoder error - " + ((NativeMethods.OpusErrors)ret));
+                    throw new Exception("Encoder error - " + ((OpusErrors)ret));
             }
         }
 
@@ -132,10 +132,9 @@ namespace Mumble
             if (srcChannelCount != 1 && srcChannelCount != 2)
                 throw new ArgumentOutOfRangeException("srcChannelCount");
 
-            NativeMethods.OpusErrors error;
-            //TODO use an enum instead of a number for application type
-            var encoder = NativeMethods.opus_encoder_create(srcSamplingRate, srcChannelCount, 2048, out error);
-            if (error != NativeMethods.OpusErrors.Ok)
+            OpusErrors error;
+            var encoder = NativeMethods.opus_encoder_create(srcSamplingRate, srcChannelCount, OpusApplication.Voip, out error);
+            if (error != OpusErrors.Ok)
             {
                 throw new Exception("Exception occured while creating encoder");
             }
@@ -159,7 +158,6 @@ namespace Mumble
             Dispose();
         }
 
-
         public ArraySegment<byte> Encode(float[] pcmSamples)
         {
             int size = NativeMethods.opus_encode(_encoder, pcmSamples, pcmSamples.Length, _encodedPacket);
@@ -172,41 +170,6 @@ namespace Mumble
             else
                 return new ArraySegment<byte>(_encodedPacket, 0, size);
         }
-        /*
-        /// <summary>
-        /// Encode audio samples.
-        /// </summary>
-        /// <param name="srcPcmSamples">PCM samples to be encoded.</param>
-        /// <param name="srcOffset">The zero-based byte offset in srcPcmSamples at which to begin reading PCM samples.</param>
-        /// <param name="dstOutputBuffer">An array of bytes. When this method returns, the buffer contains the specified byte array with the values starting at offset replaced with encoded audio data.</param>
-        /// <param name="dstOffset">The zero-based byte offset in dstOutputBuffer at which to begin writing encoded audio.</param>
-        /// <param name="sampleCount">The number of samples, per channel, to encode.</param>
-        /// <returns>The total number of bytes written to dstOutputBuffer.</returns>
-        public unsafe int Encode(float[] srcPcmSamples, int srcOffset, byte[] dstOutputBuffer, int dstOffset, int sampleCount)
-        {
-            if (srcPcmSamples == null) throw new ArgumentNullException("srcPcmSamples");
-            if (dstOutputBuffer == null) throw new ArgumentNullException("dstOutputBuffer");
-            if (!PermittedFrameSizes.Contains(sampleCount))
-                throw new Exception("Frame size is not permitted");
-            var readSize = _sampleSize * sampleCount;
-            if (srcOffset + readSize > srcPcmSamples.Length)
-                throw new Exception("Not enough samples in source");
-            var maxSizeBytes = dstOutputBuffer.Length - dstOffset;
-            int encodedLen;
-            fixed (byte* benc = dstOutputBuffer)
-            {
-                fixed (byte* bsrc = srcPcmSamples)
-                {
-                    var encodedPtr = (new IntPtr(benc)).Add(dstOffset);// IntPtr.Add(new IntPtr(benc), dstOffset);
-                    var pcmPtr = (new IntPtr(bsrc)).Add(srcOffset);// IntPtr.Add(new IntPtr(bsrc), srcOffset);
-                    encodedLen = NativeMethods.opus_encode(_encoder, pcmPtr, sampleCount, encodedPtr, maxSizeBytes);
-                }
-            }
-            if (encodedLen < 0)
-                throw new Exception("Encoding failed - " + ((NativeMethods.OpusErrors)encodedLen));
-            return encodedLen;
-        }
-        */
 
         /// <summary>
         /// Calculates the size of a frame in bytes.
@@ -217,7 +180,6 @@ namespace Mumble
         {
             return frameSizeInSamples * _sampleSize;
         }
-
 
         /// <summary>
         /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.

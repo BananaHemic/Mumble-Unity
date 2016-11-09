@@ -62,10 +62,10 @@ namespace Mumble
 
         //Control the encoder
         [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int opus_encoder_ctl(IntPtr encoder, Ctl request, out int value);
+        internal static extern int opus_encoder_ctl(IntPtr encoder, OpusCtl request, out int value);
 
         [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int opus_encoder_ctl(IntPtr encoder, Ctl request, int value);
+        internal static extern int opus_encoder_ctl(IntPtr encoder, OpusCtl request, int value);
 
         [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr opus_decoder_create(int sampleRate, int channelCount, out IntPtr error);
@@ -81,12 +81,12 @@ namespace Mumble
 
 
         #region internal methods
-        internal static IntPtr opus_encoder_create(int sampleRate, int channelCount, int application, out OpusErrors error)
+        internal static IntPtr opus_encoder_create(int sampleRate, int channelCount, OpusApplication application, out OpusErrors error)
         {
             int size = opus_encoder_get_size(channelCount);
             IntPtr ptr = Marshal.AllocHGlobal(size);
 
-            error = opus_encoder_init(ptr, sampleRate, channelCount, application);
+            error = opus_encoder_init(ptr, sampleRate, channelCount, (int)application);
             
             if(error != OpusErrors.Ok)
                 if (ptr != IntPtr.Zero)
@@ -147,26 +147,6 @@ namespace Mumble
                 Debug.LogError("Encoding error: " + (OpusErrors)length);
 
             return length;
-        }
-        #endregion
-        #region enums
-        public enum Ctl
-        {
-            SetBitrateRequest = 4002,
-            GetBitrateRequest = 4003,
-            SetInbandFecRequest = 4012,
-            GetInbandFecRequest = 4013
-        }
-        public enum OpusErrors
-        {
-            Ok = 0,
-            BadArgument = -1,
-            BufferTooSmall = -2,
-            InternalError = -3,
-            InvalidPacket = -4,
-            NotImplemented = -5,
-            InvalidState = -6,
-            AllocFail = -7
         }
         #endregion
     }

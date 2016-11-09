@@ -58,10 +58,10 @@ namespace Mumble
             if (outputChannelCount != 1 && outputChannelCount != 2)
                 throw new ArgumentOutOfRangeException("outputChannelCount");
 
-            NativeMethods.OpusErrors error;
+            OpusErrors error;
             _decoder = NativeMethods.opus_decoder_create(outputSampleRate, outputChannelCount, out error);
-            if (error != NativeMethods.OpusErrors.Ok)
-                throw new Exception(string.Format("Exception occured while creating decoder, {0}", ((NativeMethods.OpusErrors)error)));
+            if (error != OpusErrors.Ok)
+                throw new Exception(string.Format("Exception occured while creating decoder, {0}", ((OpusErrors)error)));
             _outputSampleRate = outputChannelCount;
             _outputChannelCount = outputChannelCount;
         }
