@@ -15,6 +15,7 @@ namespace Mumble
         private readonly Thread _encodingThread;
         private readonly List<PcmArray> _pcmArrays;
 
+        private int _numSamplesPerPacket;
         private bool _isEncodingThreadRunning;
         private UInt32 sequenceIndex;
 
@@ -34,6 +35,10 @@ namespace Mumble
         {
             Dispose();
         }
+        internal void SetNumSamplesPerPacket(int newNumSamples)
+        {
+            _numSamplesPerPacket = newNumSamples;
+        }
         public PcmArray GetAvailablePcmArray()
         {
             foreach(PcmArray ray in _pcmArrays)
@@ -44,7 +49,7 @@ namespace Mumble
                     return ray;
                 }
             }
-            PcmArray newArray = new PcmArray(MumbleConstants.NUM_SAMPLES_PER_PACKET, _pcmArrays.Count);
+            PcmArray newArray = new PcmArray(_numSamplesPerPacket, _pcmArrays.Count);
             _pcmArrays.Add(newArray);
 
             //Debug.Log("New buffer length is: " + _pcmArrays.Count);

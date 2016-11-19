@@ -93,6 +93,11 @@ namespace Mumble
         {
             _tcpConnection.StartClient(username, password);
         }
+        internal void SetEncodingFrequency(int newFrequency)
+        {
+            _codec.SetEncodingSampleRate(newFrequency);
+            _manageSendBuffer.SetNumSamplesPerPacket(newFrequency / 100 * MumbleConstants.NUM_FRAMES_PER_OUTGOING_PACKET);
+        }
 
         internal void ConnectUdp()
         {
@@ -141,6 +146,22 @@ namespace Mumble
         public byte[] GetLatestClientNonce()
         {
             return _udpConnection.GetLatestClientNonce();
+        }
+        public static int GetNearestSupportedSampleRate(int listedRate)
+        {
+            int currentBest = -1;
+            int currentDifference = int.MaxValue;
+
+            for(int i = 0; i < MumbleConstants.SUPPORTED_SAMPLE_RATES.Length; i++)
+            {
+                if(Math.Abs(listedRate - MumbleConstants.SUPPORTED_SAMPLE_RATES[i]) < currentDifference)
+                {
+                    currentBest = MumbleConstants.SUPPORTED_SAMPLE_RATES[i];
+                    currentDifference = Math.Abs(listedRate - MumbleConstants.SUPPORTED_SAMPLE_RATES[i]);
+                }
+            }
+
+            return currentBest;
         }
     }
 }
