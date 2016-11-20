@@ -14,7 +14,7 @@ using Mumble;
 public class MumbleTester : MonoBehaviour {
 
     public MumbleAudioPlayer MyMumbleAudioPlayer;
-    public SendMumbleAudio MyMumbleAudioSender;
+    public MumbleMicrophone MyMumbleMic;
     public DebugValues DebuggingVariables;
 
     private MumbleClient _mumbleClient;
@@ -28,8 +28,10 @@ public class MumbleTester : MonoBehaviour {
         _mumbleClient = new MumbleClient(hostName, port, DebuggingVariables);
         _mumbleClient.Connect(_username, _password);
 
-        MyMumbleAudioPlayer.Initialize(_mumbleClient);
-        MyMumbleAudioSender.Initialize(_mumbleClient);
+        if(MyMumbleAudioPlayer != null)
+            _mumbleClient.AddMumbleAudioPlayer(MyMumbleAudioPlayer);
+        if(MyMumbleMic != null)
+            _mumbleClient.AddMumbleMic(MyMumbleMic);
 
 #if UNITY_EDITOR
         if (DebuggingVariables.EnableEditorIOGraph)

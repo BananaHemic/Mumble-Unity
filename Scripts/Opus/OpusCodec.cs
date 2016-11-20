@@ -28,13 +28,12 @@ namespace Mumble
         {
             return _decoder.Decode(encodedData, floatBuffer);
         }
-        public bool SetEncodingSampleRate(int newSampleRate)
+        public bool InitializeEncoderWithSampleRate(int newSampleRate)
         {
             if (_encoder != null)
                 return false;
 
             _encoder = new OpusEncoder(newSampleRate, MumbleConstants.NUM_CHANNELS) { EnableForwardErrorCorrection = true };
-            Debug.Log("Initializing encoder");
             return _encoder != null;
         }
     }

@@ -32,6 +32,9 @@ namespace Mumble
         private MumbleTcpConnection _tcpConnection;
         private MumbleUdpConnection _udpConnection;
         private ManageAudioSendBuffer _manageSendBuffer;
+        private MumbleMicrophone _mumbleMic;
+        private MumbleAudioPlayer _mumbleAudioPlayer;
+
         private DebugValues _debugValues;
         private Dictionary<uint, UserState> AllUsers = new Dictionary<uint, UserState>();
         private readonly AudioDecodingBuffer _audioDecodingBuffer;
@@ -44,6 +47,9 @@ namespace Mumble
         internal CodecVersion CodecVersion { get; set; }
         internal PermissionQuery PermissionQuery { get; set; }
         internal ServerConfig ServerConfig { get; set; }
+
+        internal int EncoderSampleRate { get; private set; }
+        internal int NumSamplesPerOutgoingPacket { get; private set; }
 
         private OpusCodec _codec;
 
@@ -74,8 +80,25 @@ namespace Mumble
             //Maybe do Lazy?
             _codec = new OpusCodec();
 
-            _manageSendBuffer = new ManageAudioSendBuffer(_codec, _udpConnection);
+            _manageSendBuffer = new ManageAudioSendBuffer(_codec, _udpConnection, this);
             _audioDecodingBuffer = new AudioDecodingBuffer(_codec);
+        }
+        internal void AddMumbleMic(MumbleMicrophone newMic)
+        {
+            _mumbleMic = newMic;
+            _mumbleMic.Initialize(this);
+            EncoderSampleRate = _mumbleMic.GetCurrentMicSampleRate();
+
+            if (EncoderSampleRate == -1)
+                return;
+            
+            NumSamplesPerOutgoingPacket = MumbleConstants.NUM_FRAMES_PER_OUTGOING_PACKET * EncoderSampleRate / 100;
+
+            _codec.InitializeEncoderWithSampleRate(EncoderSampleRate);
+        }
+        internal void AddMumbleAudioPlayer(MumbleAudioPlayer newSpeaker)
+        {
+            _mumbleAudioPlayer = newSpeaker;
         }
         internal PcmArray GetAvailablePcmArray()
         {
@@ -92,11 +115,6 @@ namespace Mumble
         public void Connect(string username, string password)
         {
             _tcpConnection.StartClient(username, password);
-        }
-        internal void SetEncodingFrequency(int newFrequency)
-        {
-            _codec.SetEncodingSampleRate(newFrequency);
-            _manageSendBuffer.SetNumSamplesPerPacket(newFrequency / 100 * MumbleConstants.NUM_FRAMES_PER_OUTGOING_PACKET);
         }
 
         internal void ConnectUdp()

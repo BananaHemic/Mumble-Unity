@@ -14,15 +14,16 @@ namespace Mumble
         private readonly AudioEncodingBuffer _encodingBuffer;
         private readonly Thread _encodingThread;
         private readonly List<PcmArray> _pcmArrays;
+        private readonly MumbleClient _mumbleClient;
 
-        private int _numSamplesPerPacket;
         private bool _isEncodingThreadRunning;
         private UInt32 sequenceIndex;
 
-        public ManageAudioSendBuffer(OpusCodec codec, MumbleUdpConnection udpConnection)
+        public ManageAudioSendBuffer(OpusCodec codec, MumbleUdpConnection udpConnection, MumbleClient mumbleClient)
         {
             _udpConnection = udpConnection;
             _codec = codec;
+            _mumbleClient = mumbleClient;
             _pcmArrays = new List<PcmArray>();
             _encodingBuffer = new AudioEncodingBuffer();
 
@@ -35,10 +36,6 @@ namespace Mumble
         {
             Dispose();
         }
-        internal void SetNumSamplesPerPacket(int newNumSamples)
-        {
-            _numSamplesPerPacket = newNumSamples;
-        }
         public PcmArray GetAvailablePcmArray()
         {
             foreach(PcmArray ray in _pcmArrays)
@@ -49,7 +46,7 @@ namespace Mumble
                     return ray;
                 }
             }
-            PcmArray newArray = new PcmArray(_numSamplesPerPacket, _pcmArrays.Count);
+            PcmArray newArray = new PcmArray(_mumbleClient.NumSamplesPerOutgoingPacket, _pcmArrays.Count);
             _pcmArrays.Add(newArray);
 
             //Debug.Log("New buffer length is: " + _pcmArrays.Count);
