@@ -1,11 +1,13 @@
 ﻿using UnityEngine;
 using System.Collections;
 using System;
+using System.Linq;
 
 namespace Mumble {
     [RequireComponent(typeof(AudioSource))]
     public class MumbleAudioPlayer : MonoBehaviour {
 
+        public float Gain = 1;
         private MumbleClient _mumbleClient;
         private AudioSource Source;
         private AudioClip _clip;
@@ -30,6 +32,14 @@ namespace Mumble {
                 return;
 
             _mumbleClient.LoadArrayWithVoiceData(data, 0, data.Length);
+
+            if (Gain == 1)
+                return;
+
+            for (int i = 0; i < data.Length; i++)
+                data[i] = Mathf.Clamp(data[i] * Gain, -1f, 1f);
+
+            //Debug.Log("playing audio with avg: " + data.Average() + " and max " + data.Max());
         }
         void OnAudioPositionSet(int position)
         {
