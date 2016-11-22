@@ -140,7 +140,7 @@ namespace Mumble {
             }
             else
             {
-                Debug.Log("decoding " + packet.Value.Sequence);
+                //Debug.Log("decoding " + packet.Value.Sequence);
             }
 
             if (_decodedBuffer[_nextBufferToDecodeInto] == null)

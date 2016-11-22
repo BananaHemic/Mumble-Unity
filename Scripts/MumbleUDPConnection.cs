@@ -55,6 +55,7 @@ namespace Mumble
         private void ReceiveUdpMessage(byte[] encrypted)
         {
             NumPacketsRecv++;
+
             ProcessUdpMessage(encrypted);
             _udpClient.BeginReceive(ReceiveUdpMessage, null);
         }
@@ -67,7 +68,12 @@ namespace Mumble
         }
         internal void ProcessUdpMessage(byte[] encrypted)
         {
+            //Debug.Log("encrypted length: " + encrypted.Length);
+            //TODO sometimes this fails and I have no idea why
             byte[] message = _cryptState.Decrypt(encrypted, encrypted.Length);
+
+            if (message == null)
+                return;
 
             // figure out type of message
             int type = message[0] >> 5 & 0x7;
