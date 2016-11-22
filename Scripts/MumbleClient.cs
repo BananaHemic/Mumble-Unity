@@ -10,6 +10,8 @@ namespace Mumble
     public delegate void UpdateOcbServerNonce(byte[] cryptSetup);
     [Serializable]
     public class DebugValues {
+        [Header("Whether to add a random number to the end of the username")]
+        public bool UseRandomUsername;
         [Header("Whether to stream the audio back to Unity directly")]
         public bool UseLocalLoopback;
         [Header("Whether to use a synthetic audio source of an audio sample")]

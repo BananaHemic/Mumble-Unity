@@ -26,6 +26,9 @@ public class MumbleTester : MonoBehaviour {
 	void Start () {
 
         _mumbleClient = new MumbleClient(hostName, port, DebuggingVariables);
+
+        if (DebuggingVariables.UseRandomUsername)
+            _username += Random.Range(0, 100f);
         _mumbleClient.Connect(_username, _password);
 
         if(MyMumbleAudioPlayer != null)
