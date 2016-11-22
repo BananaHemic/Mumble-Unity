@@ -3,7 +3,7 @@ using System.Collections;
 
 namespace Mumble
 {
-    public class SendMumbleAudio : MonoBehaviour
+    public class MumbleMicrophone : MonoBehaviour
     {
         public int MicNumberToUse;
         public AudioClip TestingClipToUse;
@@ -11,7 +11,13 @@ namespace Mumble
         public KeyCode PushToTalkKeycode;
 
         const int NumRecordingSeconds = 24;
-        const int NumSamples = NumRecordingSeconds * MumbleConstants.SAMPLE_RATE;
+        private int NumSamplesInAudioClip {
+            get
+            {
+                return NumRecordingSeconds * _mumbleClient.EncoderSampleRate;
+            }
+        }
+        public int NumSamplesPerOutgoingPacket { get; private set; }
 
         private MumbleClient _mumbleClient;
         private AudioClip _sendAudioClip;
@@ -24,21 +30,30 @@ namespace Mumble
         public void Initialize(MumbleClient mumbleClient)
         {
             _mumbleClient = mumbleClient;
-            GetCurrentMic();
         }
-        void GetCurrentMic()
+        /// <summary>
+        /// Find the microphone to use and return it's sample rate
+        /// </summary>
+        /// <returns>New Mic's sample rate</returns>
+        internal int GetCurrentMicSampleRate()
         {
-            foreach (string device in Microphone.devices)
-            {
-                _currentMic = device;
-                int minFreq;
-                int maxFreq;
-                Microphone.GetDeviceCaps(_currentMic, out minFreq, out maxFreq);
-                print("Device:  " + _currentMic + " has freq: " + minFreq + " to " + maxFreq);
-            }
+            //Make sure the requested mic index exists
+            if (Microphone.devices.Length <= MicNumberToUse)
+                return -1;
+
+            int minFreq;
+            int maxFreq;
+            Microphone.GetDeviceCaps(_currentMic, out minFreq, out maxFreq);
+
+            int micSampleRate = MumbleClient.GetNearestSupportedSampleRate(maxFreq);
+            NumSamplesPerOutgoingPacket = MumbleConstants.NUM_FRAMES_PER_OUTGOING_PACKET * micSampleRate / 100;
+
+            print("Device:  " + _currentMic + " has freq: " + minFreq + " to " + maxFreq + " setting to: " + micSampleRate);
             _currentMic = Microphone.devices[MicNumberToUse];
+
             if (AlwaysSendAudio)
-                StartSendingAudio();
+                StartSendingAudio(micSampleRate);
+            return micSampleRate;
         }
         void SendVoiceIfReady()
         {
@@ -47,34 +62,26 @@ namespace Mumble
             if(currentPosition < _previousPosition)
                 _numTimesLooped++;
 
-            int totalSamples = _numTimesLooped * NumSamples + currentPosition;
+            int totalSamples = _numTimesLooped * NumSamplesInAudioClip + currentPosition;
             _previousPosition = currentPosition;
 
-            while(totalSamples - _totalNumSamplesSent >= MumbleConstants.NUM_SAMPLES_PER_PACKET)
+            while(totalSamples - _totalNumSamplesSent >= NumSamplesPerOutgoingPacket)
             {
-                //print("Sending sample of size: " + _mumbleClient.NumSamplesPerFrame);
-                //TODO use a big buffer that we load parts into
                 PcmArray newData = _mumbleClient.GetAvailablePcmArray();
 
                 if (!_mumbleClient.UseSyntheticSource)
-                    _sendAudioClip.GetData(newData.Pcm, _totalNumSamplesSent % NumSamples);
+                    _sendAudioClip.GetData(newData.Pcm, _totalNumSamplesSent % NumSamplesInAudioClip);
                 else {
-                    TestingClipToUse.GetData(newData.Pcm, _totalNumSamplesSent % NumSamples);
-                    /*
-                    for (int i = 0; i < tempSampleStore.Length; i++)
-                    {
-                        tempSampleStore[i] = Mathf.Sin(i * 100f);
-                    }
-                    */
+                    TestingClipToUse.GetData(newData.Pcm, _totalNumSamplesSent % NumSamplesInAudioClip);
                 }
 
                 _mumbleClient.SendVoicePacket(newData);
-                _totalNumSamplesSent += MumbleConstants.NUM_SAMPLES_PER_PACKET;
+                _totalNumSamplesSent += NumSamplesPerOutgoingPacket;
             }
         }
-        void StartSendingAudio()
+        void StartSendingAudio(int sampleRate)
         {
-            _sendAudioClip = Microphone.Start(_currentMic, true, NumRecordingSeconds, MumbleConstants.SAMPLE_RATE);
+            _sendAudioClip = Microphone.Start(_currentMic, true, NumRecordingSeconds, sampleRate);
             _previousPosition = 0;
             _numTimesLooped = 0;
             _totalNumSamplesSent = 0;
@@ -92,7 +99,7 @@ namespace Mumble
                 return;
 
             if (Input.GetKeyDown(PushToTalkKeycode))
-                StartSendingAudio();
+                StartSendingAudio(_mumbleClient.EncoderSampleRate);
             if (Input.GetKeyUp(PushToTalkKeycode))
                 StopSendingAudio();
             if (isRecording)

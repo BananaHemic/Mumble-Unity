@@ -32,6 +32,9 @@ namespace Mumble
         private MumbleTcpConnection _tcpConnection;
         private MumbleUdpConnection _udpConnection;
         private ManageAudioSendBuffer _manageSendBuffer;
+        private MumbleMicrophone _mumbleMic;
+        private MumbleAudioPlayer _mumbleAudioPlayer;
+
         private DebugValues _debugValues;
         private Dictionary<uint, UserState> AllUsers = new Dictionary<uint, UserState>();
         private readonly AudioDecodingBuffer _audioDecodingBuffer;
@@ -44,6 +47,9 @@ namespace Mumble
         internal CodecVersion CodecVersion { get; set; }
         internal PermissionQuery PermissionQuery { get; set; }
         internal ServerConfig ServerConfig { get; set; }
+
+        internal int EncoderSampleRate { get; private set; }
+        internal int NumSamplesPerOutgoingPacket { get; private set; }
 
         private OpusCodec _codec;
 
@@ -74,8 +80,25 @@ namespace Mumble
             //Maybe do Lazy?
             _codec = new OpusCodec();
 
-            _manageSendBuffer = new ManageAudioSendBuffer(_codec, _udpConnection);
+            _manageSendBuffer = new ManageAudioSendBuffer(_codec, _udpConnection, this);
             _audioDecodingBuffer = new AudioDecodingBuffer(_codec);
+        }
+        internal void AddMumbleMic(MumbleMicrophone newMic)
+        {
+            _mumbleMic = newMic;
+            _mumbleMic.Initialize(this);
+            EncoderSampleRate = _mumbleMic.GetCurrentMicSampleRate();
+
+            if (EncoderSampleRate == -1)
+                return;
+            
+            NumSamplesPerOutgoingPacket = MumbleConstants.NUM_FRAMES_PER_OUTGOING_PACKET * EncoderSampleRate / 100;
+
+            _codec.InitializeEncoderWithSampleRate(EncoderSampleRate);
+        }
+        internal void AddMumbleAudioPlayer(MumbleAudioPlayer newSpeaker)
+        {
+            _mumbleAudioPlayer = newSpeaker;
         }
         internal PcmArray GetAvailablePcmArray()
         {
@@ -141,6 +164,22 @@ namespace Mumble
         public byte[] GetLatestClientNonce()
         {
             return _udpConnection.GetLatestClientNonce();
+        }
+        public static int GetNearestSupportedSampleRate(int listedRate)
+        {
+            int currentBest = -1;
+            int currentDifference = int.MaxValue;
+
+            for(int i = 0; i < MumbleConstants.SUPPORTED_SAMPLE_RATES.Length; i++)
+            {
+                if(Math.Abs(listedRate - MumbleConstants.SUPPORTED_SAMPLE_RATES[i]) < currentDifference)
+                {
+                    currentBest = MumbleConstants.SUPPORTED_SAMPLE_RATES[i];
+                    currentDifference = Math.Abs(listedRate - MumbleConstants.SUPPORTED_SAMPLE_RATES[i]);
+                }
+            }
+
+            return currentBest;
         }
     }
 }
