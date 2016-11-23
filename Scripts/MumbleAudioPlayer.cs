@@ -28,17 +28,16 @@ namespace Mumble {
         }
         void OnAudioRead(float[] data)
         {
+            //print("On audio read");
             if (_mumbleClient == null || !_mumbleClient.ConnectionSetupFinished)
                 return;
 
             _mumbleClient.LoadArrayWithVoiceData(data, 0, data.Length);
-
             if (Gain == 1)
                 return;
 
             for (int i = 0; i < data.Length; i++)
                 data[i] = Mathf.Clamp(data[i] * Gain, -1f, 1f);
-
             //Debug.Log("playing audio with avg: " + data.Average() + " and max " + data.Max());
         }
         void OnAudioPositionSet(int position)

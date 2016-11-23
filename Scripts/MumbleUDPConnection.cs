@@ -122,7 +122,7 @@ namespace Mumble
                 size &= 0x1fff;
 
                 //Debug.Log("Received sess: " + session);
-                Debug.Log(" seq: " + sequence + " size = " + size + " packetLen: " + plainTextMessage.Length);
+                //Debug.Log(" seq: " + sequence + " size = " + size + " packetLen: " + plainTextMessage.Length);
 
                 if (size == 0)
                     return;

@@ -101,6 +101,7 @@ namespace Mumble
         internal void AddMumbleAudioPlayer(MumbleAudioPlayer newSpeaker)
         {
             _mumbleAudioPlayer = newSpeaker;
+            _mumbleAudioPlayer.Initialize(this);
         }
         internal PcmArray GetAvailablePcmArray()
         {
