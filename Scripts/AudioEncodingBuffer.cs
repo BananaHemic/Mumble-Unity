@@ -53,21 +53,29 @@ namespace Mumble
             isStop = false;
             isEmpty = false;
             PcmArray nextPcmToSend = null;
+
             lock (_unencodedBuffer)
             {
-                if (_unencodedBuffer.Count == 1 && _isWaitingToSendLastPacket)
-                {
-                    isStop = true;
-                    _isWaitingToSendLastPacket = false;
-                }
                 if (_unencodedBuffer.Count == 0)
                     isEmpty = true;
                 else
                 {
-                    nextPcmToSend = _unencodedBuffer.Dequeue().PcmData;
-                    nextPcmToSend.IsAvailable = true;
+                    if (_unencodedBuffer.Count == 1 && _isWaitingToSendLastPacket)
+                    {
+                        isStop = true;
+                        _isWaitingToSendLastPacket = false;
+                    }
+
+                    TargettedSpeech speech = _unencodedBuffer.Dequeue();
+                    isStop = isStop || speech.IsStop;
+                    if (!isStop)
+                    {
+                        nextPcmToSend = speech.PcmData;
+                        nextPcmToSend.IsAvailable = true;
+                    }
                 }
             }
+
             if (nextPcmToSend == null || nextPcmToSend.Pcm.Length == 0)
                 isEmpty = true;
 
