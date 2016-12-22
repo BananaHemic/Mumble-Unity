@@ -132,19 +132,22 @@ namespace Mumble {
             var packet = GetNextEncodedData();
             if (!packet.HasValue)
                 return false;
-            //TODO Decode a null to indicate a dropped packet
+            if (_decodedBuffer[_nextBufferToDecodeInto] == null)
+                _decodedBuffer[_nextBufferToDecodeInto] = new float[SubBufferSize];
+
             if (packet.Value.Sequence != _nextSequenceToDecode && _nextSequenceToDecode != 0)
             {
                 Debug.LogWarning("dropped packet, recv: " + packet.Value.Sequence + ", expected " + _nextSequenceToDecode);
-                NumPacketsLost += packet.Value.Sequence - _nextSequenceToDecode;
+                if(packet.Value.Sequence > _nextSequenceToDecode)
+                {
+                    NumPacketsLost += packet.Value.Sequence - _nextSequenceToDecode;
+                    _codec.Decode(null, _decodedBuffer[_nextBufferToDecodeInto]);
+                }
             }
             else
             {
                 //Debug.Log("decoding " + packet.Value.Sequence);
             }
-
-            if (_decodedBuffer[_nextBufferToDecodeInto] == null)
-                _decodedBuffer[_nextBufferToDecodeInto] = new float[SubBufferSize];
 
             int numRead = _codec.Decode(packet.Value.Data, _decodedBuffer[_nextBufferToDecodeInto]);
 

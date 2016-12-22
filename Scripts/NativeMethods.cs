@@ -135,13 +135,15 @@ namespace Mumble
                 return 0;
             }
             //TODO use null to signify empty packet
+            /*
             if(encodedData == null)
             {
                 Debug.LogError("Empty encoded packet?");
                 return 0;
             }
+            */
 
-            int length = NativeMethods.opus_decode_float(decoder, encodedData, encodedData.Length, outputPcm, outputPcm.Length / channelCount, MumbleConstants.USE_FORWARD_ERROR_CORRECTION);
+            int length = NativeMethods.opus_decode_float(decoder, encodedData, encodedData != null ? encodedData.Length : 0, outputPcm, outputPcm.Length / channelCount, MumbleConstants.USE_FORWARD_ERROR_CORRECTION);
 
             if (length <= 0)
                 Debug.LogError("Encoding error: " + (OpusErrors)length);
