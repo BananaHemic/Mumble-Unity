@@ -79,14 +79,14 @@ namespace Mumble
         {
             if (_decoder != IntPtr.Zero)
             {
-                NativeMethods.opus_decoder_destroy(_decoder);
+                NativeMethods.destroy_opus(_decoder);
                 _decoder = IntPtr.Zero;
             }
         }
 
         public int Decode(byte[] packetData, float[] floatBuffer)
         {
-            return NativeMethods.opus_decode(_decoder, packetData, floatBuffer, 2 * (int)(MumbleConstants.FRAME_SIZE * MumbleConstants.NUM_CHANNELS), _outputChannelCount);
+            return NativeMethods.opus_decode(_decoder, packetData, floatBuffer, _outputChannelCount);
         }
 
         public static int GetChannels(byte[] srcEncodedBuffer)

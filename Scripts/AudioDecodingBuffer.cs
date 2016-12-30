@@ -156,7 +156,7 @@ namespace Mumble {
 
             _decodedCount += numRead;
             _numSamplesInBuffer[_nextBufferToDecodeInto] = numRead;
-            _nextSequenceToDecode = packet.Value.Sequence + numRead / MumbleConstants.FRAME_SIZE;
+            _nextSequenceToDecode = packet.Value.Sequence + numRead / (MumbleConstants.FRAME_SIZE * MumbleConstants.NUM_CHANNELS);
             _nextBufferToDecodeInto++;
             //Make sure we don't go over our max number of buffers
             if (_nextBufferToDecodeInto == NumDecodedSubBuffers)

@@ -74,7 +74,7 @@ namespace Mumble
         private static extern int opus_decode(IntPtr decoder, IntPtr data, int len, IntPtr pcm, int frameSize, int decodeFec);
 
         [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int opus_decode_float(IntPtr decoder, byte[] data, int len, float[] pcm, int frameSize, int decodeFec);
+        private static extern int opus_decode_float(IntPtr decoder, byte[] data, int len, float[] pcm, int frameSize, int useFEC);//NB: useFEC means to use in-band forward error correction!
 
         [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void opus_decoder_destroy(IntPtr decoder);
@@ -122,33 +122,27 @@ namespace Mumble
         }
         internal static IntPtr opus_decoder_create(int sampleRate, int channelCount, out OpusErrors error)
         {
-            IntPtr p;
-            IntPtr res =  NativeMethods.opus_decoder_create(sampleRate, channelCount, out p);
-            error = (OpusErrors)p;
-            return res;
+            int decoder_size = NativeMethods.opus_decoder_get_size(channelCount);
+            IntPtr ptr = Marshal.AllocHGlobal(decoder_size);
+
+            error = NativeMethods.opus_decoder_init(ptr, MumbleConstants.SAMPLE_RATE, channelCount);
+            return ptr;
         }
-        internal static int opus_decode(IntPtr decoder, byte[] encodedData, float[] outputPcm, int frameSize, int channelCount)
+        internal static int opus_decode(IntPtr decoder, byte[] encodedData, float[] outputPcm, int channelCount)
         {
             if (decoder == IntPtr.Zero)
             {
                 Debug.LogError("Encoder empty??");
                 return 0;
             }
-            //TODO use null to signify empty packet
-            /*
-            if(encodedData == null)
-            {
-                Debug.LogError("Empty encoded packet?");
-                return 0;
-            }
-            */
 
             int length = NativeMethods.opus_decode_float(decoder, encodedData, encodedData != null ? encodedData.Length : 0, outputPcm, outputPcm.Length / channelCount, MumbleConstants.USE_FORWARD_ERROR_CORRECTION);
+            //Debug.Log("Retrieved " + length + " samples");
 
             if (length <= 0)
-                Debug.LogError("Encoding error: " + (OpusErrors)length);
+                Debug.LogError("Decoding error: " + (OpusErrors)length);
 
-            return length;
+            return length * channelCount;
         }
         #endregion
     }

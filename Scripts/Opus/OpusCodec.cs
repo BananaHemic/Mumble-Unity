@@ -8,7 +8,7 @@ namespace Mumble
 {
     public class OpusCodec
     {
-        readonly OpusDecoder _decoder = new OpusDecoder((int)MumbleConstants.SAMPLE_RATE, MumbleConstants.NUM_CHANNELS) { EnableForwardErrorCorrection = true };
+        readonly OpusDecoder _decoder = new OpusDecoder((int)MumbleConstants.SAMPLE_RATE, MumbleConstants.NUM_CHANNELS) { EnableForwardErrorCorrection = false };
         private OpusEncoder _encoder;
 
 
@@ -33,7 +33,7 @@ namespace Mumble
             if (_encoder != null)
                 return false;
 
-            _encoder = new OpusEncoder(newSampleRate, MumbleConstants.NUM_CHANNELS) { EnableForwardErrorCorrection = true };
+            _encoder = new OpusEncoder(newSampleRate, 1) { EnableForwardErrorCorrection = false };
             return _encoder != null;
         }
     }
