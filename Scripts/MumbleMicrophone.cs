@@ -7,8 +7,8 @@ namespace Mumble
     {
         public int MicNumberToUse;
         public AudioClip TestingClipToUse;
-        public bool AlwaysSendAudio;
-        public KeyCode PushToTalkKeycode;
+        public bool AlwaysSendAudio = true;
+        public KeyCode PushToTalkKeycode = KeyCode.Space;
 
         const int NumRecordingSeconds = 24;
         private int NumSamplesInAudioClip {

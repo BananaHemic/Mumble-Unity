@@ -52,11 +52,16 @@ namespace Mumble
             _username = username;
             _password = password;
             _tcpClient.BeginConnect(_host.Address, _host.Port, new AsyncCallback(OnTcpConnected), null);
+            Debug.Log("Attempting to connect to " + _host);
         }
         private void OnTcpConnected(IAsyncResult connectionResult)
         {
             if (!_tcpClient.Connected)
+            {
+                Debug.LogError("Connection failed! Please confirm that you have internet access, and that the hostname is correct");
                 throw new Exception("Failed to connect");
+            }
+            
 
             NetworkStream networkStream = _tcpClient.GetStream();
             _ssl = new SslStream(networkStream, false, ValidateCertificate);
@@ -277,12 +282,18 @@ namespace Mumble
 
         internal void Close()
         {
-            _ssl.Close();
-            _tcpTimer.Close();
-            _processThread.Abort();
-            _reader.Close();
-            _writer.Close();
-            _tcpClient.Close();
+            if(_ssl != null)
+                _ssl.Close();
+            if(_tcpTimer != null)
+                _tcpTimer.Close();
+            if(_processThread != null)
+                _processThread.Abort();
+            if(_reader != null)
+                _reader.Close();
+            if(_writer != null)
+                _writer.Close();
+            if(_tcpClient != null)
+                _tcpClient.Close();
         }
 
         internal void SendPing(object sender, ElapsedEventArgs elapsedEventArgs)

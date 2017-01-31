@@ -18,18 +18,24 @@ public class MumbleTester : MonoBehaviour {
     public DebugValues DebuggingVariables;
 
     private MumbleClient _mumbleClient;
-    public string hostName = "1.2.3.4";
-    public int port = 64738;
-    public string _username = "SuperUser";
-    public string _password = "1passwordHere!";
+    public string HostName = "1.2.3.4";
+    public int Port = 64738;
+    public string Username = "ExampleUser";
+    public string Password = "1passwordHere!";
 
 	void Start () {
 
-        _mumbleClient = new MumbleClient(hostName, port, DebuggingVariables);
+        if(HostName == "1.2.3.4")
+        {
+            Debug.LogError("Please set the mumble host name to your mumble server");
+            return;
+        }
+
+        _mumbleClient = new MumbleClient(HostName, Port, DebuggingVariables);
 
         if (DebuggingVariables.UseRandomUsername)
-            _username += Random.Range(0, 100f);
-        _mumbleClient.Connect(_username, _password);
+            Username += Random.Range(0, 100f);
+        _mumbleClient.Connect(Username, Password);
 
         if(MyMumbleAudioPlayer != null)
             _mumbleClient.AddMumbleAudioPlayer(MyMumbleAudioPlayer);
