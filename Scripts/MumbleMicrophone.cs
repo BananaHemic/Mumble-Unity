@@ -81,6 +81,7 @@ namespace Mumble
         }
         void StartSendingAudio(int sampleRate)
         {
+            Debug.LogWarning("Starting to send audio");
             _sendAudioClip = Microphone.Start(_currentMic, true, NumRecordingSeconds, sampleRate);
             _previousPosition = 0;
             _numTimesLooped = 0;
@@ -98,9 +99,9 @@ namespace Mumble
             if (_mumbleClient == null || !_mumbleClient.ConnectionSetupFinished)
                 return;
 
-            if (Input.GetKeyDown(PushToTalkKeycode))
+            if (!AlwaysSendAudio && Input.GetKeyDown(PushToTalkKeycode))
                 StartSendingAudio(_mumbleClient.EncoderSampleRate);
-            if (Input.GetKeyUp(PushToTalkKeycode))
+            if (!AlwaysSendAudio && Input.GetKeyUp(PushToTalkKeycode))
                 StopSendingAudio();
             if (isRecording)
                 SendVoiceIfReady();

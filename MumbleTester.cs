@@ -30,6 +30,7 @@ public class MumbleTester : MonoBehaviour {
             Debug.LogError("Please set the mumble host name to your mumble server");
             return;
         }
+        Application.runInBackground = true;
 
         _mumbleClient = new MumbleClient(HostName, Port, DebuggingVariables);
 
