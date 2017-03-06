@@ -40,11 +40,17 @@ namespace Mumble
         private DebugValues _debugValues;
         private Dictionary<uint, UserState> AllUsers = new Dictionary<uint, UserState>();
         private Dictionary<string, ChannelState> Channels = new Dictionary<string, ChannelState>();
+        private UserState OurUserState
+        {
+            get
+            {
+                return  AllUsers[ServerSync.session];
+            }
+        }
         private readonly AudioDecodingBuffer _audioDecodingBuffer;
 
         internal Version RemoteVersion { get; set; }
         internal CryptSetup CryptSetup { get; set; }
-        internal UserState OurUserState { get; set; }
         internal ServerSync ServerSync { get; set; }
         internal CodecVersion CodecVersion { get; set; }
         internal PermissionQuery PermissionQuery { get; set; }
@@ -109,7 +115,7 @@ namespace Mumble
         }
         internal void AddUser(UserState newUserState)
         {
-            AllUsers.Add(newUserState.session, newUserState);
+            AllUsers[newUserState.session] = newUserState;
         }
         internal void RemoveUser(uint removedUserSession)
         {

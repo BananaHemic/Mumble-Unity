@@ -191,16 +191,16 @@ namespace Mumble
                         Debug.Log("Permission Cannel = " + _mumbleClient.PermissionQuery.channel_id);
                         break;
                     case MessageType.UserState:
-                        //This is called for every user in the room
-                        //TODO add support for multiple users
-                        _mumbleClient.OurUserState = Serializer.DeserializeWithLengthPrefix<UserState>(_ssl,
+                        //This is called for every user in the room, including us
+                        UserState user = Serializer.DeserializeWithLengthPrefix<UserState>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        Debug.Log("User State Actor= " + _mumbleClient.OurUserState.actor);
-                        Debug.Log("User State Session= " + _mumbleClient.OurUserState.session);
-                        Debug.Log("User State User ID= " + _mumbleClient.OurUserState.user_id);
-                        Debug.Log("User State User ID= " + _mumbleClient.OurUserState.plugin_identity);
+                        Debug.Log("Name: " + user.name);
+                        Debug.Log("Session: " + user.session);
+                        Debug.Log("actor: " + user.actor);
+                        _mumbleClient.AddUser(user);
                         break;
                     case MessageType.ServerSync:
+                        //This is where we get our session Id
                         _mumbleClient.ServerSync = Serializer.DeserializeWithLengthPrefix<ServerSync>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         Debug.Log("Server Sync Session= " + _mumbleClient.ServerSync.session);
@@ -254,6 +254,11 @@ namespace Mumble
                             PrefixStyle.Fixed32BigEndian);
                         Debug.Log("Removing " + removal.session);
                         _mumbleClient.RemoveUser(removal.session);
+                        break;
+                    case MessageType.PermissionDenied:
+                        var denial = Serializer.DeserializeWithLengthPrefix<PermissionDenied>(_ssl,
+                            PrefixStyle.Fixed32BigEndian);
+                        Debug.LogError("Permission denied with fields Name: " + denial.name +", Type: " + denial.type + ", Reason: " + denial.reason);
                         break;
                     default:
                         Debug.LogError("Message type " + messageType + " not implemented");
