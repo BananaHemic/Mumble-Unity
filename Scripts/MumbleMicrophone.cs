@@ -79,7 +79,7 @@ namespace Mumble
                 _totalNumSamplesSent += NumSamplesPerOutgoingPacket;
             }
         }
-        void StartSendingAudio(int sampleRate)
+        public void StartSendingAudio(int sampleRate)
         {
             Debug.LogWarning("Starting to send audio");
             _sendAudioClip = Microphone.Start(_currentMic, true, NumRecordingSeconds, sampleRate);
@@ -88,7 +88,7 @@ namespace Mumble
             _totalNumSamplesSent = 0;
             isRecording = true;
         }
-        void StopSendingAudio()
+        public void StopSendingAudio()
         {
             Microphone.End(_currentMic);
             _mumbleClient.StopSendingVoice();
