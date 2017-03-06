@@ -174,14 +174,21 @@ namespace Mumble
                         //Debug.Log("Got codec version");
                         break;
                     case MessageType.ChannelState:
-                        _mumbleClient.ChannelState = Serializer.DeserializeWithLengthPrefix<ChannelState>(_ssl,
+                        ChannelState ChannelState = Serializer.DeserializeWithLengthPrefix<ChannelState>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        //Debug.Log("Channel state ID = " + _mc.ChannelState.channel_id);
+                        Debug.Log("Channel state Name = " + ChannelState.name);
+                        Debug.Log("Channel state ID = " + ChannelState.channel_id);
+                        Debug.Log("Channel state Position = " + ChannelState.position);
+                        Debug.Log("Channel state Temporary = " + ChannelState.temporary);
+                        Debug.Log("Channel state Parent = " + ChannelState.parent);
+                        Debug.Log("Channel state Description = " + ChannelState.description);
+                        _mumbleClient.AddChannel(ChannelState);
                         break;
                     case MessageType.PermissionQuery:
                         _mumbleClient.PermissionQuery = Serializer.DeserializeWithLengthPrefix<PermissionQuery>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        //Debug.Log("Permission Query = " + _mc.PermissionQuery);
+                        Debug.Log("Permission Query = " + _mumbleClient.PermissionQuery.permissions);
+                        Debug.Log("Permission Cannel = " + _mumbleClient.PermissionQuery.channel_id);
                         break;
                     case MessageType.UserState:
                         //This is called for every user in the room

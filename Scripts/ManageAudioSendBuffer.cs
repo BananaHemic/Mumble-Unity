@@ -94,12 +94,15 @@ namespace Mumble
                     if (isLastPacket)
                         Debug.Log("Will send last packet");
 
+                    if (packet == null)
+                        Debug.Log("Null Packet");
+
                     if (packet.Array.Length == 0 || packet.Count == 0)
                         Debug.LogError("Empty packet?");
 
                     //Make the header
                     byte type = (byte)4;
-                    //originaly [type = codec_type_id << 5 | whistep_chanel_id]. now we can talk only to normal chanel
+                    //originally [type = codec_type_id << 5 | whistep_chanel_id]. now we can talk only to normal chanel
                     type = (byte)(type << 5);
                     byte[] sequence = Var64.writeVarint64_alternative((UInt64)sequenceIndex);
 

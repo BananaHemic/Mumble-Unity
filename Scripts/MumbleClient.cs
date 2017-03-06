@@ -39,11 +39,11 @@ namespace Mumble
 
         private DebugValues _debugValues;
         private Dictionary<uint, UserState> AllUsers = new Dictionary<uint, UserState>();
+        private Dictionary<string, ChannelState> Channels = new Dictionary<string, ChannelState>();
         private readonly AudioDecodingBuffer _audioDecodingBuffer;
 
         internal Version RemoteVersion { get; set; }
         internal CryptSetup CryptSetup { get; set; }
-        internal ChannelState ChannelState { get; set; }
         internal UserState OurUserState { get; set; }
         internal ServerSync ServerSync { get; set; }
         internal CodecVersion CodecVersion { get; set; }
@@ -138,7 +138,7 @@ namespace Mumble
             {
                 message = textMessage,
             };
-            msg.channel_id.Add(ChannelState.channel_id);
+            msg.channel_id.Add(OurUserState.channel_id);
             msg.actor = ServerSync.session;
             Debug.Log("Now session length = " + msg.session.Count);
 
@@ -156,6 +156,28 @@ namespace Mumble
         public void LoadArrayWithVoiceData(float[] pcmArray, int offset, int length)
         {
             _audioDecodingBuffer.Read(pcmArray, offset, length);
+        }
+        public void JoinChannel(string channelToJoin)
+        {
+            ChannelState channel;
+            if (!Channels.TryGetValue(channelToJoin, out channel))
+            {
+                Debug.LogError("Channel " + channelToJoin + " not found!");
+                return;
+            }
+            UserState state = new UserState();
+            state.channel_id = channel.channel_id;
+            state.actor = OurUserState.actor;
+            state.session = OurUserState.session; 
+            _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
+        }
+        internal void AddChannel(ChannelState channelToAdd)
+        {
+            Channels[channelToAdd.name] = channelToAdd;
+        }
+        internal void RemoveChannel(ChannelState channelToRemove)
+        {
+            Channels.Remove(channelToRemove.name);
         }
         /// <summary>
         /// Tell the encoder to send the last audio packet, then reset the sequence number

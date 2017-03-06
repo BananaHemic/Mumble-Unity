@@ -70,6 +70,7 @@ namespace Mumble
         {
             //Debug.Log("encrypted length: " + encrypted.Length);
             //TODO sometimes this fails and I have no idea why
+            //Debug.Log(encrypted[0] + " " + encrypted[1]);
             byte[] message = _cryptState.Decrypt(encrypted, encrypted.Length);
 
             if (message == null)

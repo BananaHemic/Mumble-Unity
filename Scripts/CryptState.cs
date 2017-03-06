@@ -69,7 +69,7 @@ namespace Mumble
             Array.Clear(block, 0, block.Length);
         }
 
-        // buffer + amount of usefull bytes in buffer
+        // buffer + amount of useful bytes in buffer
         public byte[] Encrypt(byte[] inBytes, int length)
         {
             for (int i = 0; i < AES_BLOCK_SIZE; i++)
@@ -160,7 +160,7 @@ namespace Mumble
             var dst = new byte[plainLength];
 
             var saveiv = new byte[AES_BLOCK_SIZE];
-            var ivbyte = (short) (source[0] & 0xFF);
+            char ivbyte = (char) (source[0] & 0xFF);
             bool restore = false;
             var tag = new byte[AES_BLOCK_SIZE];
 
@@ -224,9 +224,7 @@ namespace Mumble
                     for (int i = 1; i < AES_BLOCK_SIZE; i++)
                     {
                         if ((_cryptSetup.server_nonce[i]--) != 0)
-                        {
                             break;
-                        }
                     }
                     restore = true;
                 }
@@ -244,9 +242,7 @@ namespace Mumble
                     for (int i = 1; i < AES_BLOCK_SIZE; i++)
                     {
                         if ((++_cryptSetup.server_nonce[i]) != 0)
-                        {
                             break;
-                        }
                     }
                 }
                 else
@@ -255,7 +251,7 @@ namespace Mumble
                     return null;
                 }
 
-                if (_decryptHistory[_cryptSetup.server_nonce[0] & 0xFF] == _cryptSetup.client_nonce[0])
+                if (_decryptHistory[_cryptSetup.server_nonce[0] & 0xFF] == _cryptSetup.client_nonce[1])
                 {
                     Array.Copy(saveiv, 0, _cryptSetup.server_nonce, 0, AES_BLOCK_SIZE);
                     Debug.LogError("Crypt: 3");
@@ -267,8 +263,15 @@ namespace Mumble
             Array.Copy(source, 4, newsrc, 0, plainLength);
             OcbDecrypt(newsrc, dst, _cryptSetup.server_nonce, tag);
 
-            if (tag[0] != source[1] || tag[1] != source[2] || tag[2] != source[3])
+            if (tag[0] != source[1]
+                || tag[1] != source[2]
+                || tag[2] != source[3])
             {
+                Debug.Log(tag[0] + " " + source[1] + "\n"
+                    + tag[1] + " " + source[2] + "\n"
+                    + tag[2] + " " + source[3]
+                    );
+
                 Array.Copy(saveiv, 0, _cryptSetup.server_nonce, 0, AES_BLOCK_SIZE);
                 Debug.LogError("Crypt: 4");
                 return null;

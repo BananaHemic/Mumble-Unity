@@ -22,6 +22,7 @@ public class MumbleTester : MonoBehaviour {
     public int Port = 64738;
     public string Username = "ExampleUser";
     public string Password = "1passwordHere!";
+    public string ChannelToJoin = "";
 
 	void Start () {
 
@@ -87,6 +88,11 @@ public class MumbleTester : MonoBehaviour {
         {
             _mumbleClient.SendTextMessage("This is an example message from Unity");
             print("Sent mumble message");
+        }
+        if (Input.GetKeyDown(KeyCode.J))
+        {
+            print("Will attempt to join channel " + ChannelToJoin);
+            _mumbleClient.JoinChannel(ChannelToJoin);
         }
 	}
 }

@@ -6,7 +6,7 @@ using UnityEditor;
 #endif
 using System.Collections;
 
-public class Channel
+public class GraphChannel
 {
     public int numPoints = 0;
     public float[] _data = new float[Graph.MAX_HISTORY];
@@ -15,7 +15,7 @@ public class Channel
 
     private float yMin, yMax;
 
-    public Channel(Color _C)
+    public GraphChannel(Color _C)
     {
         _color = _C;
     }
@@ -50,13 +50,13 @@ public class Graph
     public const int MAX_HISTORY = 1024;
     public const int MAX_CHANNELS = 3;
 
-    public static Channel[] channel = new Channel[MAX_CHANNELS];
+    public static GraphChannel[] channel = new GraphChannel[MAX_CHANNELS];
 
     static Graph()
     {
-        Graph.channel[0] = new Channel(Color.gray);
-        Graph.channel[1] = new Channel(Color.blue);
-        Graph.channel[2] = new Channel(Color.red);
+        Graph.channel[0] = new GraphChannel(Color.gray);
+        Graph.channel[1] = new GraphChannel(Color.blue);
+        Graph.channel[2] = new GraphChannel(Color.red);
     }
     public static void UpdateMax(float newMin, float newMax)
     {
@@ -125,7 +125,7 @@ public class EditorGraph : EditorWindow
 
         for (int chan = 0; chan < Graph.MAX_CHANNELS; chan++)
         {
-            Channel C = Graph.channel[chan];
+            GraphChannel C = Graph.channel[chan];
 
             if (!C.isActive)
                 continue;
