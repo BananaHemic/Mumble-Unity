@@ -547,7 +547,7 @@ namespace MumbleProto
       set { _user_id = value; }
     }
     private uint _channel_id = default(uint);
-    [global::ProtoBuf.ProtoMember(5, IsRequired = false, Name=@"channel_id", DataFormat = global::ProtoBuf.DataFormat.TwosComplement)]
+    [global::ProtoBuf.ProtoMember(5, IsRequired = true, Name=@"channel_id", DataFormat = global::ProtoBuf.DataFormat.TwosComplement)]
     [global::System.ComponentModel.DefaultValue(default(uint))]
     public uint channel_id
     {

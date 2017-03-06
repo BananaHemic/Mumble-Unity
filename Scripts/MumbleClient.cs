@@ -115,7 +115,8 @@ namespace Mumble
         }
         internal void AddUser(UserState newUserState)
         {
-            AllUsers[newUserState.session] = newUserState;
+            if(!AllUsers.ContainsKey(newUserState.session))
+                AllUsers[newUserState.session] = newUserState;
         }
         internal void RemoveUser(uint removedUserSession)
         {
@@ -173,8 +174,9 @@ namespace Mumble
             }
             UserState state = new UserState();
             state.channel_id = channel.channel_id;
-            state.actor = OurUserState.actor;
-            state.session = OurUserState.session; 
+            state.actor = OurUserState.session;
+            state.session = OurUserState.session;
+            Debug.Log("Attempting to join channel Id: " + state.channel_id);
             _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
         }
         internal void AddChannel(ChannelState channelToAdd)

@@ -104,7 +104,7 @@ namespace Mumble
             lock (_ssl)
             {
                 if(mt != MessageType.Ping)
-                Debug.Log("Sending " + mt + " message");
+                    Debug.Log("Sending " + mt + " message");
                 //_writer.Write(IPAddress.HostToNetworkOrder((Int16) mt));
                 //Serializer.SerializeWithLengthPrefix(_ssl, message, PrefixStyle.Fixed32BigEndian);
 
@@ -130,6 +130,16 @@ namespace Mumble
                 _writer.Write(IPAddress.HostToNetworkOrder(messageSize));
                 messageStream.Position = 0;
                 _writer.Write(messageStream.ToArray());
+                /*
+                StringBuilder sb = new StringBuilder();
+                byte[] msgArray = messageStream.ToArray();
+                for (int i = 0; i < msgArray.Length; i++)
+                {
+                    sb.Append(msgArray[i]);
+                    sb.Append(",");
+                }
+                Debug.Log(sb.ToString());
+                */
                 _writer.Flush();
             }
         }
