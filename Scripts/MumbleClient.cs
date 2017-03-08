@@ -115,8 +115,19 @@ namespace Mumble
         }
         internal void AddUser(UserState newUserState)
         {
-            if(!AllUsers.ContainsKey(newUserState.session))
+            if (!AllUsers.ContainsKey(newUserState.session))
+            {
                 AllUsers[newUserState.session] = newUserState;
+            }
+            else
+            {
+                // Copy over the things that have changed
+                //TODO we should be doing with with a proto merge in MumbleTCPConnection,
+                //but I don't know how to identify object it needs to be merged with before it's been deserialized
+                if(!string.IsNullOrEmpty(newUserState.name))
+                    AllUsers[newUserState.session].name = newUserState.name;
+                AllUsers[newUserState.session].channel_id = newUserState.channel_id;
+            }
         }
         internal void RemoveUser(uint removedUserSession)
         {
@@ -178,6 +189,16 @@ namespace Mumble
             state.session = OurUserState.session;
             Debug.Log("Attempting to join channel Id: " + state.channel_id);
             _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
+        }
+        public string GetCurrentChannel()
+        {
+            foreach(string key in Channels.Keys)
+            {
+                if (Channels[key].channel_id == OurUserState.channel_id)
+                    return Channels[key].name;
+            }
+            Debug.LogError("Could not get current channel");
+            return null;
         }
         internal void AddChannel(ChannelState channelToAdd)
         {
