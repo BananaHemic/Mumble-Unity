@@ -10,7 +10,7 @@ namespace Mumble
         public bool AlwaysSendAudio = true;
         public KeyCode PushToTalkKeycode = KeyCode.Space;
 
-        const int NumRecordingSeconds = 24;
+        const int NumRecordingSeconds = 1;
         private int NumSamplesInAudioClip {
             get
             {
