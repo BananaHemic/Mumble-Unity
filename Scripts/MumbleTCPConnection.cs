@@ -186,12 +186,14 @@ namespace Mumble
                     case MessageType.ChannelState:
                         ChannelState ChannelState = Serializer.DeserializeWithLengthPrefix<ChannelState>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
+                        /*
                         Debug.Log("Channel state Name = " + ChannelState.name);
                         Debug.Log("Channel state ID = " + ChannelState.channel_id);
                         Debug.Log("Channel state Position = " + ChannelState.position);
                         Debug.Log("Channel state Temporary = " + ChannelState.temporary);
                         Debug.Log("Channel state Parent = " + ChannelState.parent);
                         Debug.Log("Channel state Description = " + ChannelState.description);
+                        */
                         _mumbleClient.AddChannel(ChannelState);
                         break;
                     case MessageType.PermissionQuery:
@@ -204,9 +206,11 @@ namespace Mumble
                         //This is called for every user in the room, including us
                         UserState user = Serializer.DeserializeWithLengthPrefix<UserState>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
+                        /*
                         Debug.Log("Name: " + user.name);
                         Debug.Log("Session: " + user.session);
                         Debug.Log("actor: " + user.actor);
+                        */
                         _mumbleClient.AddUser(user);
                         break;
                     case MessageType.ServerSync:
