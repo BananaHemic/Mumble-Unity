@@ -104,6 +104,7 @@ namespace Mumble
         {
             byte typeByte = plainTextMessage[0];
             int target = typeByte & 31;
+            //Debug.Log("len = " + plainTextMessage.Length + " typeByte = " + typeByte);
 
             using (var reader = new UdpPacketReader(new MemoryStream(plainTextMessage, 1, plainTextMessage.Length - 1)))
             {
@@ -111,6 +112,7 @@ namespace Mumble
                 if(!_mumbleClient.UseLocalLoopBack)
                     session = (uint)reader.ReadVarInt64();
                 Int64 sequence = reader.ReadVarInt64();
+
 
                 //We assume we mean OPUS
                 int size = (int)reader.ReadVarInt64();
@@ -129,6 +131,7 @@ namespace Mumble
                     return;
 
                 byte[] data = reader.ReadBytes(size);
+                
 
                 if (data == null || data.Length != size)
                 {
@@ -136,6 +139,11 @@ namespace Mumble
                     return;
                 }
 
+                long remaining = reader.GetRemainingBytes();
+                if(remaining != 0)
+                {
+                    Debug.LogWarning("We have " + remaining + " bytes!");
+                }
                 _mumbleClient.ReceiveEncodedVoice(data, sequence);
             }
         }

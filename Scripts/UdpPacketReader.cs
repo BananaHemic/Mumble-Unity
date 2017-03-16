@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
+using UnityEngine;
 
 namespace Mumble
 {
@@ -18,6 +19,11 @@ namespace Mumble
         public void Dispose()
         {
             _inner.Dispose();
+        }
+
+        public long GetRemainingBytes()
+        {
+            return _inner.Length - _inner.Position;
         }
 
         public byte ReadByte()
@@ -40,8 +46,10 @@ namespace Mumble
 
         public long ReadVarInt64()
         {
+            //return ProtoBuf.ProtoReader.DirectReadVarintInt32(_inner);
             byte b = ReadByte();
             int leadingOnes = LeadingOnes(b);
+            //Debug.Log("b = " + b + " starts with " + leadingOnes);
             switch (leadingOnes)
             {
                 case 0:
