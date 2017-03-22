@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Mumble
 {
-    public class MumbleConstants
+    public static class MumbleConstants
     {
         public const int SAMPLE_RATE = 48000;
         public static readonly int[] SUPPORTED_SAMPLE_RATES = new int[] {

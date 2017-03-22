@@ -5,9 +5,25 @@ namespace Mumble
 {
     public class MumbleMicrophone : MonoBehaviour
     {
+        public enum MicType
+        {
+            AlwaysSend,
+            //SignalToNoise, //TODO we need a dll to calculate the signal to noise, as it requires a FFT which I don't want to do in C#
+            Amplitude,
+            PushToTalk,
+            MethodBased // Start / Stop speaking based on calls to this method
+        }
+        public bool SendAudioOnStart = true;
         public int MicNumberToUse;
+        /// <summary>
+        /// The minimum aplitude to recognize as voice data
+        /// Only used if Mic is set to "Amplitude"
+        /// </summary>
+        [Range (0.0f, 1.0f)]
+        public float MinAmplitude = 0.007f;
+        public float VoiceHoldSeconds = 0.5f;
+        public MicType VoiceSendingType = MicType.AlwaysSend;
         public AudioClip TestingClipToUse;
-        public bool AlwaysSendAudio = true;
         public KeyCode PushToTalkKeycode = KeyCode.Space;
 
         const int NumRecordingSeconds = 1;
@@ -26,6 +42,9 @@ namespace Mumble
         private int _previousPosition = 0;
         private int _totalNumSamplesSent = 0;
         private int _numTimesLooped = 0;
+        // Amplitude MicType vars
+        private int _voiceHoldSamples;
+        private int _sampleNumberOfLastMinAmplitudeVoice;
         
         public void Initialize(MumbleClient mumbleClient)
         {
@@ -51,7 +70,10 @@ namespace Mumble
             print("Device:  " + _currentMic + " has freq: " + minFreq + " to " + maxFreq + " setting to: " + micSampleRate);
             _currentMic = Microphone.devices[MicNumberToUse];
 
-            if (AlwaysSendAudio)
+            _voiceHoldSamples = Mathf.RoundToInt(micSampleRate * VoiceHoldSeconds);
+
+            if (SendAudioOnStart && (VoiceSendingType == MicType.AlwaysSend
+                || VoiceSendingType == MicType.Amplitude))
                 StartSendingAudio(micSampleRate);
             return micSampleRate;
         }
@@ -74,10 +96,36 @@ namespace Mumble
                 else {
                     TestingClipToUse.GetData(newData.Pcm, _totalNumSamplesSent % NumSamplesInAudioClip);
                 }
-
-                _mumbleClient.SendVoicePacket(newData);
                 _totalNumSamplesSent += NumSamplesPerOutgoingPacket;
+
+                if(VoiceSendingType == MicType.Amplitude)
+                {
+                    if (AmplitudeHigherThan(MinAmplitude, newData.Pcm))
+                    {
+                        _sampleNumberOfLastMinAmplitudeVoice = _totalNumSamplesSent;
+                    }
+                    else
+                    {
+                        if (_totalNumSamplesSent > _sampleNumberOfLastMinAmplitudeVoice + _voiceHoldSamples)
+                            return;
+                    }
+                }
+                _mumbleClient.SendVoicePacket(newData);
             }
+        }
+        private bool AmplitudeHigherThan(float minAmplitude, float[] pcm)
+        {
+            float currentSum = pcm[0];
+            int checkInterval = 200;
+
+            for(int i = 1; i < pcm.Length; i++)
+            {
+                currentSum += Mathf.Abs(pcm[i]);
+                // Allow early returning
+                if (i % checkInterval == 0 && currentSum / i > minAmplitude)
+                    return true;
+            }
+            return currentSum / pcm.Length > minAmplitude;
         }
         public void StartSendingAudio(int sampleRate)
         {
@@ -99,10 +147,13 @@ namespace Mumble
             if (_mumbleClient == null || !_mumbleClient.ConnectionSetupFinished)
                 return;
 
-            if (!AlwaysSendAudio && Input.GetKeyDown(PushToTalkKeycode))
-                StartSendingAudio(_mumbleClient.EncoderSampleRate);
-            if (!AlwaysSendAudio && Input.GetKeyUp(PushToTalkKeycode))
-                StopSendingAudio();
+            if (VoiceSendingType == MicType.PushToTalk)
+            {
+                if (Input.GetKeyDown(PushToTalkKeycode))
+                    StartSendingAudio(_mumbleClient.EncoderSampleRate);
+                if (Input.GetKeyUp(PushToTalkKeycode))
+                    StopSendingAudio();
+            }
             if (isRecording)
                 SendVoiceIfReady();
         }
