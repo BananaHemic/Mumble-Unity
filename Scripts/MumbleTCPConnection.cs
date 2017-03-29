@@ -200,7 +200,7 @@ namespace Mumble
                         _mumbleClient.PermissionQuery = Serializer.DeserializeWithLengthPrefix<PermissionQuery>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         Debug.Log("Permission Query = " + _mumbleClient.PermissionQuery.permissions);
-                        Debug.Log("Permission Cannel = " + _mumbleClient.PermissionQuery.channel_id);
+                        Debug.Log("Permission Channel = " + _mumbleClient.PermissionQuery.channel_id);
                         break;
                     case MessageType.UserState:
                         //This is called for every user in the room, including us
