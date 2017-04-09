@@ -18,7 +18,7 @@ Easily send low-latency text and voice to a group of other users
   * [Python](https://github.com/frymaster/mumbleclient)
   * [C#](https://github.com/martindevans/MumbleSharp)
   * [NodeJS](https://github.com/Rantanen/node-mumble)
-  * Probably some other that I've forgotten to mention
+  * Probably some others that I've forgotten to mention
 * Cross platform
 
 ## Limitations
@@ -40,7 +40,5 @@ Or you can [setup your own Mumble server](https://wiki.mumble.info/wiki/Installi
    * Then, simply open the included example scene, and input your Mumble server's address into "MumbleTester"
 
 ## TODO
-1. Add channel support
-2. Make decoding happen off the main thread
-3. Get Opus libraries for Linux
-4. Add per-speaker positional audio
+1. Make decoding happen off the main thread
+2. Get Opus libraries for Linux
