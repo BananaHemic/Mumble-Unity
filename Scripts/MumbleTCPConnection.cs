@@ -215,8 +215,9 @@ namespace Mumble
                         break;
                     case MessageType.ServerSync:
                         //This is where we get our session Id
-                        _mumbleClient.ServerSync = Serializer.DeserializeWithLengthPrefix<ServerSync>(_ssl,
-                            PrefixStyle.Fixed32BigEndian);
+                        Debug.Log("Will server sync!");
+                        _mumbleClient.SetServerSync(Serializer.DeserializeWithLengthPrefix<ServerSync>(_ssl,
+                            PrefixStyle.Fixed32BigEndian));
                         Debug.Log("Server Sync Session= " + _mumbleClient.ServerSync.session);
                         _mumbleClient.ConnectionSetupFinished = true;
                         break;

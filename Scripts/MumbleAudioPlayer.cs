@@ -4,10 +4,12 @@ using System;
 using System.Linq;
 
 namespace Mumble {
+    [RequireComponent(typeof(AudioSource))]
     public class MumbleAudioPlayer : MonoBehaviour {
 
         public float Gain = 1;
         private MumbleClient _mumbleClient;
+        private UInt32 _session;
         //private AudioSource Source;
         private AudioClip _clip;
         private int _position = 0;
@@ -22,9 +24,10 @@ namespace Mumble {
             //Source.clip = _clip;
             //Source.Play();
         }
-        public void Initialize(MumbleClient mumbleClient)
+        public void Initialize(MumbleClient mumbleClient, UInt32 session)
         {
             _mumbleClient = mumbleClient;
+            _session = session;
         }
         void OnAudioFilterRead(float[] data, int channels)
         //void OnAudioRead(float[] data)
@@ -33,7 +36,7 @@ namespace Mumble {
             if (_mumbleClient == null || !_mumbleClient.ConnectionSetupFinished)
                 return;
 
-            _mumbleClient.LoadArrayWithVoiceData(data, 0, data.Length);
+            _mumbleClient.LoadArrayWithVoiceData(_session, data, 0, data.Length);
 
             //Debug.Log("playing audio with avg: " + data.Average() + " and max " + data.Max());
             if (Gain == 1)

@@ -108,7 +108,7 @@ namespace Mumble
 
             using (var reader = new UdpPacketReader(new MemoryStream(plainTextMessage, 1, plainTextMessage.Length - 1)))
             {
-                UInt32 session;
+                UInt32 session = 0;
                 if(!_mumbleClient.UseLocalLoopBack)
                     session = (uint)reader.ReadVarInt64();
                 Int64 sequence = reader.ReadVarInt64();
@@ -116,7 +116,7 @@ namespace Mumble
 
                 //We assume we mean OPUS
                 int size = (int)reader.ReadVarInt64();
-                //Debug.Log("Size " + size);
+                Debug.Log("Seq = " + sequence + " Ses: " + session + " Size " + size + " type= " + typeByte + " tar= " + target);
                 bool isLast = (size & 8192) == 8192;
                 if (isLast)
                     Debug.Log("Found last byte in seq");
@@ -144,7 +144,7 @@ namespace Mumble
                 {
                     Debug.LogWarning("We have " + remaining + " bytes!");
                 }
-                _mumbleClient.ReceiveEncodedVoice(data, sequence);
+                _mumbleClient.ReceiveEncodedVoice(session, data, sequence);
             }
         }
         internal void SendPing()

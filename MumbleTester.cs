@@ -5,6 +5,7 @@
  * in order to work the way you want it to
  */
 using UnityEngine;
+using System;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -13,7 +14,7 @@ using Mumble;
 
 public class MumbleTester : MonoBehaviour {
 
-    public MumbleAudioPlayer MyMumbleAudioPlayer;
+    public GameObject MyMumbleAudioPlayerPrefab;
     public MumbleMicrophone MyMumbleMic;
     public DebugValues DebuggingVariables;
 
@@ -32,15 +33,12 @@ public class MumbleTester : MonoBehaviour {
             return;
         }
         Application.runInBackground = true;
-
-        _mumbleClient = new MumbleClient(HostName, Port, DebuggingVariables);
+        _mumbleClient = new MumbleClient(HostName, Port, CreateMumbleAudioPlayerFromPrefab, DestroyMumbleAudioPlayer, DebuggingVariables);
 
         if (DebuggingVariables.UseRandomUsername)
-            Username += Random.Range(0, 100f);
+            Username += UnityEngine.Random.Range(0, 100f);
         _mumbleClient.Connect(Username, Password);
 
-        if(MyMumbleAudioPlayer != null)
-            _mumbleClient.AddMumbleAudioPlayer(MyMumbleAudioPlayer);
         if(MyMumbleMic != null)
             _mumbleClient.AddMumbleMic(MyMumbleMic);
 
@@ -53,7 +51,18 @@ public class MumbleTester : MonoBehaviour {
         }
 #endif
     }
-	
+    private MumbleAudioPlayer CreateMumbleAudioPlayerFromPrefab()
+    {
+        // Depending on your use case, you might want to add the prefab to an existing object (like someone's head)
+        // If you have users entering and leaving frequently, you might want to implement an object pool
+        GameObject newObj = GameObject.Instantiate(MyMumbleAudioPlayerPrefab);
+        MumbleAudioPlayer newPlayer = newObj.GetComponent<MumbleAudioPlayer>();
+        return newPlayer;
+    }
+    private void DestroyMumbleAudioPlayer(MumbleAudioPlayer playerToDestroy)
+    {
+        UnityEngine.GameObject.Destroy(playerToDestroy.gameObject);
+    }
     void OnApplicationQuit()
     {
         Debug.LogWarning("Shutting down connections");

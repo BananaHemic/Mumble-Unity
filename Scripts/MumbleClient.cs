@@ -28,30 +28,40 @@ namespace Mumble
         public bool UseSyntheticSource { get { return _debugValues.UseSyntheticSource; } }
         public int NumUDPPacketsSent { get { return _udpConnection.NumPacketsSent; } }
         public int NumUDPPacketsReceieved { get { return _udpConnection.NumPacketsRecv; } }
-        public long NumUDPPacketsLost { get { return _audioDecodingBuffer.NumPacketsLost; } }
-        public bool ConnectionSetupFinished { get; internal set; }
-
-        private MumbleTcpConnection _tcpConnection;
-        private MumbleUdpConnection _udpConnection;
-        private ManageAudioSendBuffer _manageSendBuffer;
-        private MumbleMicrophone _mumbleMic;
-        private MumbleAudioPlayer _mumbleAudioPlayer;
-
-        private DebugValues _debugValues;
-        private Dictionary<uint, UserState> AllUsers = new Dictionary<uint, UserState>();
-        private Dictionary<string, ChannelState> Channels = new Dictionary<string, ChannelState>();
-        private UserState OurUserState
-        {
-            get
-            {
-                return  AllUsers[ServerSync.session];
+        public long NumUDPPacketsLost {
+            get {
+                long numLost = 0;
+                foreach (var pair in _audioDecodingBuffers)
+                    numLost += pair.Value.NumPacketsLost;
+                return numLost;
             }
         }
-        private readonly AudioDecodingBuffer _audioDecodingBuffer;
+        public bool ConnectionSetupFinished { get; internal set; }
+        /// <summary>
+        /// Methods to create or delete the Unity audio players
+        /// These are NOT! Multithread safe, as they can call Unity functions
+        /// </summary>
+        /// <returns></returns>
+        public delegate MumbleAudioPlayer AudioPlayerCreatorMethod();
+        public delegate void AudioPlayerRemoverMethod(MumbleAudioPlayer audioPlayerToRemove);
 
+        private readonly MumbleTcpConnection _tcpConnection;
+        private readonly MumbleUdpConnection _udpConnection;
+        private readonly ManageAudioSendBuffer _manageSendBuffer;
+        private MumbleMicrophone _mumbleMic;
+        private readonly AudioPlayerCreatorMethod _audioPlayerCreator;
+        private readonly AudioPlayerRemoverMethod _audioPlayerDestroyer;
+
+        private DebugValues _debugValues;
+        private readonly Dictionary<uint, UserState> AllUsers = new Dictionary<uint, UserState>();
+        private readonly Dictionary<string, ChannelState> Channels = new Dictionary<string, ChannelState>();
+        private readonly Dictionary<UInt32, AudioDecodingBuffer> _audioDecodingBuffers = new Dictionary<uint, AudioDecodingBuffer>();
+        private readonly Dictionary<UInt32, MumbleAudioPlayer> _mumbleAudioPlayers = new Dictionary<uint, MumbleAudioPlayer>();
+
+        internal UserState OurUserState { get; private set; }
         internal Version RemoteVersion { get; set; }
         internal CryptSetup CryptSetup { get; set; }
-        internal ServerSync ServerSync { get; set; }
+        internal ServerSync ServerSync { get; private set; }
         internal CodecVersion CodecVersion { get; set; }
         internal PermissionQuery PermissionQuery { get; set; }
         internal ServerConfig ServerConfig { get; set; }
@@ -67,7 +77,7 @@ namespace Mumble
         public const uint Minor = 2;
         public const uint Patch = 8;
 
-        public MumbleClient(string hostName, int port, DebugValues debugVals=null)
+        public MumbleClient(string hostName, int port, AudioPlayerCreatorMethod createMumbleAudioPlayerMethod, AudioPlayerRemoverMethod removeMumbleAudioPlayerMethod, DebugValues debugVals=null)
         {
             IPAddress[] addresses = Dns.GetHostAddresses(hostName);
             if (addresses.Length == 0)
@@ -80,6 +90,8 @@ namespace Mumble
             var host = new IPEndPoint(addresses[0], port);
             _udpConnection = new MumbleUdpConnection(host, this);
             _tcpConnection = new MumbleTcpConnection(host, hostName, _udpConnection.UpdateOcbServerNonce, _udpConnection, this);
+            _audioPlayerCreator = createMumbleAudioPlayerMethod;
+            _audioPlayerDestroyer = removeMumbleAudioPlayerMethod;
 
             if (debugVals == null)
                 debugVals = new DebugValues();
@@ -89,7 +101,6 @@ namespace Mumble
             _codec = new OpusCodec();
 
             _manageSendBuffer = new ManageAudioSendBuffer(_codec, _udpConnection, this);
-            _audioDecodingBuffer = new AudioDecodingBuffer(_codec);
         }
         internal void AddMumbleMic(MumbleMicrophone newMic)
         {
@@ -104,11 +115,6 @@ namespace Mumble
 
             _codec.InitializeEncoderWithSampleRate(EncoderSampleRate);
         }
-        internal void AddMumbleAudioPlayer(MumbleAudioPlayer newSpeaker)
-        {
-            _mumbleAudioPlayer = newSpeaker;
-            _mumbleAudioPlayer.Initialize(this);
-        }
         internal PcmArray GetAvailablePcmArray()
         {
             return _manageSendBuffer.GetAvailablePcmArray();
@@ -118,6 +124,15 @@ namespace Mumble
             if (!AllUsers.ContainsKey(newUserState.session))
             {
                 AllUsers[newUserState.session] = newUserState;
+                AudioDecodingBuffer buffer = new AudioDecodingBuffer(_codec);
+                _audioDecodingBuffers.Add(newUserState.session, buffer);
+                EventProcessor.Instance.QueueEvent(() =>
+                {
+                    // We also create a new audio player for each user
+                    MumbleAudioPlayer newPlayer = _audioPlayerCreator();
+                    _mumbleAudioPlayers.Add(newUserState.session, newPlayer);
+                    newPlayer.Initialize(this, newUserState.session);
+                });
             }
             else
             {
@@ -129,15 +144,29 @@ namespace Mumble
                 AllUsers[newUserState.session].channel_id = newUserState.channel_id;
             }
         }
+        internal void SetServerSync(ServerSync sync)
+        {
+            ServerSync = sync;
+            OurUserState = AllUsers[ServerSync.session];
+        }
         internal void RemoveUser(uint removedUserSession)
         {
             AllUsers.Remove(removedUserSession);
+            // Try to remove the audio player if it exists
+            MumbleAudioPlayer oldAudioPlayer;
+            if(_mumbleAudioPlayers.TryGetValue(removedUserSession, out oldAudioPlayer))
+            {
+                _mumbleAudioPlayers.Remove(removedUserSession);
+                EventProcessor.Instance.QueueEvent(() =>
+                {
+                    _audioPlayerDestroyer(oldAudioPlayer);
+                });
+            }
         }
         public void Connect(string username, string password)
         {
             _tcpConnection.StartClient(username, password);
         }
-
         internal void ConnectUdp()
         {
             _udpConnection.Connect();
@@ -147,9 +176,7 @@ namespace Mumble
             _tcpConnection.Close();
             _udpConnection.Close();
             _manageSendBuffer.Dispose();
-            _manageSendBuffer = null;
         }
-
         public void SendTextMessage(string textMessage)
         {
             var msg = new TextMessage
@@ -166,14 +193,18 @@ namespace Mumble
         {
             _manageSendBuffer.SendVoice(floatData, SpeechTarget.Normal, 0);
         }
-        public void ReceiveEncodedVoice(byte[] data, long sequence)
+        public void ReceiveEncodedVoice(UInt32 session, byte[] data, long sequence)
         {
             //Debug.Log("Adding packet");
-            _audioDecodingBuffer.AddEncodedPacket(sequence, data);
+            _audioDecodingBuffers[session].AddEncodedPacket(sequence, data);
         }
-        public void LoadArrayWithVoiceData(float[] pcmArray, int offset, int length)
+        public void LoadArrayWithVoiceData(UInt32 session, float[] pcmArray, int offset, int length)
         {
-            _audioDecodingBuffer.Read(pcmArray, offset, length);
+            if (session == ServerSync.session)
+                return;
+            //Debug.Log("Will decode for " + session);
+
+            _audioDecodingBuffers[session].Read(pcmArray, offset, length);
         }
         public void JoinChannel(string channelToJoin)
         {
