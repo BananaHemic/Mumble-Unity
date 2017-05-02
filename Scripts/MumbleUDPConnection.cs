@@ -116,7 +116,7 @@ namespace Mumble
 
                 //We assume we mean OPUS
                 int size = (int)reader.ReadVarInt64();
-                Debug.Log("Seq = " + sequence + " Ses: " + session + " Size " + size + " type= " + typeByte + " tar= " + target);
+                //Debug.Log("Seq = " + sequence + " Ses: " + session + " Size " + size + " type= " + typeByte + " tar= " + target);
                 bool isLast = (size & 8192) == 8192;
                 if (isLast)
                     Debug.Log("Found last byte in seq");
