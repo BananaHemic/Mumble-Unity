@@ -30,5 +30,6 @@ namespace Mumble
         public const int NUM_CHANNELS = 2;
         //How many bytes can go into a single UDP packet
         public const int MAX_BYTES_PER_PACKET = 480;
+        public const int RECEIVED_PACKET_BUFFER_SIZE = 10;
     }
 }

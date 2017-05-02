@@ -33,7 +33,7 @@ namespace Mumble {
         private readonly int[] _numSamplesInBuffer = new int[NumDecodedSubBuffers];
         private long _nextSequenceToDecode;
         private long _lastReceivedSequence;
-        private readonly List<BufferPacket> _encodedBuffer = new List<BufferPacket>();
+        private readonly Queue<BufferPacket> _encodedBuffer = new Queue<BufferPacket>();
         private readonly OpusCodec _codec;
         const int NumDecodedSubBuffers = (int)(MumbleConstants.MAX_LATENCY_SECONDS * (MumbleConstants.SAMPLE_RATE / MumbleConstants.FRAME_SIZE));
         const int SubBufferSize = MumbleConstants.FRAME_SIZE * MumbleConstants.MAX_FRAMES_PER_PACKET * MumbleConstants.NUM_CHANNELS;
@@ -77,13 +77,7 @@ namespace Mumble {
                 if (_encodedBuffer.Count == 0)
                     return null;
 
-                int minIndex = 0;
-                for (int i = 1; i < _encodedBuffer.Count; i++)
-                    minIndex = _encodedBuffer[minIndex].Sequence < _encodedBuffer[i].Sequence ? minIndex : i;
-
-                var packet = _encodedBuffer[minIndex];
-                _encodedBuffer.RemoveAt(minIndex);
-
+                BufferPacket packet = _encodedBuffer.Dequeue();
                 return packet;
             }
         }
@@ -218,7 +212,10 @@ namespace Mumble {
 
             lock (_encodedBuffer)
             {
-                _encodedBuffer.Add(new BufferPacket
+                if (_encodedBuffer.Count > MumbleConstants.RECEIVED_PACKET_BUFFER_SIZE)
+                    return;
+
+                _encodedBuffer.Enqueue(new BufferPacket
                 {
                     Data = data,
                     Sequence = sequence

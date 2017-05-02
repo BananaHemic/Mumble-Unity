@@ -247,6 +247,7 @@ namespace Mumble
                 }
                 else
                 {
+                    // Happens if the packets arrive out of order
                     Debug.LogError("Crypt: 2");
                     return null;
                 }
