@@ -9,6 +9,7 @@ using UnityEngine;
 using ProtoBuf;
 using System.Timers;
 using System.Threading;
+using System.Text;
 using Version = MumbleProto.Version;
 
 namespace Mumble
@@ -103,33 +104,32 @@ namespace Mumble
         {
             lock (_ssl)
             {
-                if(mt != MessageType.Ping)
+                if(mt != MessageType.Ping && mt != MessageType.UDPTunnel)
                     Debug.Log("Sending " + mt + " message");
                 //_writer.Write(IPAddress.HostToNetworkOrder((Int16) mt));
                 //Serializer.SerializeWithLengthPrefix(_ssl, message, PrefixStyle.Fixed32BigEndian);
-
-                if (mt == MessageType.TextMessage && message is TextMessage)
-                {
-                    TextMessage txt = (message as TextMessage);
-                    Debug.Log("Will print: " + txt.message);
-                    Debug.Log("From: " + txt.actor);
-                    Debug.Log("Sessions length  =" + txt.session.Count);
-                    foreach(uint ses in txt.session)
-                        Debug.Log("Session: " + ses);
-                    foreach(uint chan in txt.channel_id)
-                        Debug.Log("Channel ID = " + chan);
-                    foreach(uint tree in txt.tree_id)
-                        Debug.Log("tree = " + tree);
-                }
-
-                MemoryStream messageStream = new MemoryStream();
-                Serializer.NonGeneric.Serialize(messageStream, message);
                 Int16 messageType = (Int16)mt;
-                Int32 messageSize = (Int32)messageStream.Length;
-                _writer.Write(IPAddress.HostToNetworkOrder(messageType));
-                _writer.Write(IPAddress.HostToNetworkOrder(messageSize));
-                messageStream.Position = 0;
-                _writer.Write(messageStream.ToArray());
+
+                // UDP Tunnels have their own way in which they handle serialization
+                if(mt == MessageType.UDPTunnel)
+                {
+                    UDPTunnel udpTunnel = message as UDPTunnel;
+                    Int32 messageSize = (Int32)udpTunnel.packet.Length;
+                    _writer.Write(IPAddress.HostToNetworkOrder(messageType));
+                    _writer.Write(IPAddress.HostToNetworkOrder(messageSize));
+                    _writer.Write(udpTunnel.packet);
+                }
+                else
+                {
+                    MemoryStream messageStream = new MemoryStream();
+                    Serializer.NonGeneric.Serialize(messageStream, message);
+                    Int32 messageSize = (Int32)messageStream.Length;
+                    _writer.Write(IPAddress.HostToNetworkOrder(messageType));
+                    _writer.Write(IPAddress.HostToNetworkOrder(messageSize));
+                    messageStream.Position = 0;
+                    _writer.Write(messageStream.ToArray());
+                }
+                
                 /*
                 StringBuilder sb = new StringBuilder();
                 byte[] msgArray = messageStream.ToArray();
@@ -246,7 +246,7 @@ namespace Mumble
                         break;
                     case MessageType.UDPTunnel:
                         var length = IPAddress.NetworkToHostOrder(_reader.ReadInt32());
-                        Debug.Log("Received UDP tunnel of length: " + length);
+                        //Debug.Log("Received UDP tunnel of length: " + length);
                         //At this point the message is already decrypted
                         _udpConnection.UnpackOpusVoicePacket(_reader.ReadBytes(length));
                         /*

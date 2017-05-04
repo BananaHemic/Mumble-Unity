@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Timers;
 using UnityEngine;
 using System.IO;
+using MumbleProto;
 
 namespace Mumble
 {
@@ -12,12 +13,17 @@ namespace Mumble
         private readonly IPEndPoint _host;
         private readonly UdpClient _udpClient;
         private readonly MumbleClient _mumbleClient;
+        private MumbleTcpConnection _tcpConnection;
         private CryptState _cryptState;
         private Timer _udpTimer;
         private bool _isConnected = false;
         internal volatile bool _isSending = false;
         internal volatile int NumPacketsSent = 0;
         internal volatile int NumPacketsRecv = 0;
+        internal volatile bool _useTcp = false;
+        // These are used for switching to TCP audio and back. Don't rely on them for anything else
+        private volatile int _numPingsSent = 0;
+        private volatile int _numPingsReceived = 0;
 
         internal MumbleUdpConnection(IPEndPoint host, MumbleClient mumbleClient)
         {
@@ -25,7 +31,10 @@ namespace Mumble
             _udpClient = new UdpClient();
             _mumbleClient = mumbleClient;
         }
-
+        internal void SetTcpConnection(MumbleTcpConnection tcpConnection)
+        {
+            _tcpConnection = tcpConnection;
+        }
         internal void UpdateOcbServerNonce(byte[] serverNonce)
         {
             if(serverNonce != null)
@@ -54,8 +63,6 @@ namespace Mumble
         }
         private void ReceiveUdpMessage(byte[] encrypted)
         {
-            NumPacketsRecv++;
-
             ProcessUdpMessage(encrypted);
             _udpClient.BeginReceive(ReceiveUdpMessage, null);
         }
@@ -98,10 +105,20 @@ namespace Mumble
         }
         internal void OnPing(byte[] message)
         {
-            //Debug.Log("Would process ping");
+            Debug.Log("Would process ping");
+            _numPingsReceived++;
+            // If we received a ping, that means that UDP is working
+            if (_useTcp)
+            {
+                Debug.Log("Switching back to UDP");
+                _useTcp = false;
+                _numPingsReceived = 0;
+                _numPingsSent = 0;
+            }
         }
         internal void UnpackOpusVoicePacket(byte[] plainTextMessage)
         {
+            NumPacketsRecv++;
             byte typeByte = plainTextMessage[0];
             int target = typeByte & 31;
             //Debug.Log("len = " + plainTextMessage.Length + " typeByte = " + typeByte);
@@ -165,6 +182,13 @@ namespace Mumble
             while (_isSending)
                 System.Threading.Thread.Sleep(1);
             _isSending = true;
+            if(!_useTcp && _numPingsSent - _numPingsReceived >= MumbleConstants.MAX_MISSED_UDP_PINGS)
+            {
+                Debug.LogWarning("Error establishing UDP connection, will switch to TCP");
+                _useTcp = true;
+            }
+            //Debug.Log(_numPingsSent - _numPingsReceived);
+            _numPingsSent++;
             _udpClient.BeginSend(encryptedData, encryptedData.Length, new AsyncCallback(OnSent), null);
         }
 
@@ -186,12 +210,23 @@ namespace Mumble
                 if (_mumbleClient.UseLocalLoopBack)
                     UnpackOpusVoicePacket(voicePacket);
                 //Debug.Log("Sending UDP packet! Length = " + voicePacket.Length);
-                byte[] encrypted = _cryptState.Encrypt(voicePacket, voicePacket.Length);
 
-                lock (_udpClient)
+                if (_useTcp)
                 {
-                    _isSending = true;
-                    _udpClient.BeginSend(encrypted, encrypted.Length, new AsyncCallback(OnSent), null);
+                    //Debug.Log("Using TCP!");
+                    UDPTunnel udpMsg = new UDPTunnel();
+                    udpMsg.packet = voicePacket;
+                    _tcpConnection.SendMessage(MessageType.UDPTunnel, udpMsg);
+                    return;
+                }
+                else
+                {
+                    byte[] encrypted = _cryptState.Encrypt(voicePacket, voicePacket.Length);
+                    lock (_udpClient)
+                    {
+                        _isSending = true;
+                        _udpClient.BeginSend(encrypted, encrypted.Length, new AsyncCallback(OnSent), null);
+                    }
                 }
                 NumPacketsSent++;
             }catch(Exception e)

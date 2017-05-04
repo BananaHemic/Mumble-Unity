@@ -83,9 +83,9 @@ public class MumbleTester : MonoBehaviour {
             long numRecvThisSample = _mumbleClient.NumUDPPacketsReceieved - numPacketsReceived;
             long numLostThisSample = _mumbleClient.NumUDPPacketsLost - numPacketsLost;
 
-            Graph.channel[0].Feed(-numSentThisSample);
-            Graph.channel[1].Feed(-numRecvThisSample);
-            Graph.channel[2].Feed(-numLostThisSample);
+            Graph.channel[0].Feed(-numSentThisSample);//gray
+            Graph.channel[1].Feed(-numRecvThisSample);//blue
+            Graph.channel[2].Feed(-numLostThisSample);//red
 
             numPacketsSent += numSentThisSample;
             numPacketsReceived += numRecvThisSample;

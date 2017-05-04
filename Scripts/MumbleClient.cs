@@ -90,6 +90,7 @@ namespace Mumble
             var host = new IPEndPoint(addresses[0], port);
             _udpConnection = new MumbleUdpConnection(host, this);
             _tcpConnection = new MumbleTcpConnection(host, hostName, _udpConnection.UpdateOcbServerNonce, _udpConnection, this);
+            _udpConnection.SetTcpConnection(_tcpConnection);
             _audioPlayerCreator = createMumbleAudioPlayerMethod;
             _audioPlayerDestroyer = removeMumbleAudioPlayerMethod;
 

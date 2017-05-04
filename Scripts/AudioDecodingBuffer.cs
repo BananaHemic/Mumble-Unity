@@ -49,7 +49,12 @@ namespace Mumble {
         }
         public int Read(float[] buffer, int offset, int count)
         {
-            //Debug.Log("We now have " + _encodedBuffer.Count + " encoded packets");
+            /*
+            lock (_encodedBuffer)
+            {
+                Debug.Log("We now have " + _encodedBuffer.Count + " encoded packets");
+            }
+            */
             //Debug.LogWarning("Will read");
 
             int readCount = 0;
@@ -183,7 +188,7 @@ namespace Mumble {
 
             _decodedCount += numRead;
             _numSamplesInBuffer[_nextBufferToDecodeInto] = numRead;
-            //Debug.Log(numRead);
+            //Debug.Log("numRead = " + numRead);
             _lastReceivedSequence = packet.Value.Sequence;
             _nextSequenceToDecode = packet.Value.Sequence + numRead / (MumbleConstants.FRAME_SIZE * MumbleConstants.NUM_CHANNELS);
             _nextBufferToDecodeInto++;
@@ -213,13 +218,17 @@ namespace Mumble {
             lock (_encodedBuffer)
             {
                 if (_encodedBuffer.Count > MumbleConstants.RECEIVED_PACKET_BUFFER_SIZE)
+                {
+                    Debug.LogWarning("Max buffer size reached, dropping");
                     return;
+                }
 
                 _encodedBuffer.Enqueue(new BufferPacket
                 {
                     Data = data,
                     Sequence = sequence
                 });
+                //Debug.Log("Count is now: " + _encodedBuffer.Count);
             }
         }
 
