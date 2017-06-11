@@ -9,7 +9,7 @@ Easily send low-latency text and voice to a group of other users
 * Opus codec support, allowing lightweight low latency HD voice communication
 * Open source server
 * Extensible server, allowing you to create the permissions structure best suited for your application
-* Works with other Mumble clients out of the box, provided they use the opus codec
+* Works with other Mumble clients out of the box, provided that they use the opus codec
 * Works with any opus-compatible Mumble SDK, including sdks for:
   * [C++](https://github.com/mumble-voip/mumble)
   * [Objective-C](https://github.com/mumble-voip/mumblekit)
@@ -23,8 +23,7 @@ Easily send low-latency text and voice to a group of other users
 
 ## Limitations
 * Only the Opus codec is supported, meaning very old mumble clients may be unable to connect
-* Requires a Mumble server
-* Different audio positions for each Mumble speaker is not yet supported, but is possible
+* Requires a (free) Mumble server
 
 ## Getting started
 ### Get a server
@@ -38,7 +37,13 @@ Or you can [setup your own Mumble server](https://wiki.mumble.info/wiki/Installi
    * If your project *is* already tracked with git, you can add this projects as a submodule by navigating to the "Assets" folder and running
    `git submodule add https://github.com/BananaHemic/Mumble-Unity.git`
    * Then, simply open the included example scene, and input your Mumble server's address into "MumbleTester"
+### Integration
+   * To begin integrating into your application, you can copy "MumbleTester.cs" and adapt the functions to best meet your individual needs
+   * For instance, if you would like to make the audio come from an object (like a person's head) you can change the `CreateMumbleAudioPlayerFromPrefab` method to create the prefab as a child of your target object
 
 ## TODO
-1. Make decoding happen off the main thread
+1. Get Opus libraries for iOS
 2. Get Opus libraries for Linux
+
+If you have any questions or errors, please feel free to open an issue
+As always, stars are more than welcome
