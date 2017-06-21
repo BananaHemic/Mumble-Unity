@@ -282,8 +282,12 @@ namespace Mumble
             }
             catch (Exception ex)
             {
-                if(ex is EndOfStreamException)
+                if (ex is EndOfStreamException)
                     Debug.LogError("EOS Exception: " + ex);//This happens when we connect again with the same username
+                //These just means the app stopped, it's ok
+                else if (ex is ObjectDisposedException) { }
+                else if (ex is ThreadAbortException) { }
+
                 else
                     Debug.LogError("Unhandled error: " + ex);
                 return;
