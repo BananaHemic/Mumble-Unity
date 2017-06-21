@@ -129,7 +129,7 @@ namespace Mumble
         }
         public void StartSendingAudio(int sampleRate)
         {
-            Debug.LogWarning("Starting to send audio");
+            Debug.Log("Starting to send audio");
             _sendAudioClip = Microphone.Start(_currentMic, true, NumRecordingSeconds, sampleRate);
             _previousPosition = 0;
             _numTimesLooped = 0;
