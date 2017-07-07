@@ -186,21 +186,19 @@ namespace Mumble
                     case MessageType.ChannelState:
                         ChannelState ChannelState = Serializer.DeserializeWithLengthPrefix<ChannelState>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        /*
                         Debug.Log("Channel state Name = " + ChannelState.name);
                         Debug.Log("Channel state ID = " + ChannelState.channel_id);
                         Debug.Log("Channel state Position = " + ChannelState.position);
                         Debug.Log("Channel state Temporary = " + ChannelState.temporary);
                         Debug.Log("Channel state Parent = " + ChannelState.parent);
                         Debug.Log("Channel state Description = " + ChannelState.description);
-                        */
                         _mumbleClient.AddChannel(ChannelState);
                         break;
                     case MessageType.PermissionQuery:
                         _mumbleClient.PermissionQuery = Serializer.DeserializeWithLengthPrefix<PermissionQuery>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        Debug.Log("Permission Query = " + _mumbleClient.PermissionQuery.permissions);
-                        Debug.Log("Permission Channel = " + _mumbleClient.PermissionQuery.channel_id);
+                        //Debug.Log("Permission Query = " + _mumbleClient.PermissionQuery.permissions);
+                        //Debug.Log("Permission Channel = " + _mumbleClient.PermissionQuery.channel_id);
                         break;
                     case MessageType.UserState:
                         //This is called for every user in the room, including us
@@ -210,6 +208,8 @@ namespace Mumble
                         Debug.Log("Name: " + user.name);
                         Debug.Log("Session: " + user.session);
                         Debug.Log("actor: " + user.actor);
+                        Debug.Log("Chan: " + user.channel_id);
+                        Debug.Log("ID: " + user.user_id);
                         */
                         _mumbleClient.AddUser(user);
                         break;
@@ -269,6 +269,12 @@ namespace Mumble
                             PrefixStyle.Fixed32BigEndian);
                         Debug.Log("Removing " + removal.session);
                         _mumbleClient.RemoveUser(removal.session);
+                        break;
+                    case MessageType.ChannelRemove:
+                        var removedChan = Serializer.DeserializeWithLengthPrefix<ChannelRemove>(_ssl,
+                            PrefixStyle.Fixed32BigEndian);
+                        _mumbleClient.RemoveChannel(removedChan.channel_id);
+                        Debug.Log("Removing channel " + removedChan.channel_id);
                         break;
                     case MessageType.PermissionDenied:
                         var denial = Serializer.DeserializeWithLengthPrefix<PermissionDenied>(_ssl,

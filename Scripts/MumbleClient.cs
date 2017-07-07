@@ -54,7 +54,7 @@ namespace Mumble
 
         private DebugValues _debugValues;
         private readonly Dictionary<uint, UserState> AllUsers = new Dictionary<uint, UserState>();
-        private readonly Dictionary<string, ChannelState> Channels = new Dictionary<string, ChannelState>();
+        private readonly Dictionary<uint, ChannelState> Channels = new Dictionary<uint, ChannelState>();
         private readonly Dictionary<UInt32, AudioDecodingBuffer> _audioDecodingBuffers = new Dictionary<uint, AudioDecodingBuffer>();
         private readonly Dictionary<UInt32, MumbleAudioPlayer> _mumbleAudioPlayers = new Dictionary<uint, MumbleAudioPlayer>();
 
@@ -210,7 +210,7 @@ namespace Mumble
         public void JoinChannel(string channelToJoin)
         {
             ChannelState channel;
-            if (!Channels.TryGetValue(channelToJoin, out channel))
+            if (!TryGetChannelByName(channelToJoin, out channel))
             {
                 Debug.LogError("Channel " + channelToJoin + " not found!");
                 return;
@@ -222,23 +222,47 @@ namespace Mumble
             Debug.Log("Attempting to join channel Id: " + state.channel_id);
             _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
         }
+        private bool TryGetChannelByName(string channelName, out ChannelState channelState)
+        {
+            foreach(uint key in Channels.Keys)
+            {
+                if (Channels[key].name == channelName)
+                {
+                    channelState = Channels[key];
+                    return true;
+                }
+                //Debug.Log("Not " + Channels[key].name + " == " + channelName);
+            }
+            channelState = null;
+            return false;
+        }
         public string GetCurrentChannel()
         {
-            foreach(string key in Channels.Keys)
-            {
-                if (Channels[key].channel_id == OurUserState.channel_id)
-                    return Channels[key].name;
-            }
+            ChannelState ourChannel;
+            if(Channels.TryGetValue(OurUserState.channel_id, out ourChannel))
+                return ourChannel.name;
+
             Debug.LogError("Could not get current channel");
             return null;
         }
         internal void AddChannel(ChannelState channelToAdd)
         {
-            Channels[channelToAdd.name] = channelToAdd;
+            // If the channel already exists, just copy over the non-null data
+            if (Channels.ContainsKey(channelToAdd.channel_id))
+            {
+                ChannelState previousChannelState = Channels[channelToAdd.channel_id];
+                if (string.IsNullOrEmpty(channelToAdd.name))
+                    channelToAdd.name = previousChannelState.name;
+                if (string.IsNullOrEmpty(channelToAdd.description))
+                    channelToAdd.description = previousChannelState.description;
+            }
+            Channels[channelToAdd.channel_id] = channelToAdd;
         }
-        internal void RemoveChannel(ChannelState channelToRemove)
+        internal void RemoveChannel(uint channelIdToRemove)
         {
-            Channels.Remove(channelToRemove.name);
+            if (channelIdToRemove == OurUserState.channel_id)
+                Debug.LogWarning("Removed current channel");
+            Channels.Remove(channelIdToRemove);
         }
         /// <summary>
         /// Tell the encoder to send the last audio packet, then reset the sequence number

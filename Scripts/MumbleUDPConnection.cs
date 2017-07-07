@@ -105,7 +105,7 @@ namespace Mumble
         }
         internal void OnPing(byte[] message)
         {
-            Debug.Log("Would process ping");
+            //Debug.Log("Would process ping");
             _numPingsReceived++;
             // If we received a ping, that means that UDP is working
             if (_useTcp)
