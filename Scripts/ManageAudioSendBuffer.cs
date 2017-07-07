@@ -94,9 +94,6 @@ namespace Mumble
                     if (isLastPacket)
                         Debug.Log("Will send last packet");
 
-                    if (packet == null)
-                        Debug.Log("Null Packet");
-
                     if (packet.Array.Length == 0 || packet.Count == 0)
                         Debug.LogError("Empty packet?");
 

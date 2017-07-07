@@ -62,7 +62,7 @@ namespace Mumble
             _decoder = NativeMethods.opus_decoder_create(outputSampleRate, outputChannelCount, out error);
             if (error != OpusErrors.Ok)
                 throw new Exception(string.Format("Exception occured while creating decoder, {0}", ((OpusErrors)error)));
-            _outputSampleRate = outputChannelCount;
+            _outputSampleRate = outputSampleRate;
             _outputChannelCount = outputChannelCount;
         }
 
