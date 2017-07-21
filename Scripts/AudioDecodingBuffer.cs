@@ -219,7 +219,7 @@ namespace Mumble {
             {
                 if (_encodedBuffer.Count > MumbleConstants.RECEIVED_PACKET_BUFFER_SIZE)
                 {
-                    Debug.LogWarning("Max buffer size reached, dropping");
+                    Debug.LogWarning("Max recv buffer size reached, dropping");
                     return;
                 }
 

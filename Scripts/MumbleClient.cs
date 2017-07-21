@@ -44,7 +44,15 @@ namespace Mumble
         /// <returns></returns>
         public delegate MumbleAudioPlayer AudioPlayerCreatorMethod();
         public delegate void AudioPlayerRemoverMethod(MumbleAudioPlayer audioPlayerToRemove);
+        /// <summary>
+        /// Delegate called whenever Mumble changes channels, either by joining a room or
+        /// by being moved
+        /// </summary>
+        /// <param name="newChannelName"></param>
+        /// <param name="newChannelID"></param>
+        public delegate void OnChannelChangedMethod(ChannelState channelWereNowIn);
 
+        public OnChannelChangedMethod OnChannelChanged;
         private readonly MumbleTcpConnection _tcpConnection;
         private readonly MumbleUdpConnection _udpConnection;
         private readonly ManageAudioSendBuffer _manageSendBuffer;
@@ -122,6 +130,7 @@ namespace Mumble
         }
         internal void AddUser(UserState newUserState)
         {
+            Debug.Log("Adding user: " + newUserState.name);
             if (!AllUsers.ContainsKey(newUserState.session))
             {
                 AllUsers[newUserState.session] = newUserState;
@@ -142,7 +151,20 @@ namespace Mumble
                 //but I don't know how to identify object it needs to be merged with before it's been deserialized
                 if(!string.IsNullOrEmpty(newUserState.name))
                     AllUsers[newUserState.session].name = newUserState.name;
-                AllUsers[newUserState.session].channel_id = newUserState.channel_id;
+                // If this is us, and it's signaling that we've changed channels, notify the delegate on the main thread
+                if(newUserState.session == OurUserState.session && OurUserState.channel_id != newUserState.channel_id)
+                {
+                    AllUsers[newUserState.session].channel_id = newUserState.channel_id;
+                    EventProcessor.Instance.QueueEvent(() =>
+                    {
+                        OnChannelChanged(Channels[newUserState.channel_id]);
+                    });
+                }
+                else
+                {
+                    AllUsers[newUserState.session].channel_id = newUserState.channel_id;
+
+                }
             }
         }
         internal void SetServerSync(ServerSync sync)
