@@ -7,16 +7,13 @@ namespace Mumble
 {
     public class ManageAudioSendBuffer : IDisposable
     {
-        const int SleepTimeMs = 10;
-
         private readonly OpusCodec _codec;
         private readonly MumbleUdpConnection _udpConnection;
         private readonly AudioEncodingBuffer _encodingBuffer;
-        private readonly Thread _encodingThread;
         private readonly List<PcmArray> _pcmArrays;
         private readonly MumbleClient _mumbleClient;
 
-        private bool _isEncodingThreadRunning;
+        private Thread _encodingThread;
         private UInt32 sequenceIndex;
 
         public ManageAudioSendBuffer(OpusCodec codec, MumbleUdpConnection udpConnection, MumbleClient mumbleClient)
@@ -27,10 +24,6 @@ namespace Mumble
             _pcmArrays = new List<PcmArray>();
             _encodingBuffer = new AudioEncodingBuffer();
 
-            _encodingThread = new Thread(EncodingThreadEntry)
-            {
-                IsBackground = true
-            };
         }
         ~ManageAudioSendBuffer()
         {
@@ -60,24 +53,29 @@ namespace Mumble
         {
             _encodingBuffer.Add(pcm, target, targetId);
 
-            if (!_encodingThread.IsAlive)
+            if (_encodingThread == null)
+            {
+                _encodingThread = new Thread(EncodingThreadEntry)
+                {
+                    IsBackground = true
+                };
                 _encodingThread.Start();
+            }
         }
         public void SendVoiceStopSignal()
         {
             _encodingBuffer.Stop();
+            _encodingThread.Abort();
+            _encodingThread = null;
         }
         public void Dispose()
         {
             if(_encodingThread != null)
                 _encodingThread.Abort();
-            _isEncodingThreadRunning = false;
         }
         private void EncodingThreadEntry()
         {
-            _isEncodingThreadRunning = true;
-
-            while (_isEncodingThreadRunning)
+            while (true)
             {
                 try
                 {
@@ -87,7 +85,7 @@ namespace Mumble
 
                     if (isEmpty)
                     {
-                        //Thread.Sleep(SleepTimeMs);
+                        Thread.Sleep(Mumble.MumbleConstants.FRAME_SIZE_MS);
                         //Debug.LogWarning("Empty Packet");
                         continue;
                     }

@@ -27,6 +27,8 @@ namespace Mumble
         public const int MAX_FRAMES_PER_PACKET = 6;
         //How many 10ms samples to include in each packet
         public const int NUM_FRAMES_PER_OUTGOING_PACKET = 2;
+        //The length of time in each audio packet
+        public const int FRAME_SIZE_MS = NUM_FRAMES_PER_OUTGOING_PACKET * 10;
         public const int NUM_CHANNELS = 2;
         //How many bytes can go into a single UDP packet
         public const int MAX_BYTES_PER_PACKET = 480;
