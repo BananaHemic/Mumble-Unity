@@ -62,7 +62,6 @@ namespace Mumble
                 Debug.LogError("Connection failed! Please confirm that you have internet access, and that the hostname is correct");
                 throw new Exception("Failed to connect");
             }
-            
 
             NetworkStream networkStream = _tcpClient.GetStream();
             _ssl = new SslStream(networkStream, false, ValidateCertificate);
@@ -104,8 +103,8 @@ namespace Mumble
         {
             lock (_ssl)
             {
-                if(mt != MessageType.Ping && mt != MessageType.UDPTunnel)
-                    Debug.Log("Sending " + mt + " message");
+                //if(mt != MessageType.Ping && mt != MessageType.UDPTunnel)
+                    //Debug.Log("Sending " + mt + " message");
                 //_writer.Write(IPAddress.HostToNetworkOrder((Int16) mt));
                 //Serializer.SerializeWithLengthPrefix(_ssl, message, PrefixStyle.Fixed32BigEndian);
                 Int16 messageType = (Int16)mt;
@@ -186,12 +185,14 @@ namespace Mumble
                     case MessageType.ChannelState:
                         ChannelState ChannelState = Serializer.DeserializeWithLengthPrefix<ChannelState>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
+                        /*
                         Debug.Log("Channel state Name = " + ChannelState.name);
                         Debug.Log("Channel state ID = " + ChannelState.channel_id);
                         Debug.Log("Channel state Position = " + ChannelState.position);
                         Debug.Log("Channel state Temporary = " + ChannelState.temporary);
                         Debug.Log("Channel state Parent = " + ChannelState.parent);
                         Debug.Log("Channel state Description = " + ChannelState.description);
+                        */
                         _mumbleClient.AddChannel(ChannelState);
                         break;
                     case MessageType.PermissionQuery:
@@ -215,17 +216,17 @@ namespace Mumble
                         break;
                     case MessageType.ServerSync:
                         //This is where we get our session Id
-                        Debug.Log("Will server sync!");
+                        //Debug.Log("Will server sync!");
                         _mumbleClient.SetServerSync(Serializer.DeserializeWithLengthPrefix<ServerSync>(_ssl,
                             PrefixStyle.Fixed32BigEndian));
-                        Debug.Log("Server Sync Session= " + _mumbleClient.ServerSync.session);
+                        //Debug.Log("Server Sync Session= " + _mumbleClient.ServerSync.session);
                         _mumbleClient.ConnectionSetupFinished = true;
                         break;
                     case MessageType.ServerConfig:
                         _mumbleClient.ServerConfig = Serializer.DeserializeWithLengthPrefix<ServerConfig>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         //Debug.Log("Sever config = " + _mc.ServerConfig);
-                        Debug.Log("Connected!");
+                        Debug.Log("Mumble is Connected!");
                         _validConnection = true; // handshake complete
                         break;
                     case MessageType.SuggestConfig:

@@ -43,7 +43,7 @@ namespace Mumble
 
         internal void Connect()
         {
-            Debug.Log("Establishing UDP connection");
+            //Debug.Log("Establishing UDP connection");
             _cryptState = new CryptState();
             _cryptState.CryptSetup = _mumbleClient.CryptSetup;
             _udpClient.Connect(_host);
@@ -126,8 +126,11 @@ namespace Mumble
             using (var reader = new UdpPacketReader(new MemoryStream(plainTextMessage, 1, plainTextMessage.Length - 1)))
             {
                 UInt32 session = 0;
-                if(!_mumbleClient.UseLocalLoopBack)
+                if (!_mumbleClient.UseLocalLoopBack)
                     session = (uint)reader.ReadVarInt64();
+                else
+                    session = _mumbleClient.OurUserState.session;
+
                 Int64 sequence = reader.ReadVarInt64();
 
 
@@ -149,7 +152,6 @@ namespace Mumble
 
                 byte[] data = reader.ReadBytes(size);
                 
-
                 if (data == null || data.Length != size)
                 {
                     Debug.LogError("empty or wrong sized packet");

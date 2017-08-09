@@ -16,16 +16,17 @@ namespace Mumble {
         const bool isStreamingAudio = true;
 
         void Start() {
-            print("outout rate " + AudioSettings.outputSampleRate);
+            //print("outout rate " + AudioSettings.outputSampleRate);
         }
         public void Initialize(MumbleClient mumbleClient, UInt32 session)
         {
+            //Debug.Log("Initialized " + session, this);
             _mumbleClient = mumbleClient;
             _session = session;
         }
         void OnAudioFilterRead(float[] data, int channels)
         {
-            //print("On audio read");
+            //print("On audio read " + _session);
             if (_mumbleClient == null || !_mumbleClient.ConnectionSetupFinished)
                 return;
 

@@ -130,9 +130,10 @@ namespace Mumble
         }
         internal void AddUser(UserState newUserState)
         {
-            Debug.Log("Adding user: " + newUserState.name);
             if (!AllUsers.ContainsKey(newUserState.session))
             {
+                Debug.Log("Adding user: " + newUserState.name);
+                //Debug.Log("New audio buffer with session: " + newUserState.session);
                 AllUsers[newUserState.session] = newUserState;
                 AudioDecodingBuffer buffer = new AudioDecodingBuffer(_codec);
                 _audioDecodingBuffers.Add(newUserState.session, buffer);
@@ -157,13 +158,13 @@ namespace Mumble
                     AllUsers[newUserState.session].channel_id = newUserState.channel_id;
                     EventProcessor.Instance.QueueEvent(() =>
                     {
-                        OnChannelChanged(Channels[newUserState.channel_id]);
+                        if(OnChannelChanged != null)
+                            OnChannelChanged(Channels[newUserState.channel_id]);
                     });
                 }
                 else
                 {
                     AllUsers[newUserState.session].channel_id = newUserState.channel_id;
-
                 }
             }
         }
@@ -218,12 +219,12 @@ namespace Mumble
         }
         public void ReceiveEncodedVoice(UInt32 session, byte[] data, long sequence)
         {
-            //Debug.Log("Adding packet");
+            //Debug.Log("Adding packet for session: " + session);
             _audioDecodingBuffers[session].AddEncodedPacket(sequence, data);
         }
         public void LoadArrayWithVoiceData(UInt32 session, float[] pcmArray, int offset, int length)
         {
-            if (session == ServerSync.session)
+            if (session == ServerSync.session && !_debugValues.UseLocalLoopback)
                 return;
             //Debug.Log("Will decode for " + session);
 

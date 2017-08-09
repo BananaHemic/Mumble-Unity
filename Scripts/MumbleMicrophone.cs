@@ -93,9 +93,9 @@ namespace Mumble
 
                 if (!_mumbleClient.UseSyntheticSource)
                     _sendAudioClip.GetData(newData.Pcm, _totalNumSamplesSent % NumSamplesInAudioClip);
-                else {
-                    TestingClipToUse.GetData(newData.Pcm, _totalNumSamplesSent % NumSamplesInAudioClip);
-                }
+                else 
+                    TestingClipToUse.GetData(newData.Pcm, _totalNumSamplesSent % TestingClipToUse.samples);
+                
                 _totalNumSamplesSent += NumSamplesPerOutgoingPacket;
 
                 if(VoiceSendingType == MicType.Amplitude)
