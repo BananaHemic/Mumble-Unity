@@ -120,7 +120,7 @@ namespace Mumble
         {
             NumPacketsRecv++;
             byte typeByte = plainTextMessage[0];
-            int target = typeByte & 31;
+            //int target = typeByte & 31;
             //Debug.Log("len = " + plainTextMessage.Length + " typeByte = " + typeByte);
 
             using (var reader = new UdpPacketReader(new MemoryStream(plainTextMessage, 1, plainTextMessage.Length - 1)))

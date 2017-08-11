@@ -65,7 +65,8 @@ namespace Mumble
         public void SendVoiceStopSignal()
         {
             _encodingBuffer.Stop();
-            _encodingThread.Abort();
+            if(_encodingThread != null)
+                _encodingThread.Abort();
             _encodingThread = null;
         }
         public void Dispose()
@@ -130,7 +131,14 @@ namespace Mumble
                         sequenceIndex = 0;
                 }
                 catch (Exception e){
-                    Debug.LogError("Error: " + e);
+                    if(e is System.Threading.ThreadAbortException)
+                    {
+                        // This is ok
+                    }
+                    else
+                    {
+                        Debug.LogError("Error: " + e);
+                    }
                 }
             }
         }

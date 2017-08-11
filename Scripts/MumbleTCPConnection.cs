@@ -232,7 +232,7 @@ namespace Mumble
                     case MessageType.SuggestConfig:
                         //Contains suggested configuratio options from the server
                         //like whether to send positional data, client version, etc.
-                        var config = Serializer.DeserializeWithLengthPrefix<SuggestConfig>(_ssl,
+                        Serializer.DeserializeWithLengthPrefix<SuggestConfig>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         break;
                     case MessageType.TextMessage:
@@ -256,7 +256,7 @@ namespace Mumble
                         */
                         break;
                     case MessageType.Ping:
-                        var ping = Serializer.DeserializeWithLengthPrefix<MumbleProto.Ping>(_ssl,
+                        Serializer.DeserializeWithLengthPrefix<MumbleProto.Ping>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         break;
                     case MessageType.Reject:
