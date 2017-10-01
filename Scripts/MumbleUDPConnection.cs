@@ -119,7 +119,7 @@ namespace Mumble
         internal void UnpackOpusVoicePacket(byte[] plainTextMessage)
         {
             NumPacketsRecv++;
-            byte typeByte = plainTextMessage[0];
+            //byte typeByte = plainTextMessage[0];
             //int target = typeByte & 31;
             //Debug.Log("len = " + plainTextMessage.Length + " typeByte = " + typeByte);
 

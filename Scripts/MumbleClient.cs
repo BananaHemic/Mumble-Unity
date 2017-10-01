@@ -128,6 +128,10 @@ namespace Mumble
         {
             return _manageSendBuffer.GetAvailablePcmArray();
         }
+        internal UserState GetUserFromSession(uint session)
+        {
+            return AllUsers[session];
+        }
         internal void AddUser(UserState newUserState)
         {
             if (!AllUsers.ContainsKey(newUserState.session))

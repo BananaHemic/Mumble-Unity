@@ -18,6 +18,12 @@ namespace Mumble {
         void Start() {
             //print("outout rate " + AudioSettings.outputSampleRate);
         }
+        public string GetUsername()
+        {
+            if (_mumbleClient == null)
+                return null;
+            return _mumbleClient.GetUserFromSession(_session).name;
+        }
         public void Initialize(MumbleClient mumbleClient, UInt32 session)
         {
             //Debug.Log("Initialized " + session, this);
