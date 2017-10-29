@@ -42,7 +42,7 @@ namespace Mumble
         /// These are NOT! Multithread safe, as they can call Unity functions
         /// </summary>
         /// <returns></returns>
-        public delegate MumbleAudioPlayer AudioPlayerCreatorMethod();
+        public delegate MumbleAudioPlayer AudioPlayerCreatorMethod(string username);
         public delegate void AudioPlayerRemoverMethod(MumbleAudioPlayer audioPlayerToRemove);
         /// <summary>
         /// Delegate called whenever Mumble changes channels, either by joining a room or
@@ -144,7 +144,7 @@ namespace Mumble
                 EventProcessor.Instance.QueueEvent(() =>
                 {
                     // We also create a new audio player for each user
-                    MumbleAudioPlayer newPlayer = _audioPlayerCreator();
+                    MumbleAudioPlayer newPlayer = _audioPlayerCreator(newUserState.name);
                     _mumbleAudioPlayers.Add(newUserState.session, newPlayer);
                     newPlayer.Initialize(this, newUserState.session);
                 });

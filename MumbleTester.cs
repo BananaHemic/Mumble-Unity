@@ -51,12 +51,14 @@ public class MumbleTester : MonoBehaviour {
         }
 #endif
     }
-    private MumbleAudioPlayer CreateMumbleAudioPlayerFromPrefab()
+    private MumbleAudioPlayer CreateMumbleAudioPlayerFromPrefab(string username)
     {
         // Depending on your use case, you might want to add the prefab to an existing object (like someone's head)
         // If you have users entering and leaving frequently, you might want to implement an object pool
         GameObject newObj = GameObject.Instantiate(MyMumbleAudioPlayerPrefab);
+        newObj.name = username + "_MumbleAudioPlayer";
         MumbleAudioPlayer newPlayer = newObj.GetComponent<MumbleAudioPlayer>();
+        Debug.Log("Adding audio player for: " + username);
         return newPlayer;
     }
     private void DestroyMumbleAudioPlayer(MumbleAudioPlayer playerToDestroy)
