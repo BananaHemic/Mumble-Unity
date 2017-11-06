@@ -234,13 +234,13 @@ namespace Mumble
 
             _audioDecodingBuffers[session].Read(pcmArray, offset, length);
         }
-        public void JoinChannel(string channelToJoin)
+        public bool JoinChannel(string channelToJoin)
         {
             ChannelState channel;
             if (!TryGetChannelByName(channelToJoin, out channel))
             {
                 Debug.LogError("Channel " + channelToJoin + " not found!");
-                return;
+                return false;
             }
             UserState state = new UserState();
             state.channel_id = channel.channel_id;
@@ -248,6 +248,7 @@ namespace Mumble
             state.session = OurUserState.session;
             Debug.Log("Attempting to join channel Id: " + state.channel_id);
             _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
+            return true;
         }
         private bool TryGetChannelByName(string channelName, out ChannelState channelState)
         {
