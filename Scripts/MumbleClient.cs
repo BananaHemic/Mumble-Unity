@@ -36,6 +36,7 @@ namespace Mumble
                 return numLost;
             }
         }
+        public bool ReadyToConnect { get; private set; }
         public bool ConnectionSetupFinished { get; internal set; }
         /// <summary>
         /// Methods to create or delete the Unity audio players
@@ -53,9 +54,11 @@ namespace Mumble
         public delegate void OnChannelChangedMethod(ChannelState channelWereNowIn);
 
         public OnChannelChangedMethod OnChannelChanged;
-        private readonly MumbleTcpConnection _tcpConnection;
-        private readonly MumbleUdpConnection _udpConnection;
-        private readonly ManageAudioSendBuffer _manageSendBuffer;
+        private MumbleTcpConnection _tcpConnection;
+        private MumbleUdpConnection _udpConnection;
+        private readonly string _hostName;
+        private readonly int _port;
+        private ManageAudioSendBuffer _manageSendBuffer;
         private MumbleMicrophone _mumbleMic;
         private readonly AudioPlayerCreatorMethod _audioPlayerCreator;
         private readonly AudioPlayerRemoverMethod _audioPlayerDestroyer;
@@ -85,20 +88,17 @@ namespace Mumble
         public const uint Minor = 2;
         public const uint Patch = 8;
 
-        public MumbleClient(string hostName, int port, AudioPlayerCreatorMethod createMumbleAudioPlayerMethod, AudioPlayerRemoverMethod removeMumbleAudioPlayerMethod, DebugValues debugVals=null)
+        public MumbleClient(string hostName, int port, AudioPlayerCreatorMethod createMumbleAudioPlayerMethod, AudioPlayerRemoverMethod removeMumbleAudioPlayerMethod, bool async=false, DebugValues debugVals=null)
         {
-            IPAddress[] addresses = Dns.GetHostAddresses(hostName);
-            if (addresses.Length == 0)
+            _hostName = hostName;
+            _port = port;
+            if (async)
+                Dns.BeginGetHostAddresses(hostName, OnHostRecv, null);
+            else
             {
-                throw new ArgumentException(
-                    "Unable to retrieve address from specified host name.",
-                    hostName
-                    );
+                IPAddress[] addresses = Dns.GetHostAddresses(hostName);
+                Init(addresses);
             }
-            var host = new IPEndPoint(addresses[0], port);
-            _udpConnection = new MumbleUdpConnection(host, this);
-            _tcpConnection = new MumbleTcpConnection(host, hostName, _udpConnection.UpdateOcbServerNonce, _udpConnection, this);
-            _udpConnection.SetTcpConnection(_tcpConnection);
             _audioPlayerCreator = createMumbleAudioPlayerMethod;
             _audioPlayerDestroyer = removeMumbleAudioPlayerMethod;
 
@@ -106,10 +106,30 @@ namespace Mumble
                 debugVals = new DebugValues();
             _debugValues = debugVals;
 
-            //Maybe do Lazy?
+        }
+        private void Init(IPAddress[] addresses)
+        {
+            //Debug.Log("Host addresses recv");
+            if (addresses == null || addresses.Length == 0)
+            {
+                Debug.LogError("Failed to get addresses!");
+                throw new ArgumentException(
+                    "Unable to retrieve address from specified host name.",
+                    _hostName
+                    );
+            }
+            var endpoint = new IPEndPoint(addresses[0], _port);
+            _udpConnection = new MumbleUdpConnection(endpoint, this);
+            _tcpConnection = new MumbleTcpConnection(endpoint, _hostName, _udpConnection.UpdateOcbServerNonce, _udpConnection, this);
+            _udpConnection.SetTcpConnection(_tcpConnection);
             _codec = new OpusCodec();
-
             _manageSendBuffer = new ManageAudioSendBuffer(_codec, _udpConnection, this);
+            ReadyToConnect = true;
+        }
+        private void OnHostRecv(IAsyncResult result)
+        {
+            IPAddress[] addresses = Dns.EndGetHostAddresses(result);
+            Init(addresses);
         }
         internal void AddMumbleMic(MumbleMicrophone newMic)
         {
@@ -193,6 +213,11 @@ namespace Mumble
         }
         public void Connect(string username, string password)
         {
+            if (!ReadyToConnect)
+            {
+                Debug.LogError("We're not ready to connect yet!");
+                return;
+            }
             _tcpConnection.StartClient(username, password);
         }
         internal void ConnectUdp()
@@ -201,9 +226,12 @@ namespace Mumble
         }
         public void Close()
         {
-            _tcpConnection.Close();
-            _udpConnection.Close();
-            _manageSendBuffer.Dispose();
+            if(_tcpConnection != null)
+                _tcpConnection.Close();
+            if(_udpConnection != null)
+                _udpConnection.Close();
+            if(_manageSendBuffer != null)
+                _manageSendBuffer.Dispose();
         }
         public void SendTextMessage(string textMessage)
         {

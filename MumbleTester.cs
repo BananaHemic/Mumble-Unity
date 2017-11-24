@@ -19,6 +19,7 @@ public class MumbleTester : MonoBehaviour {
     public DebugValues DebuggingVariables;
 
     private MumbleClient _mumbleClient;
+    public bool ConnectAsyncronously = true;
     public string HostName = "1.2.3.4";
     public int Port = 64738;
     public string Username = "ExampleUser";
@@ -33,14 +34,19 @@ public class MumbleTester : MonoBehaviour {
             return;
         }
         Application.runInBackground = true;
-        _mumbleClient = new MumbleClient(HostName, Port, CreateMumbleAudioPlayerFromPrefab, DestroyMumbleAudioPlayer, DebuggingVariables);
+        _mumbleClient = new MumbleClient(HostName, Port, CreateMumbleAudioPlayerFromPrefab, DestroyMumbleAudioPlayer, ConnectAsyncronously, DebuggingVariables);
 
         if (DebuggingVariables.UseRandomUsername)
             Username += UnityEngine.Random.Range(0, 100f);
-        _mumbleClient.Connect(Username, Password);
 
-        if(MyMumbleMic != null)
-            _mumbleClient.AddMumbleMic(MyMumbleMic);
+        if (ConnectAsyncronously)
+            StartCoroutine(ConnectAsync());
+        else
+        {
+            _mumbleClient.Connect(Username, Password);
+            if(MyMumbleMic != null)
+                _mumbleClient.AddMumbleMic(MyMumbleMic);
+        }
 
 #if UNITY_EDITOR
         if (DebuggingVariables.EnableEditorIOGraph)
@@ -50,6 +56,16 @@ public class MumbleTester : MonoBehaviour {
             StartCoroutine(UpdateEditorGraph());
         }
 #endif
+    }
+    IEnumerator ConnectAsync()
+    {
+        while (!_mumbleClient.ReadyToConnect)
+            yield return null;
+        Debug.Log("Will now connect");
+        _mumbleClient.Connect(Username, Password);
+        yield return null;
+        if(MyMumbleMic != null)
+            _mumbleClient.AddMumbleMic(MyMumbleMic);
     }
     private MumbleAudioPlayer CreateMumbleAudioPlayerFromPrefab(string username)
     {
@@ -95,6 +111,8 @@ public class MumbleTester : MonoBehaviour {
         }
     }
 	void Update () {
+        if (!_mumbleClient.ReadyToConnect)
+            return;
         if (Input.GetKeyDown(KeyCode.S))
         {
             _mumbleClient.SendTextMessage("This is an example message from Unity");
