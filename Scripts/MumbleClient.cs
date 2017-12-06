@@ -294,6 +294,9 @@ namespace Mumble
         }
         public string GetCurrentChannel()
         {
+            if (Channels == null
+                || OurUserState == null)
+                return null;
             ChannelState ourChannel;
             if(Channels.TryGetValue(OurUserState.channel_id, out ourChannel))
                 return ourChannel.name;
