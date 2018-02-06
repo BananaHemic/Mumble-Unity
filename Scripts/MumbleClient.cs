@@ -80,8 +80,6 @@ namespace Mumble
         internal int EncoderSampleRate { get; private set; }
         internal int NumSamplesPerOutgoingPacket { get; private set; }
 
-        private OpusCodec _codec;
-
         //The Mumble version of this integration
         public const string ReleaseName = "MumbleUnity";
         public const uint Major = 1;
@@ -122,8 +120,7 @@ namespace Mumble
             _udpConnection = new MumbleUdpConnection(endpoint, this);
             _tcpConnection = new MumbleTcpConnection(endpoint, _hostName, _udpConnection.UpdateOcbServerNonce, _udpConnection, this);
             _udpConnection.SetTcpConnection(_tcpConnection);
-            _codec = new OpusCodec();
-            _manageSendBuffer = new ManageAudioSendBuffer(_codec, _udpConnection, this);
+            _manageSendBuffer = new ManageAudioSendBuffer(_udpConnection, this);
             ReadyToConnect = true;
         }
         private void OnHostRecv(IAsyncResult result)
@@ -141,8 +138,7 @@ namespace Mumble
                 return;
             
             NumSamplesPerOutgoingPacket = MumbleConstants.NUM_FRAMES_PER_OUTGOING_PACKET * EncoderSampleRate / 100;
-
-            _codec.InitializeEncoderWithSampleRate(EncoderSampleRate);
+            _manageSendBuffer.InitForSampleRate(EncoderSampleRate);
         }
         internal PcmArray GetAvailablePcmArray()
         {
@@ -157,9 +153,9 @@ namespace Mumble
             if (!AllUsers.ContainsKey(newUserState.session))
             {
                 Debug.Log("Adding user: " + newUserState.name);
-                //Debug.Log("New audio buffer with session: " + newUserState.session);
+                Debug.Log("New audio buffer with session: " + newUserState.session);
                 AllUsers[newUserState.session] = newUserState;
-                AudioDecodingBuffer buffer = new AudioDecodingBuffer(_codec);
+                AudioDecodingBuffer buffer = new AudioDecodingBuffer();
                 _audioDecodingBuffers.Add(newUserState.session, buffer);
                 EventProcessor.Instance.QueueEvent(() =>
                 {

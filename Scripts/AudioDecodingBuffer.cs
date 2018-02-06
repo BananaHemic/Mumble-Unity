@@ -34,7 +34,7 @@ namespace Mumble {
         private long _nextSequenceToDecode;
         private long _lastReceivedSequence;
         private readonly Queue<BufferPacket> _encodedBuffer = new Queue<BufferPacket>();
-        private readonly OpusCodec _codec;
+        private readonly OpusDecoder _decoder;
         const int NumDecodedSubBuffers = (int)(MumbleConstants.MAX_LATENCY_SECONDS * (MumbleConstants.SAMPLE_RATE / MumbleConstants.FRAME_SIZE));
         const int SubBufferSize = MumbleConstants.FRAME_SIZE * MumbleConstants.MAX_FRAMES_PER_PACKET * MumbleConstants.NUM_CHANNELS;
         /// <summary>
@@ -43,9 +43,9 @@ namespace Mumble {
         /// </summary>
         const long MaxMissingPackets = 25;
 
-        public AudioDecodingBuffer(OpusCodec codec)
+        public AudioDecodingBuffer()
         {
-            _codec = codec;
+            _decoder = new OpusDecoder(MumbleConstants.SAMPLE_RATE, MumbleConstants.NUM_CHANNELS) { EnableForwardErrorCorrection = false };
         }
         public int Read(float[] buffer, int offset, int count)
         {
@@ -173,12 +173,12 @@ namespace Mumble {
                     if(packet.Value.Sequence > _nextSequenceToDecode)
                     {
                         NumPacketsLost += packet.Value.Sequence - _nextSequenceToDecode;
-                        _codec.Decode(null, _decodedBuffer[_nextBufferToDecodeInto]);
+                        _decoder.Decode(null, _decodedBuffer[_nextBufferToDecodeInto]);
                     }
                 }
             }
 
-            int numRead = _codec.Decode(packet.Value.Data, _decodedBuffer[_nextBufferToDecodeInto]);
+            int numRead = _decoder.Decode(packet.Value.Data, _decodedBuffer[_nextBufferToDecodeInto]);
 
             if (numRead < 0)
             {

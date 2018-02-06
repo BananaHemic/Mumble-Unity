@@ -7,23 +7,31 @@ namespace Mumble
 {
     public class ManageAudioSendBuffer : IDisposable
     {
-        private readonly OpusCodec _codec;
         private readonly MumbleUdpConnection _udpConnection;
         private readonly AudioEncodingBuffer _encodingBuffer;
         private readonly List<PcmArray> _pcmArrays;
         private readonly MumbleClient _mumbleClient;
+        private OpusEncoder _encoder;
 
         private Thread _encodingThread;
         private UInt32 sequenceIndex;
 
-        public ManageAudioSendBuffer(OpusCodec codec, MumbleUdpConnection udpConnection, MumbleClient mumbleClient)
+        public ManageAudioSendBuffer(MumbleUdpConnection udpConnection, MumbleClient mumbleClient)
         {
             _udpConnection = udpConnection;
-            _codec = codec;
             _mumbleClient = mumbleClient;
             _pcmArrays = new List<PcmArray>();
             _encodingBuffer = new AudioEncodingBuffer();
-
+        }
+        internal void InitForSampleRate(int sampleRate)
+        {
+            if(_encoder != null)
+            {
+                Debug.LogError("Destroying opus encoder");
+                _encoder.Dispose();
+                _encoder = null;
+            }
+            _encoder = new OpusEncoder(sampleRate, 1) { EnableForwardErrorCorrection = false };
         }
         ~ManageAudioSendBuffer()
         {
@@ -82,7 +90,7 @@ namespace Mumble
                 {
                     bool isLastPacket;
                     bool isEmpty;
-                    ArraySegment<byte> packet = _encodingBuffer.Encode(_codec, out isLastPacket, out isEmpty);
+                    ArraySegment<byte> packet = _encodingBuffer.Encode(_encoder, out isLastPacket, out isEmpty);
 
                     if (isEmpty)
                     {
