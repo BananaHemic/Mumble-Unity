@@ -48,7 +48,7 @@ namespace Mumble
             }
         }
 
-        public ArraySegment<byte> Encode(OpusCodec codec, out bool isStop, out bool isEmpty)
+        public ArraySegment<byte> Encode(OpusEncoder encoder, out bool isStop, out bool isEmpty)
         {
             isStop = false;
             isEmpty = false;
@@ -83,7 +83,7 @@ namespace Mumble
                 return EmptyByteSegment;
 
             //Debug.Log("Will encode: " + nextPcmToSend.Length);
-            return codec.Encode(nextPcmToSend.Pcm);
+            return encoder.Encode(nextPcmToSend.Pcm);
         }
 
         /// <summary>

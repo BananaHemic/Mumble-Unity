@@ -22,8 +22,7 @@ namespace Mumble
         internal volatile int NumPacketsRecv = 0;
         internal volatile bool _useTcp = false;
         // These are used for switching to TCP audio and back. Don't rely on them for anything else
-        private volatile int _numPingsSent = 0;
-        private volatile int _numPingsReceived = 0;
+        private volatile int _numPingsOutstanding = 0;
 
         internal MumbleUdpConnection(IPEndPoint host, MumbleClient mumbleClient)
         {
@@ -106,14 +105,12 @@ namespace Mumble
         internal void OnPing(byte[] message)
         {
             //Debug.Log("Would process ping");
-            _numPingsReceived++;
+            _numPingsOutstanding = 0;
             // If we received a ping, that means that UDP is working
             if (_useTcp)
             {
                 Debug.Log("Switching back to UDP");
                 _useTcp = false;
-                _numPingsReceived = 0;
-                _numPingsSent = 0;
             }
         }
         internal void UnpackOpusVoicePacket(byte[] plainTextMessage)
@@ -184,13 +181,13 @@ namespace Mumble
             while (_isSending)
                 System.Threading.Thread.Sleep(1);
             _isSending = true;
-            if(!_useTcp && _numPingsSent - _numPingsReceived >= MumbleConstants.MAX_MISSED_UDP_PINGS)
+            if(!_useTcp && _numPingsOutstanding >= MumbleConstants.MAX_CONSECUTIVE_MISSED_UDP_PINGS)
             {
                 Debug.LogWarning("Error establishing UDP connection, will switch to TCP");
                 _useTcp = true;
             }
             //Debug.Log(_numPingsSent - _numPingsReceived);
-            _numPingsSent++;
+            _numPingsOutstanding++;
             _udpClient.BeginSend(encryptedData, encryptedData.Length, new AsyncCallback(OnSent), null);
         }
 

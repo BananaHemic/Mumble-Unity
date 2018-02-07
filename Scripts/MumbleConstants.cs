@@ -33,6 +33,6 @@ namespace Mumble
         //How many bytes can go into a single UDP packet
         public const int MAX_BYTES_PER_PACKET = 480;
         public const int RECEIVED_PACKET_BUFFER_SIZE = 10;
-        public const int MAX_MISSED_UDP_PINGS = 2;
+        public const int MAX_CONSECUTIVE_MISSED_UDP_PINGS = 2;
     }
 }
