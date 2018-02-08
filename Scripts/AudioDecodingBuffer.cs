@@ -175,7 +175,9 @@ namespace Mumble {
                     if(packet.Value.Sequence > _nextSequenceToDecode)
                     {
                         NumPacketsLost += packet.Value.Sequence - _nextSequenceToDecode;
-                        _decoder.Decode(null, _decodedBuffer[_nextBufferToDecodeInto]);
+                        int emptySampleNumRead =_decoder.Decode(null, _decodedBuffer[_nextBufferToDecodeInto]);
+                        _numSamplesInBuffer[_nextBufferToDecodeInto] = emptySampleNumRead;
+                        _nextSequenceToDecode = packet.Value.Sequence + emptySampleNumRead / (MumbleConstants.FRAME_SIZE * MumbleConstants.NUM_CHANNELS);
                     }
                 }
             }
