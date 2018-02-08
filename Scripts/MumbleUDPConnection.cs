@@ -144,10 +144,7 @@ namespace Mumble
                 //Debug.Log("Received sess: " + session);
                 //Debug.Log(" seq: " + sequence + " size = " + size + " packetLen: " + plainTextMessage.Length);
 
-                if (size == 0)
-                    return;
-
-                byte[] data = reader.ReadBytes(size);
+                byte[] data = (size != 0) ? reader.ReadBytes(size) : new byte[0];
                 
                 if (data == null || data.Length != size)
                 {
@@ -160,7 +157,7 @@ namespace Mumble
                 {
                     Debug.LogWarning("We have " + remaining + " bytes!");
                 }
-                _mumbleClient.ReceiveEncodedVoice(session, data, sequence);
+                _mumbleClient.ReceiveEncodedVoice(session, data, sequence, isLast);
             }
         }
         internal void SendPing()

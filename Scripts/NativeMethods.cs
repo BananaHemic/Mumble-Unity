@@ -61,12 +61,16 @@ namespace Mumble
         internal static extern int opus_packet_get_nb_channels(byte[] encodedData);
 
         //Control the encoder
+        // Used to get values
         [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int opus_encoder_ctl(IntPtr encoder, OpusCtl request, out int value);
-
+        // Used to set values
         [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int opus_encoder_ctl(IntPtr encoder, OpusCtl request, int value);
-
+        // Mostly just used for reset 
+        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int opus_encoder_ctl(IntPtr encoder, OpusCtl request);
+        
         [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr opus_decoder_create(int sampleRate, int channelCount, out IntPtr error);
 
@@ -79,6 +83,16 @@ namespace Mumble
         [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void opus_decoder_destroy(IntPtr decoder);
 
+        // Control the decoder
+        // Used to get values
+        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int opus_decoder_ctl(IntPtr decoder, OpusCtl request, out int value);
+        // Used to set values
+        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int opus_decoder_ctl(IntPtr decoder, OpusCtl request, int value);
+        // Mostly just used for reset 
+        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int opus_decoder_ctl(IntPtr decoder, OpusCtl request);
 
         #region internal methods
         internal static IntPtr opus_encoder_create(int sampleRate, int channelCount, OpusApplication application, out OpusErrors error)
@@ -143,6 +157,32 @@ namespace Mumble
                 Debug.LogError("Decoding error: " + (OpusErrors)length);
 
             return length * channelCount;
+        }
+        internal static int opus_reset_decoder(IntPtr decoder)
+        {
+            if (decoder == IntPtr.Zero)
+            {
+                Debug.LogError("Encoder empty??");
+                return 0;
+            }
+
+            int resp = NativeMethods.opus_decoder_ctl(decoder, OpusCtl.RESET_STATE);
+            if(resp != 0)
+                Debug.LogError("Resetting decoder had response: " + resp);
+            return resp;
+        }
+        internal static int opus_reset_encoder(IntPtr encoder)
+        {
+            if (encoder == IntPtr.Zero)
+            {
+                Debug.LogError("Encoder empty??");
+                return 0;
+            }
+
+            int resp = NativeMethods.opus_encoder_ctl(encoder, OpusCtl.RESET_STATE);
+            if(resp != 0)
+                Debug.LogError("Resetting encoder had response: " + resp);
+            return resp;
         }
         #endregion
     }

@@ -14,9 +14,10 @@ namespace Mumble
     {
         private readonly Queue<TargettedSpeech> _unencodedBuffer = new Queue<TargettedSpeech>();
 
-        public readonly ArraySegment<byte> EmptyByteSegment = new ArraySegment<byte> { };
+        //TODO not certain on this
+        public readonly ArraySegment<byte> EmptyByteSegment = new ArraySegment<byte>(new byte[0] {});
 
-        private bool _isWaitingToSendLastPacket = false;
+        private volatile bool _isWaitingToSendLastPacket = false;
 
         /// <summary>
         /// Add some raw PCM data to the buffer to send
@@ -44,7 +45,7 @@ namespace Mumble
                     _unencodedBuffer.Enqueue(new TargettedSpeech(stop: true));
                 }
                 else
-                    Debug.LogWarning("Marking last packet");
+                    Debug.Log("Marking last packet");
             }
         }
 
@@ -53,6 +54,7 @@ namespace Mumble
             isStop = false;
             isEmpty = false;
             PcmArray nextPcmToSend = null;
+            ArraySegment<byte> encoder_buffer;
 
             lock (_unencodedBuffer)
             {
@@ -61,29 +63,31 @@ namespace Mumble
                 else
                 {
                     if (_unencodedBuffer.Count == 1 && _isWaitingToSendLastPacket)
-                    {
                         isStop = true;
-                        _isWaitingToSendLastPacket = false;
-                    }
 
                     TargettedSpeech speech = _unencodedBuffer.Dequeue();
                     isStop = isStop || speech.IsStop;
-                    if (!isStop)
-                    {
-                        nextPcmToSend = speech.PcmData;
+
+                    nextPcmToSend = speech.PcmData;
+                    if(nextPcmToSend != null)
                         nextPcmToSend.IsAvailable = true;
-                    }
+
+                    if (isStop)
+                        _isWaitingToSendLastPacket = false;
                 }
             }
 
             if (nextPcmToSend == null || nextPcmToSend.Pcm.Length == 0)
                 isEmpty = true;
 
-            if (isEmpty)
-                return EmptyByteSegment;
+            encoder_buffer = isEmpty ? EmptyByteSegment : encoder.Encode(nextPcmToSend.Pcm);
 
-            //Debug.Log("Will encode: " + nextPcmToSend.Length);
-            return encoder.Encode(nextPcmToSend.Pcm);
+            if (isStop)
+            {
+                Debug.Log("Resetting encoder state");
+                encoder.ResetState();
+            }
+            return encoder_buffer;
         }
 
         /// <summary>
@@ -106,7 +110,7 @@ namespace Mumble
                 IsStop = false;
             }
             
-            public TargettedSpeech(bool stop = true)
+            public TargettedSpeech(bool stop)
             {
                 IsStop = stop;
                 PcmData = null;

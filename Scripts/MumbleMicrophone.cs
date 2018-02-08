@@ -27,7 +27,7 @@ namespace Mumble
         public KeyCode PushToTalkKeycode = KeyCode.Space;
 
         const int NumRecordingSeconds = 1;
-        private int NumSamplesInAudioClip {
+        private int NumSamplesInMicBuffer {
             get
             {
                 return NumRecordingSeconds * _mumbleClient.EncoderSampleRate;
@@ -68,23 +68,29 @@ namespace Mumble
             NumSamplesPerOutgoingPacket = MumbleConstants.NUM_FRAMES_PER_OUTGOING_PACKET * micSampleRate / 100;
 
             print("Device:  " + _currentMic + " has freq: " + minFreq + " to " + maxFreq + " setting to: " + micSampleRate);
+            if (micSampleRate != 48000)
+                Debug.LogWarning("Using a possibly unsupported sample rate of " + micSampleRate + " things might get weird");
             _currentMic = Microphone.devices[MicNumberToUse];
 
             _voiceHoldSamples = Mathf.RoundToInt(micSampleRate * VoiceHoldSeconds);
 
             if (SendAudioOnStart && (VoiceSendingType == MicType.AlwaysSend
-                || VoiceSendingType == MicType.Amplitude))
+                || VoiceSendingType == MicType.Amplitude)) 
                 StartSendingAudio(micSampleRate);
             return micSampleRate;
         }
         void SendVoiceIfReady()
         {
             int currentPosition = Microphone.GetPosition(_currentMic);
+            //Debug.Log(currentPosition + " " + Microphone.IsRecording(_currentMic));
 
             if(currentPosition < _previousPosition)
                 _numTimesLooped++;
 
-            int totalSamples = _numTimesLooped * NumSamplesInAudioClip + currentPosition;
+            //int numSourceSamples = !_mumbleClient.UseSyntheticSource ? NumSamplesInMicBuffer : TestingClipToUse.samples;
+
+            int totalSamples = currentPosition + _numTimesLooped * NumSamplesInMicBuffer;
+            //int totalSamples = currentPosition + _numTimesLooped * numSourceSamples;
             _previousPosition = currentPosition;
 
             while(totalSamples - _totalNumSamplesSent >= NumSamplesPerOutgoingPacket)
@@ -92,10 +98,11 @@ namespace Mumble
                 PcmArray newData = _mumbleClient.GetAvailablePcmArray();
 
                 if (!_mumbleClient.UseSyntheticSource)
-                    _sendAudioClip.GetData(newData.Pcm, _totalNumSamplesSent % NumSamplesInAudioClip);
+                    _sendAudioClip.GetData(newData.Pcm, _totalNumSamplesSent % NumSamplesInMicBuffer);
                 else 
                     TestingClipToUse.GetData(newData.Pcm, _totalNumSamplesSent % TestingClipToUse.samples);
-                
+                //Debug.Log(Time.frameCount + " " + currentPosition);
+
                 _totalNumSamplesSent += NumSamplesPerOutgoingPacket;
 
                 if(VoiceSendingType == MicType.Amplitude)
@@ -103,18 +110,24 @@ namespace Mumble
                     if (AmplitudeHigherThan(MinAmplitude, newData.Pcm))
                     {
                         _sampleNumberOfLastMinAmplitudeVoice = _totalNumSamplesSent;
+                        _mumbleClient.SendVoicePacket(newData);
                     }
                     else
                     {
                         if (_totalNumSamplesSent > _sampleNumberOfLastMinAmplitudeVoice + _voiceHoldSamples)
-                            return;
+                            continue;
+                        _mumbleClient.SendVoicePacket(newData);
+                        // If this is the sample before the hold turns off, stop sending after it's sent
+                        if (_totalNumSamplesSent + NumSamplesPerOutgoingPacket > _sampleNumberOfLastMinAmplitudeVoice + _voiceHoldSamples)
+                            _mumbleClient.StopSendingVoice();
                     }
-                }
-                _mumbleClient.SendVoicePacket(newData);
+                }else
+                    _mumbleClient.SendVoicePacket(newData);
             }
         }
-        private bool AmplitudeHigherThan(float minAmplitude, float[] pcm)
+        private static bool AmplitudeHigherThan(float minAmplitude, float[] pcm)
         {
+            //return true;
             float currentSum = pcm[0];
             int checkInterval = 200;
 
@@ -134,6 +147,7 @@ namespace Mumble
             _previousPosition = 0;
             _numTimesLooped = 0;
             _totalNumSamplesSent = 0;
+            _sampleNumberOfLastMinAmplitudeVoice = int.MinValue;
             isRecording = true;
         }
         public void StopSendingAudio()

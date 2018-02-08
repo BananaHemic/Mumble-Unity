@@ -140,8 +140,8 @@ namespace Mumble {
             if (_decodedBuffer[_nextBufferToDecodeInto] == null)
                 _decodedBuffer[_nextBufferToDecodeInto] = new float[SubBufferSize];
 
-            //Debug.Log("decoding " + packet.Value.Sequence + " len=" + packet.Value.Data.Length);
-            if(_nextSequenceToDecode != 0)
+            //Debug.Log("decoding " + packet.Value.Sequence + " last=" + _lastReceivedSequence + " len=" + packet.Value.Data.Length);
+            if (_nextSequenceToDecode != 0)
             {
                 long seqDiff = packet.Value.Sequence - _nextSequenceToDecode;
 
@@ -149,19 +149,21 @@ namespace Mumble {
                 if(seqDiff < -MaxMissingPackets)
                 {
                     Debug.Log("Sequence has possibly reset diff = " + seqDiff);
+                    _decoder.ResetState();
                 }
                 // If the packet came before we were expecting it to, but after the last packet, the sampling has probably changed
-                else if (packet.Value.Sequence > _lastReceivedSequence && seqDiff < 0)
+                // unless the packet is a last packet (in which case the sequence may have only increased by 1)
+                else if (packet.Value.Sequence > _lastReceivedSequence && seqDiff < 0 && !packet.Value.IsLast)
                 {
                     Debug.Log("Mumble sample rate may have changed");
                 }
                 // If the sequence number changes abruptly (which happens with push to talk)
                 else if (seqDiff > MaxMissingPackets)
                 {
-                    Debug.Log("Mumble packet sequence changed abruptly");
+                    Debug.Log("Mumble packet sequence changed abruptly pkt: " + packet.Value.Sequence + " last: " + _lastReceivedSequence);
                 }
                 // If the packet is a bit late, drop it
-                else if (seqDiff < 0)
+                else if (seqDiff < 0 && !packet.Value.IsLast)
                 {
                     Debug.LogWarning("Received old packet " + packet.Value.Sequence + " expecting " + _nextSequenceToDecode);
                     return false;
@@ -178,11 +180,13 @@ namespace Mumble {
                 }
             }
 
-            int numRead = _decoder.Decode(packet.Value.Data, _decodedBuffer[_nextBufferToDecodeInto]);
+            int numRead = 0;
+            if(packet.Value.Data.Length != 0)
+                numRead = _decoder.Decode(packet.Value.Data, _decodedBuffer[_nextBufferToDecodeInto]);
 
             if (numRead < 0)
             {
-                Debug.Log("num read is 0");
+                Debug.Log("num read is < 0");
                 return false;
             }
 
@@ -190,8 +194,16 @@ namespace Mumble {
             _numSamplesInBuffer[_nextBufferToDecodeInto] = numRead;
             //Debug.Log("numRead = " + numRead);
             _lastReceivedSequence = packet.Value.Sequence;
-            _nextSequenceToDecode = packet.Value.Sequence + numRead / (MumbleConstants.FRAME_SIZE * MumbleConstants.NUM_CHANNELS);
-            _nextBufferToDecodeInto++;
+            if (!packet.Value.IsLast)
+                _nextSequenceToDecode = packet.Value.Sequence + numRead / (MumbleConstants.FRAME_SIZE * MumbleConstants.NUM_CHANNELS);
+            else
+            {
+                Debug.Log("Resetting decoder");
+                _nextSequenceToDecode = 0;
+                _decoder.ResetState();
+            }
+            if(numRead > 0)
+                _nextBufferToDecodeInto++;
             //Make sure we don't go over our max number of buffers
             if (_nextBufferToDecodeInto == NumDecodedSubBuffers)
                 _nextBufferToDecodeInto = 0;
@@ -204,7 +216,7 @@ namespace Mumble {
         /// <param name="sequence">Sequence number of this packet</param>
         /// <param name="data">The encoded audio packet</param>
         /// <param name="codec">The codec to use to decode this packet</param>
-        public void AddEncodedPacket(long sequence, byte[] data)
+        public void AddEncodedPacket(long sequence, byte[] data, bool isLast)
         {
             /* TODO this messes up when we hit configure in the desktop mumble app. The sequence number drops to 0
             //If the next seq we expect to decode comes after this packet we've already missed our opportunity!
@@ -226,7 +238,8 @@ namespace Mumble {
                 _encodedBuffer.Enqueue(new BufferPacket
                 {
                     Data = data,
-                    Sequence = sequence
+                    Sequence = sequence,
+                    IsLast = isLast
                 });
                 //Debug.Log("Count is now: " + _encodedBuffer.Count);
             }
@@ -236,6 +249,7 @@ namespace Mumble {
         {
             public byte[] Data;
             public long Sequence;
+            public bool IsLast;
         }
     }
 }
