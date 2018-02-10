@@ -150,7 +150,7 @@ namespace Mumble
                 return 0;
             }
 
-            int length = NativeMethods.opus_decode_float(decoder, encodedData, encodedData != null ? encodedData.Length : 0, outputPcm, outputPcm.Length / channelCount, MumbleConstants.USE_FORWARD_ERROR_CORRECTION);
+            int length = NativeMethods.opus_decode_float(decoder, encodedData, encodedData != null ? encodedData.Length : 0, outputPcm, encodedData == null ? MumbleConstants.FRAME_SIZE * MumbleConstants.NUM_CHANNELS: outputPcm.Length / channelCount, MumbleConstants.USE_FORWARD_ERROR_CORRECTION);
             //Debug.Log("Retrieved " + length + " samples");
 
             if (length <= 0)

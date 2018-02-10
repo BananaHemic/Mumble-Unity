@@ -165,6 +165,8 @@ namespace Mumble
             {
                 if (Input.GetKeyDown(PushToTalkKeycode))
                     StartSendingAudio(_mumbleClient.EncoderSampleRate);
+                // TODO we should send one extra voice packet marked with isLast
+                // Instead of sending an empty packet marked with isLast
                 if (Input.GetKeyUp(PushToTalkKeycode))
                     StopSendingAudio();
             }

@@ -150,6 +150,7 @@ namespace Mumble
                     if(e is System.Threading.ThreadAbortException)
                     {
                         // This is ok
+                        break;
                     }
                     else
                     {
