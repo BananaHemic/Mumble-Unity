@@ -44,12 +44,26 @@ namespace Mumble {
         /// </summary>
         const long MaxMissingPackets = 25;
 
+        /// <summary>
+        /// How many incoming packets to buffer before audio begins to be played
+        /// Higher values increase stability and latency
+        /// </summary>
+        const int InitialSampleBuffer = 3;
+        private bool _hasFilledInitialBuffer;
+
         public AudioDecodingBuffer()
         {
             _decoder = new OpusDecoder(MumbleConstants.SAMPLE_RATE, MumbleConstants.NUM_CHANNELS);
         }
         public int Read(float[] buffer, int offset, int count)
         {
+            // Don't send audio until we've filled our initial buffer of packets
+            if (!_hasFilledInitialBuffer)
+            {
+                Array.Clear(buffer, offset, count);
+                return 0;
+            }
+
             /*
             lock (_encodedBuffer)
             {
@@ -223,6 +237,7 @@ namespace Mumble {
             {
                 //Debug.Log("Resetting decoder");
                 _nextSequenceToDecode = 0;
+                _hasFilledInitialBuffer = false;
                 _decoder.ResetState();
             }
             if(numRead > 0)
@@ -260,13 +275,16 @@ namespace Mumble {
             //Debug.Log("Adding #" + sequence);
             lock (_encodedBuffer)
             {
-                if (_encodedBuffer.Count > MumbleConstants.RECEIVED_PACKET_BUFFER_SIZE)
+                int count = _encodedBuffer.Count;
+                if (count > MumbleConstants.RECEIVED_PACKET_BUFFER_SIZE)
                 {
                     Debug.LogWarning("Max recv buffer size reached, dropping");
                     return;
                 }
 
                 _encodedBuffer.Enqueue(packet);
+                if (!_hasFilledInitialBuffer && count + 1 >= InitialSampleBuffer)
+                    _hasFilledInitialBuffer = true;
                 //Debug.Log("Count is now: " + _encodedBuffer.Count);
             }
         }
