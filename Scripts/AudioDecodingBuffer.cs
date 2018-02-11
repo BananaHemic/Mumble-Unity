@@ -13,7 +13,7 @@ using System.Text;
 using UnityEngine;
 
 namespace Mumble {
-    public class AudioDecodingBuffer
+    public class AudioDecodingBuffer : IDisposable
     {
         public long NumPacketsLost { get; private set; }
         /// <summary>
@@ -29,13 +29,20 @@ namespace Mumble {
         /// The index of the next sub-buffer to decode into
         /// </summary>
         private int _nextBufferToDecodeInto;
+        /// <summary>
+        /// The sequence that we expect for the next packet
+        /// </summary>
+        private long _nextSequenceToDecode;
+        /// <summary>
+        /// The sequence that we last decoded
+        /// </summary>
+        private long _lastReceivedSequence;
+        private OpusDecoder _decoder;
+
         private readonly float[][] _decodedBuffer = new float[NumDecodedSubBuffers][];
         private readonly int[] _numSamplesInBuffer = new int[NumDecodedSubBuffers];
         private readonly int[] _readOffsetInBuffer = new int[NumDecodedSubBuffers];
-        private long _nextSequenceToDecode;
-        private long _lastReceivedSequence;
         private readonly Queue<BufferPacket> _encodedBuffer = new Queue<BufferPacket>();
-        private readonly OpusDecoder _decoder;
         const int NumDecodedSubBuffers = (int)(MumbleConstants.MAX_LATENCY_SECONDS * (MumbleConstants.SAMPLE_RATE / MumbleConstants.FRAME_SIZE));
         const int SubBufferSize = MumbleConstants.FRAME_SIZE * MumbleConstants.MAX_FRAMES_PER_PACKET * MumbleConstants.NUM_CHANNELS;
         /// <summary>
@@ -53,7 +60,6 @@ namespace Mumble {
 
         public AudioDecodingBuffer()
         {
-            _decoder = new OpusDecoder(MumbleConstants.SAMPLE_RATE, MumbleConstants.NUM_CHANNELS);
         }
         public int Read(float[] buffer, int offset, int count)
         {
@@ -163,6 +169,10 @@ namespace Mumble {
                 //Debug.Log("empty");
                 return false;
             }
+            // Don't make the decoder unless we know that we'll have to
+            if(_decoder == null)
+                _decoder = new OpusDecoder(MumbleConstants.SAMPLE_RATE, MumbleConstants.NUM_CHANNELS);
+
             if (_decodedBuffer[_nextBufferToDecodeInto] == null)
                 _decodedBuffer[_nextBufferToDecodeInto] = new float[SubBufferSize];
 
@@ -286,6 +296,15 @@ namespace Mumble {
                 if (!_hasFilledInitialBuffer && count + 1 >= InitialSampleBuffer)
                     _hasFilledInitialBuffer = true;
                 //Debug.Log("Count is now: " + _encodedBuffer.Count);
+            }
+        }
+
+        public void Dispose()
+        {
+            if(_decoder != null)
+            {
+                _decoder.Dispose();
+                _decoder = null;
             }
         }
 
