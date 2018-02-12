@@ -11,10 +11,12 @@ namespace Mumble
         private readonly AudioEncodingBuffer _encodingBuffer;
         private readonly List<PcmArray> _pcmArrays;
         private readonly MumbleClient _mumbleClient;
+        private readonly AutoResetEvent _waitHandle;
         private OpusEncoder _encoder;
 
         private Thread _encodingThread;
         private UInt32 sequenceIndex;
+        private bool _stopSendingRequested = false;
 
         public ManageAudioSendBuffer(MumbleUdpConnection udpConnection, MumbleClient mumbleClient)
         {
@@ -22,6 +24,7 @@ namespace Mumble
             _mumbleClient = mumbleClient;
             _pcmArrays = new List<PcmArray>();
             _encodingBuffer = new AudioEncodingBuffer();
+            _waitHandle = new AutoResetEvent(false);
         }
         internal void InitForSampleRate(int sampleRate)
         {
@@ -32,6 +35,14 @@ namespace Mumble
                 _encoder = null;
             }
             _encoder = new OpusEncoder(sampleRate, 1) { EnableForwardErrorCorrection = false };
+            if (_encodingThread == null)
+            {
+                _encodingThread = new Thread(EncodingThreadEntry)
+                {
+                    IsBackground = true
+                };
+                _encodingThread.Start();
+            }
         }
         ~ManageAudioSendBuffer()
         {
@@ -59,23 +70,14 @@ namespace Mumble
         }
         public void SendVoice(PcmArray pcm, SpeechTarget target, uint targetId)
         {
+            _stopSendingRequested = false;
             _encodingBuffer.Add(pcm, target, targetId);
-
-            if (_encodingThread == null)
-            {
-                _encodingThread = new Thread(EncodingThreadEntry)
-                {
-                    IsBackground = true
-                };
-                _encodingThread.Start();
-            }
+            _waitHandle.Set();
         }
         public void SendVoiceStopSignal()
         {
             _encodingBuffer.Stop();
-            if(_encodingThread != null)
-                _encodingThread.Abort();
-            _encodingThread = null;
+            _stopSendingRequested = true;
         }
         public void Dispose()
         {
@@ -84,15 +86,23 @@ namespace Mumble
         }
         private void EncodingThreadEntry()
         {
+            // Wait for an initial voice packet
+            _waitHandle.WaitOne();
+            Debug.Log("Starting encoder thread");
+            bool isLastPacket = false;
+
             while (true)
             {
                 try
                 {
-                    bool isLastPacket;
+                    // Keep running until a stop has been requested and we've encoded the rest of the buffer
+                    // Then wait for a new voice packet
+                    while (_stopSendingRequested && isLastPacket)
+                        _waitHandle.WaitOne();
                     bool isEmpty;
                     ArraySegment<byte> packet = _encodingBuffer.Encode(_encoder, out isLastPacket, out isEmpty);
 
-                    if (isEmpty)
+                    if (isEmpty && !isLastPacket)
                     {
                         Thread.Sleep(Mumble.MumbleConstants.FRAME_SIZE_MS);
                         //Debug.LogWarning("Empty Packet");
@@ -101,9 +111,6 @@ namespace Mumble
                     if (isLastPacket)
                         Debug.Log("Will send last packet");
 
-                    if (packet.Array.Length == 0 || packet.Count == 0)
-                        Debug.LogError("Empty packet?");
-
                     //Make the header
                     byte type = (byte)4;
                     //originally [type = codec_type_id << 5 | whistep_chanel_id]. now we can talk only to normal chanel
@@ -111,13 +118,14 @@ namespace Mumble
                     byte[] sequence = Var64.writeVarint64_alternative((UInt64)sequenceIndex);
 
                     //Write header to show how long the encoded data is
-                    byte[] opusHeader = Var64.writeVarint64_alternative((UInt64)packet.Count);
+                    ulong opusHeaderNum = isEmpty ? 0 : (UInt64)packet.Count;
                     //Mark the leftmost bit if this is the last packet
                     if (isLastPacket)
                     {
-                        opusHeader[0] = (byte)(opusHeader[0] | 128);
-                        Debug.LogWarning("Adding end flag");
+                        opusHeaderNum += 8192;
+                        Debug.Log("Adding end flag");
                     }
+                    byte[] opusHeader = Var64.writeVarint64_alternative(opusHeaderNum);
                     //Packet:
                     //[type/target] [sequence] [opus length header] [packet data]
                     byte[] finalPacket = new byte[1 + sequence.Length + opusHeader.Length + packet.Count];
@@ -142,6 +150,7 @@ namespace Mumble
                     if(e is System.Threading.ThreadAbortException)
                     {
                         // This is ok
+                        break;
                     }
                     else
                     {
@@ -149,6 +158,8 @@ namespace Mumble
                     }
                 }
             }
+            Debug.Log("Terminated encoding thread");
+            _encodingThread = null;
         }
     }
     /// <summary>

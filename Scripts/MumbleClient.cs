@@ -245,10 +245,14 @@ namespace Mumble
         {
             _manageSendBuffer.SendVoice(floatData, SpeechTarget.Normal, 0);
         }
-        public void ReceiveEncodedVoice(UInt32 session, byte[] data, long sequence)
+        public void ReceiveEncodedVoice(UInt32 session, byte[] data, long sequence, bool isLast)
         {
             //Debug.Log("Adding packet for session: " + session);
-            _audioDecodingBuffers[session].AddEncodedPacket(sequence, data);
+            _audioDecodingBuffers[session].AddEncodedPacket(sequence, data, isLast);
+        }
+        public bool HasPlayableAudio(UInt32 session)
+        {
+            return _audioDecodingBuffers[session].HasFilledInitialBuffer;
         }
         public void LoadArrayWithVoiceData(UInt32 session, float[] pcmArray, int offset, int length)
         {

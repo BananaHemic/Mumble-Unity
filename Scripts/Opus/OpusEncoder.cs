@@ -67,7 +67,7 @@ namespace Mumble
                 if (_encoder == IntPtr.Zero)
                     throw new ObjectDisposedException("OpusEncoder");
                 int bitrate;
-                var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.GetBitrateRequest, out bitrate);
+                var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.GET_BITRATE_REQUEST, out bitrate);
                 if (ret < 0)
                     throw new Exception("Encoder error - " + ((OpusErrors)ret));
                 return bitrate;
@@ -76,7 +76,7 @@ namespace Mumble
             {
                 if (_encoder == IntPtr.Zero)
                     throw new ObjectDisposedException("OpusEncoder");
-                var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.SetBitrateRequest, out value);
+                var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.SET_BITRATE_REQUEST, out value);
                 if (ret < 0)
                     throw new Exception("Encoder error - " + ((OpusErrors)ret));
             }
@@ -92,7 +92,7 @@ namespace Mumble
                 if (_encoder == IntPtr.Zero)
                     throw new ObjectDisposedException("OpusEncoder");
                 int fec;
-                var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.GetInbandFecRequest, out fec);
+                var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.GET_INBAND_FEC_REQUEST, out fec);
                 if (ret < 0)
                     throw new Exception("Encoder error - " + ((OpusErrors)ret));
                 return fec > 0;
@@ -102,7 +102,7 @@ namespace Mumble
                 if (_encoder == IntPtr.Zero)
                     throw new ObjectDisposedException("OpusEncoder");
                 int req = Convert.ToInt32(value);
-                var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.SetInbandFecRequest, req);
+                var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.SET_INBAND_FEC_REQUEST, req);
                 if (ret < 0)
                     throw new Exception("Encoder error - " + ((OpusErrors)ret));
             }
@@ -179,6 +179,15 @@ namespace Mumble
         public int FrameSizeInBytes(int frameSizeInSamples)
         {
             return frameSizeInSamples * _sampleSize;
+        }
+
+        /// <summary>
+        /// Resets the encoder to an ambient state
+        /// This should be called after any discontinuties in the stream
+        /// </summary>
+        public void ResetState()
+        {
+            NativeMethods.opus_reset_encoder(_encoder);
         }
 
         /// <summary>

@@ -1,7 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections;
 using System;
-using System.Linq;
 
 namespace Mumble {
     [RequireComponent(typeof(AudioSource))]
@@ -10,13 +9,12 @@ namespace Mumble {
         public float Gain = 1;
         private MumbleClient _mumbleClient;
         private UInt32 _session;
-        private AudioClip _clip;
-
-        const int SampleLengthSeconds = 1;
-        const bool isStreamingAudio = true;
+        private AudioSource _audioSource;
+        private bool _isPlaying = false;
 
         void Start() {
             //print("outout rate " + AudioSettings.outputSampleRate);
+            _audioSource = GetComponent<AudioSource>();
         }
         public string GetUsername()
         {
@@ -45,6 +43,23 @@ namespace Mumble {
             for (int i = 0; i < data.Length; i++)
                 data[i] = Mathf.Clamp(data[i] * Gain, -1f, 1f);
             //Debug.Log("playing audio with avg: " + data.Average() + " and max " + data.Max());
+        }
+        void Update()
+        {
+            if (_mumbleClient == null)
+                return;
+            if (!_isPlaying && _mumbleClient.HasPlayableAudio(_session))
+            {
+                _audioSource.Play();
+                _isPlaying = true;
+                Debug.Log("Playing audio");
+            }
+            else if(_isPlaying && !_mumbleClient.HasPlayableAudio(_session))
+            {
+                _audioSource.Stop();
+                _isPlaying = false;
+                Debug.Log("Stopping audio");
+            }
         }
     }
 }

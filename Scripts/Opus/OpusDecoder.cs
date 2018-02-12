@@ -84,6 +84,15 @@ namespace Mumble
             }
         }
 
+        /// <summary>
+        /// Resets the decoder to an ambient state
+        /// This should be called after any discontinuties in the stream
+        /// </summary>
+        public void ResetState()
+        {
+            NativeMethods.opus_reset_decoder(_decoder); 
+        }
+
         public int Decode(byte[] packetData, float[] floatBuffer)
         {
             return NativeMethods.opus_decode(_decoder, packetData, floatBuffer, _outputChannelCount);
