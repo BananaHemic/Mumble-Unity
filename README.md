@@ -42,8 +42,10 @@ Or you can [setup your own Mumble server](https://wiki.mumble.info/wiki/Installi
    * For instance, if you would like to make the audio come from an object (like a person's head) you can change the `CreateMumbleAudioPlayerFromPrefab` method to create the prefab as a child of your target object
 
 ## TODO
-1. Get Opus libraries for iOS
-2. Get Opus libraries for Linux
+1. Better support multiple audio per packet sizes (20ms is currently assumed)
+2. Switch to TCP without sending voice packets
+3. Get Opus libraries for iOS
+4. Get Opus libraries for Linux
 
 If you have any questions or errors, please feel free to open an issue
 As always, stars are more than welcome

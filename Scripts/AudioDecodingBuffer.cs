@@ -16,6 +16,7 @@ namespace Mumble {
     public class AudioDecodingBuffer : IDisposable
     {
         public long NumPacketsLost { get; private set; }
+        public bool HasFilledInitialBuffer { get; private set; }
         /// <summary>
         /// How many samples have been decoded
         /// </summary>
@@ -56,7 +57,6 @@ namespace Mumble {
         /// Higher values increase stability and latency
         /// </summary>
         const int InitialSampleBuffer = 3;
-        private bool _hasFilledInitialBuffer;
 
         public AudioDecodingBuffer()
         {
@@ -64,7 +64,7 @@ namespace Mumble {
         public int Read(float[] buffer, int offset, int count)
         {
             // Don't send audio until we've filled our initial buffer of packets
-            if (!_hasFilledInitialBuffer)
+            if (!HasFilledInitialBuffer)
             {
                 Array.Clear(buffer, offset, count);
                 return 0;
@@ -247,7 +247,7 @@ namespace Mumble {
             {
                 //Debug.Log("Resetting decoder");
                 _nextSequenceToDecode = 0;
-                _hasFilledInitialBuffer = false;
+                HasFilledInitialBuffer = false;
                 _decoder.ResetState();
             }
             if(numRead > 0)
@@ -293,8 +293,8 @@ namespace Mumble {
                 }
 
                 _encodedBuffer.Enqueue(packet);
-                if (!_hasFilledInitialBuffer && count + 1 >= InitialSampleBuffer)
-                    _hasFilledInitialBuffer = true;
+                if (!HasFilledInitialBuffer && count + 1 >= InitialSampleBuffer)
+                    HasFilledInitialBuffer = true;
                 //Debug.Log("Count is now: " + _encodedBuffer.Count);
             }
         }

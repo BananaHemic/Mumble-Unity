@@ -250,6 +250,10 @@ namespace Mumble
             //Debug.Log("Adding packet for session: " + session);
             _audioDecodingBuffers[session].AddEncodedPacket(sequence, data, isLast);
         }
+        public bool HasPlayableAudio(UInt32 session)
+        {
+            return _audioDecodingBuffers[session].HasFilledInitialBuffer;
+        }
         public void LoadArrayWithVoiceData(UInt32 session, float[] pcmArray, int offset, int length)
         {
             if (session == ServerSync.session && !_debugValues.UseLocalLoopback)
