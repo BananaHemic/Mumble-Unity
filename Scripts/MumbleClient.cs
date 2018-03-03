@@ -264,6 +264,8 @@ namespace Mumble
         }
         public bool JoinChannel(string channelToJoin)
         {
+            if (OurUserState == null)
+                return false;
             ChannelState channel;
             if (!TryGetChannelByName(channelToJoin, out channel))
             {
