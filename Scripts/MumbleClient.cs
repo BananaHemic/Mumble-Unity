@@ -224,13 +224,18 @@ namespace Mumble
         {
             if(_tcpConnection != null)
                 _tcpConnection.Close();
+            _tcpConnection = null;
             if(_udpConnection != null)
                 _udpConnection.Close();
+            _udpConnection = null;
             if(_manageSendBuffer != null)
                 _manageSendBuffer.Dispose();
+            _manageSendBuffer = null;
         }
         public void SendTextMessage(string textMessage)
         {
+            if (OurUserState == null)
+                return;
             var msg = new TextMessage
             {
                 message = textMessage,
@@ -243,16 +248,26 @@ namespace Mumble
         }
         public void SendVoicePacket(PcmArray floatData)
         {
-            _manageSendBuffer.SendVoice(floatData, SpeechTarget.Normal, 0);
+            if(_manageSendBuffer != null)
+                _manageSendBuffer.SendVoice(floatData, SpeechTarget.Normal, 0);
         }
         public void ReceiveEncodedVoice(UInt32 session, byte[] data, long sequence, bool isLast)
         {
             //Debug.Log("Adding packet for session: " + session);
-            _audioDecodingBuffers[session].AddEncodedPacket(sequence, data, isLast);
+
+            AudioDecodingBuffer decodingBuffer;
+            if (_audioDecodingBuffers.TryGetValue(session, out decodingBuffer))
+                decodingBuffer.AddEncodedPacket(sequence, data, isLast);
+            else
+                Debug.LogError("No decoding buffer found for session:" + session);
         }
         public bool HasPlayableAudio(UInt32 session)
         {
-            return _audioDecodingBuffers[session].HasFilledInitialBuffer;
+            AudioDecodingBuffer decodingBuffer;
+            if (_audioDecodingBuffers.TryGetValue(session, out decodingBuffer))
+                return decodingBuffer.HasFilledInitialBuffer;
+            else
+                return false;
         }
         public void LoadArrayWithVoiceData(UInt32 session, float[] pcmArray, int offset, int length)
         {
@@ -260,7 +275,9 @@ namespace Mumble
                 return;
             //Debug.Log("Will decode for " + session);
 
-            _audioDecodingBuffers[session].Read(pcmArray, offset, length);
+            AudioDecodingBuffer decodingBuffer;
+            if (_audioDecodingBuffers.TryGetValue(session, out decodingBuffer))
+                decodingBuffer.Read(pcmArray, offset, length);
         }
         public bool JoinChannel(string channelToJoin)
         {
@@ -330,11 +347,14 @@ namespace Mumble
         /// </summary>
         public void StopSendingVoice()
         {
-            _manageSendBuffer.SendVoiceStopSignal();
+            if(_manageSendBuffer != null)
+                _manageSendBuffer.SendVoiceStopSignal();
         }
         public byte[] GetLatestClientNonce()
         {
-            return _udpConnection.GetLatestClientNonce();
+            if(_udpConnection != null)
+                return _udpConnection.GetLatestClientNonce();
+            return null;
         }
         public static int GetNearestSupportedSampleRate(int listedRate)
         {

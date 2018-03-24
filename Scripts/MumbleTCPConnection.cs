@@ -260,11 +260,13 @@ namespace Mumble
                             PrefixStyle.Fixed32BigEndian);
                         break;
                     case MessageType.Reject:
+                        // This is called, for example, when the max number of users has been hit
                         var reject = Serializer.DeserializeWithLengthPrefix<Reject>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         _validConnection = false;
                         Debug.LogError("Mumble server reject: " + reject.reason);
-                        break;
+                        // The server connection is over, so we return
+                        return;
                     case MessageType.UserRemove:
                         var removal = Serializer.DeserializeWithLengthPrefix<UserRemove>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
