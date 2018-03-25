@@ -185,14 +185,14 @@ namespace Mumble
                     userState.SelfDeaf = newUserState.SelfDeaf;
                 if (newUserState.ShouldSerializeComment())
                     userState.Comment = newUserState.Comment;
-                uint prevChannelId = userState.ChannelId;
-                userState.ChannelId = newUserState.ChannelId;
+                if (newUserState.ShouldSerializeChannelId())
+                    userState.ChannelId = newUserState.ChannelId;
 
                 if (newUserState.ShouldSerializeMute() && userState.Mute)
                     Debug.Log("User " + userState.Name + " has been muted");
 
                 // If this is us, and it's signaling that we've changed channels, notify the delegate on the main thread
-                if(newUserState.Session == OurUserState.Session && prevChannelId != userState.ChannelId)
+                if(newUserState.Session == OurUserState.Session && newUserState.ShouldSerializeChannelId())
                 {
                     Debug.Log("Our Channel changed! #" + newUserState.ChannelId);
                     AllUsers[newUserState.Session].ChannelId = newUserState.ChannelId;
@@ -264,6 +264,10 @@ namespace Mumble
         }
         public void SendVoicePacket(PcmArray floatData)
         {
+            // Don't send anything out if we're muted
+            if (OurUserState == null
+                || OurUserState.Mute)
+                return;
             if(_manageSendBuffer != null)
                 _manageSendBuffer.SendVoice(floatData, SpeechTarget.Normal, 0);
         }
