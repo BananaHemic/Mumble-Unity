@@ -150,48 +150,64 @@ namespace Mumble
         }
         internal void AddUser(UserState newUserState)
         {
-            if (!AllUsers.ContainsKey(newUserState.session))
+            if (!AllUsers.ContainsKey(newUserState.Session))
             {
-                Debug.Log("Adding user: " + newUserState.name);
-                Debug.Log("New audio buffer with session: " + newUserState.session);
-                AllUsers[newUserState.session] = newUserState;
+                Debug.Log("Adding user: " + newUserState.Name);
+                Debug.Log("New audio buffer with session: " + newUserState.Session);
+                AllUsers[newUserState.Session] = newUserState;
                 AudioDecodingBuffer buffer = new AudioDecodingBuffer();
-                _audioDecodingBuffers.Add(newUserState.session, buffer);
+                _audioDecodingBuffers.Add(newUserState.Session, buffer);
                 EventProcessor.Instance.QueueEvent(() =>
                 {
                     // We also create a new audio player for each user
-                    MumbleAudioPlayer newPlayer = _audioPlayerCreator(newUserState.name);
-                    _mumbleAudioPlayers.Add(newUserState.session, newPlayer);
-                    newPlayer.Initialize(this, newUserState.session);
+                    MumbleAudioPlayer newPlayer = _audioPlayerCreator(newUserState.Name);
+                    _mumbleAudioPlayers.Add(newUserState.Session, newPlayer);
+                    newPlayer.Initialize(this, newUserState.Session);
                 });
             }
             else
             {
                 // Copy over the things that have changed
-                //TODO we should be doing with with a proto merge in MumbleTCPConnection,
-                //but I don't know how to identify object it needs to be merged with before it's been deserialized
-                if(!string.IsNullOrEmpty(newUserState.name))
-                    AllUsers[newUserState.session].name = newUserState.name;
+                UserState userState = AllUsers[newUserState.Session];
+                if (newUserState.ShouldSerializeActor())
+                    userState.Actor = newUserState.Actor;
+                if(newUserState.ShouldSerializeName())
+                    userState.Name = newUserState.Name;
+                if (newUserState.ShouldSerializeMute())
+                    userState.Mute = newUserState.Mute;
+                if (newUserState.ShouldSerializeDeaf())
+                    userState.Deaf = newUserState.Deaf;
+                if (newUserState.ShouldSerializeSuppress())
+                    userState.Suppress = newUserState.Suppress;
+                if (newUserState.ShouldSerializeSelfMute())
+                    userState.SelfMute = newUserState.SelfMute;
+                if (newUserState.ShouldSerializeSelfDeaf())
+                    userState.SelfDeaf = newUserState.SelfDeaf;
+                if (newUserState.ShouldSerializeComment())
+                    userState.Comment = newUserState.Comment;
+                uint prevChannelId = userState.ChannelId;
+                userState.ChannelId = newUserState.ChannelId;
+
+                if (newUserState.ShouldSerializeMute() && userState.Mute)
+                    Debug.Log("User " + userState.Name + " has been muted");
+
                 // If this is us, and it's signaling that we've changed channels, notify the delegate on the main thread
-                if(newUserState.session == OurUserState.session && OurUserState.channel_id != newUserState.channel_id)
+                if(newUserState.Session == OurUserState.Session && prevChannelId != userState.ChannelId)
                 {
-                    AllUsers[newUserState.session].channel_id = newUserState.channel_id;
+                    Debug.Log("Our Channel changed! #" + newUserState.ChannelId);
+                    AllUsers[newUserState.Session].ChannelId = newUserState.ChannelId;
                     EventProcessor.Instance.QueueEvent(() =>
                     {
                         if(OnChannelChanged != null)
-                            OnChannelChanged(Channels[newUserState.channel_id]);
+                            OnChannelChanged(Channels[newUserState.ChannelId]);
                     });
-                }
-                else
-                {
-                    AllUsers[newUserState.session].channel_id = newUserState.channel_id;
                 }
             }
         }
         internal void SetServerSync(ServerSync sync)
         {
             ServerSync = sync;
-            OurUserState = AllUsers[ServerSync.session];
+            OurUserState = AllUsers[ServerSync.Session];
         }
         internal void RemoveUser(uint removedUserSession)
         {
@@ -238,11 +254,11 @@ namespace Mumble
                 return;
             var msg = new TextMessage
             {
-                message = textMessage,
+                Message = textMessage,
+                ChannelIds = new uint[] { OurUserState.ChannelId },
+                Actor = ServerSync.Session
             };
-            msg.channel_id.Add(OurUserState.channel_id);
-            msg.actor = ServerSync.session;
-            Debug.Log("Now session length = " + msg.session.Count);
+            Debug.Log("Now session length = " + msg.Sessions.Length);
 
             _tcpConnection.SendMessage(MessageType.TextMessage, msg);
         }
@@ -271,7 +287,7 @@ namespace Mumble
         }
         public void LoadArrayWithVoiceData(UInt32 session, float[] pcmArray, int offset, int length)
         {
-            if (session == ServerSync.session && !_debugValues.UseLocalLoopback)
+            if (session == ServerSync.Session && !_debugValues.UseLocalLoopback)
                 return;
             //Debug.Log("Will decode for " + session);
 
@@ -290,10 +306,10 @@ namespace Mumble
                 return false;
             }
             UserState state = new UserState();
-            state.channel_id = channel.channel_id;
-            state.actor = OurUserState.session;
-            state.session = OurUserState.session;
-            Debug.Log("Attempting to join channel Id: " + state.channel_id);
+            state.ChannelId = channel.ChannelId;
+            state.Actor = OurUserState.Session;
+            state.Session = OurUserState.Session;
+            Debug.Log("Attempting to join channel Id: " + state.ChannelId);
             _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
             return true;
         }
@@ -301,7 +317,7 @@ namespace Mumble
         {
             foreach(uint key in Channels.Keys)
             {
-                if (Channels[key].name == channelName)
+                if (Channels[key].Name == channelName)
                 {
                     channelState = Channels[key];
                     return true;
@@ -317,8 +333,8 @@ namespace Mumble
                 || OurUserState == null)
                 return null;
             ChannelState ourChannel;
-            if(Channels.TryGetValue(OurUserState.channel_id, out ourChannel))
-                return ourChannel.name;
+            if(Channels.TryGetValue(OurUserState.ChannelId, out ourChannel))
+                return ourChannel.Name;
 
             Debug.LogError("Could not get current channel");
             return null;
@@ -326,19 +342,19 @@ namespace Mumble
         internal void AddChannel(ChannelState channelToAdd)
         {
             // If the channel already exists, just copy over the non-null data
-            if (Channels.ContainsKey(channelToAdd.channel_id))
+            if (Channels.ContainsKey(channelToAdd.ChannelId))
             {
-                ChannelState previousChannelState = Channels[channelToAdd.channel_id];
-                if (string.IsNullOrEmpty(channelToAdd.name))
-                    channelToAdd.name = previousChannelState.name;
-                if (string.IsNullOrEmpty(channelToAdd.description))
-                    channelToAdd.description = previousChannelState.description;
+                ChannelState previousChannelState = Channels[channelToAdd.ChannelId];
+                if (string.IsNullOrEmpty(channelToAdd.Name))
+                    channelToAdd.Name = previousChannelState.Name;
+                if (string.IsNullOrEmpty(channelToAdd.Description))
+                    channelToAdd.Description = previousChannelState.Description;
             }
-            Channels[channelToAdd.channel_id] = channelToAdd;
+            Channels[channelToAdd.ChannelId] = channelToAdd;
         }
         internal void RemoveChannel(uint channelIdToRemove)
         {
-            if (channelIdToRemove == OurUserState.channel_id)
+            if (channelIdToRemove == OurUserState.ChannelId)
                 Debug.LogWarning("Removed current channel");
             Channels.Remove(channelIdToRemove);
         }

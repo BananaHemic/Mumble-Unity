@@ -20,7 +20,7 @@ namespace Mumble {
         {
             if (_mumbleClient == null)
                 return null;
-            return _mumbleClient.GetUserFromSession(_session).name;
+            return _mumbleClient.GetUserFromSession(_session).Name;
         }
         public void Initialize(MumbleClient mumbleClient, UInt32 session)
         {

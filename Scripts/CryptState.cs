@@ -27,7 +27,7 @@ namespace Mumble
                 var aesAlg = new AesManaged
                 {
                     BlockSize = AES_BLOCK_SIZE*8,
-                    Key = _cryptSetup.key,
+                    Key = _cryptSetup.Key,
                     Mode = CipherMode.ECB,
                     Padding = PaddingMode.None
                 };
@@ -74,7 +74,7 @@ namespace Mumble
         {
             for (int i = 0; i < AES_BLOCK_SIZE; i++)
             {
-                if (++_cryptSetup.client_nonce[i] != 0)
+                if (++_cryptSetup.ClientNonce[i] != 0)
                     break;
             }
 
@@ -82,11 +82,11 @@ namespace Mumble
             var tag = new byte[AES_BLOCK_SIZE];
 
             var dst = new byte[length];
-            OcbEncrypt(inBytes, length, dst, _cryptSetup.client_nonce, tag);
+            OcbEncrypt(inBytes, length, dst, _cryptSetup.ClientNonce, tag);
 
             var fdst = new byte[dst.Length + 4];
-//            _logger.Debug("IV: " + (int) _cryptSetup.client_nonce[0]);
-            fdst[0] = _cryptSetup.client_nonce[0];
+//            _logger.Debug("IV: " + (int) _cryptSetup.ClientNonce[0]);
+            fdst[0] = _cryptSetup.ClientNonce[0];
             fdst[1] = tag[0];
             fdst[2] = tag[1];
             fdst[3] = tag[2];
@@ -167,21 +167,21 @@ namespace Mumble
             int lost = 0;
             int late = 0;
 
-            Array.Copy(_cryptSetup.server_nonce, 0, saveiv, 0, AES_BLOCK_SIZE);
+            Array.Copy(_cryptSetup.ServerNonce, 0, saveiv, 0, AES_BLOCK_SIZE);
 
-            if (((_cryptSetup.server_nonce[0] + 1) & 0xFF) == ivbyte)
+            if (((_cryptSetup.ServerNonce[0] + 1) & 0xFF) == ivbyte)
             {
                 // In order as expected.
-                if (ivbyte > (_cryptSetup.server_nonce[0] & 0xFF))
+                if (ivbyte > (_cryptSetup.ServerNonce[0] & 0xFF))
                 {
-                    _cryptSetup.server_nonce[0] = (byte) ivbyte;
+                    _cryptSetup.ServerNonce[0] = (byte) ivbyte;
                 }
-                else if (ivbyte < (_cryptSetup.server_nonce[0] & 0xFF))
+                else if (ivbyte < (_cryptSetup.ServerNonce[0] & 0xFF))
                 {
-                    _cryptSetup.server_nonce[0] = (byte) ivbyte;
+                    _cryptSetup.ServerNonce[0] = (byte) ivbyte;
                     for (int i = 1; i < AES_BLOCK_SIZE; i++)
                     {
-                        if ((++_cryptSetup.server_nonce[i]) != 0)
+                        if ((++_cryptSetup.ServerNonce[i]) != 0)
                         {
                             break;
                         }
@@ -196,7 +196,7 @@ namespace Mumble
             else
             {
                 // This is either out of order or a repeat.
-                int diff = ivbyte - (_cryptSetup.server_nonce[0] & 0xFF);
+                int diff = ivbyte - (_cryptSetup.ServerNonce[0] & 0xFF);
                 if (diff > 128)
                 {
                     diff = diff - 256;
@@ -206,42 +206,42 @@ namespace Mumble
                     diff = diff + 256;
                 }
 
-                if ((ivbyte < (_cryptSetup.server_nonce[0] & 0xFF)) && (diff > -30) && (diff < 0))
+                if ((ivbyte < (_cryptSetup.ServerNonce[0] & 0xFF)) && (diff > -30) && (diff < 0))
                 {
                     // Late packet, but no wraparound.
                     late = 1;
                     lost = -1;
-                    _cryptSetup.server_nonce[0] = (byte) ivbyte;
+                    _cryptSetup.ServerNonce[0] = (byte) ivbyte;
                     restore = true;
                 }
-                else if ((ivbyte > (_cryptSetup.server_nonce[0] & 0xFF)) && (diff > -30) &&
+                else if ((ivbyte > (_cryptSetup.ServerNonce[0] & 0xFF)) && (diff > -30) &&
                          (diff < 0))
                 {
                     // Last was 0x02, here comes 0xff from last round
                     late = 1;
                     lost = -1;
-                    _cryptSetup.server_nonce[0] = (byte) ivbyte;
+                    _cryptSetup.ServerNonce[0] = (byte) ivbyte;
                     for (int i = 1; i < AES_BLOCK_SIZE; i++)
                     {
-                        if ((_cryptSetup.server_nonce[i]--) != 0)
+                        if ((_cryptSetup.ServerNonce[i]--) != 0)
                             break;
                     }
                     restore = true;
                 }
-                else if ((ivbyte > (_cryptSetup.server_nonce[0] & 0xFF)) && (diff > 0))
+                else if ((ivbyte > (_cryptSetup.ServerNonce[0] & 0xFF)) && (diff > 0))
                 {
                     // Lost a few packets, but beyond that we're good.
-                    lost = ivbyte - _cryptSetup.server_nonce[0] - 1;
-                    _cryptSetup.server_nonce[0] = (byte) ivbyte;
+                    lost = ivbyte - _cryptSetup.ServerNonce[0] - 1;
+                    _cryptSetup.ServerNonce[0] = (byte) ivbyte;
                 }
-                else if ((ivbyte < (_cryptSetup.server_nonce[0] & 0xFF)) && (diff > 0))
+                else if ((ivbyte < (_cryptSetup.ServerNonce[0] & 0xFF)) && (diff > 0))
                 {
                     // Lost a few packets, and wrapped around
-                    lost = 256 - (_cryptSetup.server_nonce[0] & 0xFF) + ivbyte - 1;
-                    _cryptSetup.server_nonce[0] = (byte) ivbyte;
+                    lost = 256 - (_cryptSetup.ServerNonce[0] & 0xFF) + ivbyte - 1;
+                    _cryptSetup.ServerNonce[0] = (byte) ivbyte;
                     for (int i = 1; i < AES_BLOCK_SIZE; i++)
                     {
-                        if ((++_cryptSetup.server_nonce[i]) != 0)
+                        if ((++_cryptSetup.ServerNonce[i]) != 0)
                             break;
                     }
                 }
@@ -252,9 +252,9 @@ namespace Mumble
                     return null;
                 }
 
-                if (_decryptHistory[_cryptSetup.server_nonce[0] & 0xFF] == _cryptSetup.client_nonce[1])
+                if (_decryptHistory[_cryptSetup.ServerNonce[0] & 0xFF] == _cryptSetup.ClientNonce[1])
                 {
-                    Array.Copy(saveiv, 0, _cryptSetup.server_nonce, 0, AES_BLOCK_SIZE);
+                    Array.Copy(saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
                     Debug.LogError("Crypt: 3");
                     return null;
                 }
@@ -262,7 +262,7 @@ namespace Mumble
 
             var newsrc = new byte[plainLength];
             Array.Copy(source, 4, newsrc, 0, plainLength);
-            OcbDecrypt(newsrc, dst, _cryptSetup.server_nonce, tag);
+            OcbDecrypt(newsrc, dst, _cryptSetup.ServerNonce, tag);
 
             if (tag[0] != source[1]
                 || tag[1] != source[2]
@@ -273,15 +273,15 @@ namespace Mumble
                     + tag[2] + " " + source[3]
                     );
 
-                Array.Copy(saveiv, 0, _cryptSetup.server_nonce, 0, AES_BLOCK_SIZE);
+                Array.Copy(saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
                 Debug.LogError("Crypt: 4");
                 return null;
             }
-            _decryptHistory[_cryptSetup.server_nonce[0] & 0xFF] = _cryptSetup.server_nonce[1];
+            _decryptHistory[_cryptSetup.ServerNonce[0] & 0xFF] = _cryptSetup.ServerNonce[1];
 
             if (restore)
             {
-                Array.Copy(saveiv, 0, _cryptSetup.server_nonce, 0, AES_BLOCK_SIZE);
+                Array.Copy(saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
             }
 
             _good++;

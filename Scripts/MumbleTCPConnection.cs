@@ -82,10 +82,10 @@ namespace Mumble
         {
             var version = new Version
             {
-                release = MumbleClient.ReleaseName,
+                Release = MumbleClient.ReleaseName,
                 version = (MumbleClient.Major << 16) | (MumbleClient.Minor << 8) | (MumbleClient.Patch),
-                os = Environment.OSVersion.ToString(),
-                os_version = Environment.OSVersion.VersionString,
+                Os = Environment.OSVersion.ToString(),
+                OsVersion = Environment.OSVersion.VersionString,
             };
             SendMessage(MessageType.Version, version);
         }
@@ -113,10 +113,10 @@ namespace Mumble
                 if(mt == MessageType.UDPTunnel)
                 {
                     UDPTunnel udpTunnel = message as UDPTunnel;
-                    Int32 messageSize = (Int32)udpTunnel.packet.Length;
+                    Int32 messageSize = (Int32)udpTunnel.Packet.Length;
                     _writer.Write(IPAddress.HostToNetworkOrder(messageType));
                     _writer.Write(IPAddress.HostToNetworkOrder(messageSize));
-                    _writer.Write(udpTunnel.packet);
+                    _writer.Write(udpTunnel.Packet);
                 }
                 else
                 {
@@ -165,9 +165,9 @@ namespace Mumble
                         //Debug.Log("Server version: " + _mc.RemoteVersion.release);
                         var authenticate = new Authenticate
                         {
-                            username = _username,
-                            password = _password,
-                            opus = true
+                            Username = _username,
+                            Password = _password,
+                            Opus = true
                         };
                         SendMessage(MessageType.Authenticate, authenticate);
                         break;
@@ -205,13 +205,12 @@ namespace Mumble
                         //This is called for every user in the room, including us
                         UserState user = Serializer.DeserializeWithLengthPrefix<UserState>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        /*
-                        Debug.Log("Name: " + user.name);
-                        Debug.Log("Session: " + user.session);
-                        Debug.Log("actor: " + user.actor);
-                        Debug.Log("Chan: " + user.channel_id);
-                        Debug.Log("ID: " + user.user_id);
-                        */
+                        
+                        //Debug.Log("Name: " + user.Name);
+                        //Debug.Log("Session: " + user.Session);
+                        //Debug.Log("actor: " + user.Actor);
+                        //Debug.Log("Chan: " + user.ChannelId);
+                        //Debug.Log("ID: " + user.UserId);
                         _mumbleClient.AddUser(user);
                         break;
                     case MessageType.ServerSync:
@@ -225,7 +224,7 @@ namespace Mumble
                     case MessageType.ServerConfig:
                         _mumbleClient.ServerConfig = Serializer.DeserializeWithLengthPrefix<ServerConfig>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        //Debug.Log("Sever config = " + _mc.ServerConfig);
+                        //Debug.Log("Sever config = " + _mumbleClient.ServerConfig);
                         Debug.Log("Mumble is Connected!");
                         _validConnection = true; // handshake complete
                         break;
@@ -239,11 +238,11 @@ namespace Mumble
                         TextMessage textMessage = Serializer.DeserializeWithLengthPrefix<TextMessage>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         
-                        Debug.Log("Text message = " + textMessage.message);
-                        Debug.Log("Text actor = " + textMessage.actor);
+                        Debug.Log("Text message = " + textMessage.Message);
+                        Debug.Log("Text actor = " + textMessage.Actor);
                         //Debug.Log("Text channel = " + textMessage.channel_id[0]);
-                        Debug.Log("Text session Length = " + textMessage.session.Count);
-                        Debug.Log("Text Tree Length = " + textMessage.tree_id.Count);
+                        //Debug.Log("Text session Length = " + textMessage.Sessions.Length);
+                        //Debug.Log("Text Tree Length = " + textMessage.TreeIds.Length);
                         break;
                     case MessageType.UDPTunnel:
                         var length = IPAddress.NetworkToHostOrder(_reader.ReadInt32());
@@ -264,25 +263,25 @@ namespace Mumble
                         var reject = Serializer.DeserializeWithLengthPrefix<Reject>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
                         _validConnection = false;
-                        Debug.LogError("Mumble server reject: " + reject.reason);
+                        Debug.LogError("Mumble server reject: " + reject.Reason);
                         // The server connection is over, so we return
                         return;
                     case MessageType.UserRemove:
                         var removal = Serializer.DeserializeWithLengthPrefix<UserRemove>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        Debug.Log("Removing " + removal.session);
-                        _mumbleClient.RemoveUser(removal.session);
+                        Debug.Log("Removing " + removal.Session);
+                        _mumbleClient.RemoveUser(removal.Session);
                         break;
                     case MessageType.ChannelRemove:
                         var removedChan = Serializer.DeserializeWithLengthPrefix<ChannelRemove>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        _mumbleClient.RemoveChannel(removedChan.channel_id);
-                        Debug.Log("Removing channel " + removedChan.channel_id);
+                        _mumbleClient.RemoveChannel(removedChan.ChannelId);
+                        Debug.Log("Removing channel " + removedChan.ChannelId);
                         break;
                     case MessageType.PermissionDenied:
                         var denial = Serializer.DeserializeWithLengthPrefix<PermissionDenied>(_ssl,
                             PrefixStyle.Fixed32BigEndian);
-                        Debug.LogError("Permission denied with fields Name: " + denial.name +", Type: " + denial.type + ", Reason: " + denial.reason);
+                        Debug.LogError("Permission denied with fields Name: " + denial.Name +", Type: " + denial.Type + ", Reason: " + denial.Reason);
                         break;
                     default:
                         Debug.LogError("Message type " + messageType + " not implemented");
@@ -296,7 +295,6 @@ namespace Mumble
                 //These just means the app stopped, it's ok
                 else if (ex is ObjectDisposedException) { }
                 else if (ex is ThreadAbortException) { }
-
                 else
                     Debug.LogError("Unhandled error: " + ex);
                 return;
@@ -308,16 +306,16 @@ namespace Mumble
 
         private void ProcessCryptSetup(CryptSetup cryptSetup)
         {
-            if (cryptSetup.key != null && cryptSetup.client_nonce != null && cryptSetup.server_nonce != null)
+            if (cryptSetup.Key != null && cryptSetup.ClientNonce != null && cryptSetup.ServerNonce != null)
             {
                 _mumbleClient.CryptSetup = cryptSetup;
-                SendMessage(MessageType.CryptSetup, new CryptSetup {client_nonce = cryptSetup.client_nonce});
+                SendMessage(MessageType.CryptSetup, new CryptSetup {ClientNonce = cryptSetup.ClientNonce});
                 _mumbleClient.ConnectUdp();
             }
-            else if(cryptSetup.server_nonce != null)
-                _updateOcbServerNonce(cryptSetup.server_nonce);
+            else if(cryptSetup.ServerNonce != null)
+                _updateOcbServerNonce(cryptSetup.ServerNonce);
             else
-                SendMessage(MessageType.CryptSetup, new CryptSetup { client_nonce = _mumbleClient.GetLatestClientNonce() });
+                SendMessage(MessageType.CryptSetup, new CryptSetup { ClientNonce = _mumbleClient.GetLatestClientNonce() });
         }
 
         internal void Close()
@@ -341,7 +339,7 @@ namespace Mumble
             if (_validConnection)
             {
                 var ping = new MumbleProto.Ping();
-                ping.timestamp = (ulong) (DateTime.UtcNow.Ticks - DateTime.Parse("01/01/1970 00:00:00").Ticks);
+                ping.Timestamp = (ulong) (DateTime.UtcNow.Ticks - DateTime.Parse("01/01/1970 00:00:00").Ticks);
                 //Debug.Log("Sending ping");
                 SendMessage(MessageType.Ping, new MumbleProto.Ping());
             }

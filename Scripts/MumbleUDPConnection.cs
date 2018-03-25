@@ -37,7 +37,7 @@ namespace Mumble
         internal void UpdateOcbServerNonce(byte[] serverNonce)
         {
             if(serverNonce != null)
-                _cryptState.CryptSetup.server_nonce = serverNonce;
+                _cryptState.CryptSetup.ServerNonce = serverNonce;
         }
 
         internal void Connect()
@@ -126,7 +126,7 @@ namespace Mumble
                 if (!_mumbleClient.UseLocalLoopBack)
                     session = (uint)reader.ReadVarInt64();
                 else
-                    session = _mumbleClient.OurUserState.session;
+                    session = _mumbleClient.OurUserState.Session;
 
                 Int64 sequence = reader.ReadVarInt64();
 
@@ -211,7 +211,7 @@ namespace Mumble
                 {
                     //Debug.Log("Using TCP!");
                     UDPTunnel udpMsg = new UDPTunnel();
-                    udpMsg.packet = voicePacket;
+                    udpMsg.Packet = voicePacket;
                     _tcpConnection.SendMessage(MessageType.UDPTunnel, udpMsg);
                     return;
                 }
@@ -236,7 +236,7 @@ namespace Mumble
         }
         internal byte[] GetLatestClientNonce()
         {
-            return _cryptState.CryptSetup.client_nonce;
+            return _cryptState.CryptSetup.ClientNonce;
         }
     }
 }
