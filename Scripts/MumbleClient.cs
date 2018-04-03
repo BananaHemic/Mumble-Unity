@@ -152,8 +152,8 @@ namespace Mumble
         {
             if (!AllUsers.ContainsKey(newUserState.Session))
             {
-                Debug.Log("Adding user: " + newUserState.Name);
-                Debug.Log("New audio buffer with session: " + newUserState.Session);
+                //Debug.Log("Adding user: " + newUserState.Name);
+                //Debug.Log("New audio buffer with session: " + newUserState.Session);
                 AllUsers[newUserState.Session] = newUserState;
                 AudioDecodingBuffer buffer = new AudioDecodingBuffer();
                 _audioDecodingBuffers.Add(newUserState.Session, buffer);
