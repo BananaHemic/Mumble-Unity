@@ -188,8 +188,8 @@ namespace Mumble
                 if (newUserState.ShouldSerializeChannelId())
                     userState.ChannelId = newUserState.ChannelId;
 
-                if (newUserState.ShouldSerializeMute() && userState.Mute)
-                    Debug.Log("User " + userState.Name + " has been muted");
+                //if (newUserState.ShouldSerializeMute() && userState.Mute)
+                    //Debug.Log("User " + userState.Name + " has been muted");
 
                 // If this is us, and it's signaling that we've changed channels, notify the delegate on the main thread
                 if(newUserState.Session == OurUserState.Session && newUserState.ShouldSerializeChannelId())
