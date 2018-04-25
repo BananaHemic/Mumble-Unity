@@ -7,7 +7,7 @@ namespace Mumble
 {
     public class CryptState
     {
-        private readonly int AES_BLOCK_SIZE = 16;
+        private static readonly int AES_BLOCK_SIZE = 16;
         private readonly byte[] _decryptHistory = new byte[256];
 
         private CryptSetup _cryptSetup;
@@ -17,6 +17,15 @@ namespace Mumble
         private int _good;
         private int _late;
         private int _lost;
+
+        // Used by Decrypt
+        private readonly byte[] saveiv = new byte[AES_BLOCK_SIZE];
+        private readonly byte[] tag = new byte[AES_BLOCK_SIZE];
+        // Used by OCB Decrypt
+        private readonly byte[] checksum = new byte[AES_BLOCK_SIZE];
+        private readonly byte[] tmp = new byte[AES_BLOCK_SIZE];
+        private readonly byte[] delta = new byte[AES_BLOCK_SIZE];
+        private readonly byte[] pad = new byte[AES_BLOCK_SIZE];
 
         public CryptSetup CryptSetup
         {
@@ -61,6 +70,14 @@ namespace Mumble
             for (int i = 0; i < AES_BLOCK_SIZE; i++)
             {
                 dst[i] = (byte) (a[i] ^ b[i]);
+            }
+        }
+        private void Xor(byte[] dst, byte[] a, byte[] b, int dst_offset, int a_offset, int b_offset)
+        {
+            
+            for (int i = 0; i < AES_BLOCK_SIZE; i++)
+            {
+                dst[dst_offset + i] = (byte) (a[a_offset + i] ^ b[b_offset + i]);
             }
         }
 
@@ -156,13 +173,8 @@ namespace Mumble
                 return null;
             }
 
-            int plainLength = length - 4;
-            var dst = new byte[plainLength];
-
-            var saveiv = new byte[AES_BLOCK_SIZE];
-            char ivbyte = (char) (source[0] & 0xFF);
+            byte ivbyte = source[0];
             bool restore = false;
-            var tag = new byte[AES_BLOCK_SIZE];
 
             int lost = 0;
             int late = 0;
@@ -172,19 +184,17 @@ namespace Mumble
             if (((_cryptSetup.ServerNonce[0] + 1) & 0xFF) == ivbyte)
             {
                 // In order as expected.
-                if (ivbyte > (_cryptSetup.ServerNonce[0] & 0xFF))
+                if (ivbyte > _cryptSetup.ServerNonce[0])
                 {
-                    _cryptSetup.ServerNonce[0] = (byte) ivbyte;
+                    _cryptSetup.ServerNonce[0] = ivbyte;
                 }
-                else if (ivbyte < (_cryptSetup.ServerNonce[0] & 0xFF))
+                else if (ivbyte < _cryptSetup.ServerNonce[0])
                 {
-                    _cryptSetup.ServerNonce[0] = (byte) ivbyte;
+                    _cryptSetup.ServerNonce[0] = ivbyte;
                     for (int i = 1; i < AES_BLOCK_SIZE; i++)
                     {
                         if ((++_cryptSetup.ServerNonce[i]) != 0)
-                        {
                             break;
-                        }
                     }
                 }
                 else
@@ -196,7 +206,7 @@ namespace Mumble
             else
             {
                 // This is either out of order or a repeat.
-                int diff = ivbyte - (_cryptSetup.ServerNonce[0] & 0xFF);
+                int diff = ivbyte - _cryptSetup.ServerNonce[0];
                 if (diff > 128)
                 {
                     diff = diff - 256;
@@ -206,21 +216,21 @@ namespace Mumble
                     diff = diff + 256;
                 }
 
-                if ((ivbyte < (_cryptSetup.ServerNonce[0] & 0xFF)) && (diff > -30) && (diff < 0))
+                if ((ivbyte < _cryptSetup.ServerNonce[0]) && (diff > -30) && (diff < 0))
                 {
                     // Late packet, but no wraparound.
                     late = 1;
                     lost = -1;
-                    _cryptSetup.ServerNonce[0] = (byte) ivbyte;
+                    _cryptSetup.ServerNonce[0] = ivbyte;
                     restore = true;
                 }
-                else if ((ivbyte > (_cryptSetup.ServerNonce[0] & 0xFF)) && (diff > -30) &&
+                else if ((ivbyte > _cryptSetup.ServerNonce[0]) && (diff > -30) &&
                          (diff < 0))
                 {
                     // Last was 0x02, here comes 0xff from last round
                     late = 1;
                     lost = -1;
-                    _cryptSetup.ServerNonce[0] = (byte) ivbyte;
+                    _cryptSetup.ServerNonce[0] = ivbyte;
                     for (int i = 1; i < AES_BLOCK_SIZE; i++)
                     {
                         if ((_cryptSetup.ServerNonce[i]--) != 0)
@@ -228,17 +238,17 @@ namespace Mumble
                     }
                     restore = true;
                 }
-                else if ((ivbyte > (_cryptSetup.ServerNonce[0] & 0xFF)) && (diff > 0))
+                else if ((ivbyte > _cryptSetup.ServerNonce[0]) && (diff > 0))
                 {
                     // Lost a few packets, but beyond that we're good.
                     lost = ivbyte - _cryptSetup.ServerNonce[0] - 1;
-                    _cryptSetup.ServerNonce[0] = (byte) ivbyte;
+                    _cryptSetup.ServerNonce[0] = ivbyte;
                 }
-                else if ((ivbyte < (_cryptSetup.ServerNonce[0] & 0xFF)) && (diff > 0))
+                else if ((ivbyte < _cryptSetup.ServerNonce[0]) && (diff > 0))
                 {
                     // Lost a few packets, and wrapped around
                     lost = 256 - (_cryptSetup.ServerNonce[0] & 0xFF) + ivbyte - 1;
-                    _cryptSetup.ServerNonce[0] = (byte) ivbyte;
+                    _cryptSetup.ServerNonce[0] = ivbyte;
                     for (int i = 1; i < AES_BLOCK_SIZE; i++)
                     {
                         if ((++_cryptSetup.ServerNonce[i]) != 0)
@@ -252,7 +262,8 @@ namespace Mumble
                     return null;
                 }
 
-                if (_decryptHistory[_cryptSetup.ServerNonce[0] & 0xFF] == _cryptSetup.ClientNonce[1])
+                //TODO should ClientNonce end in 0?
+                if (_decryptHistory[_cryptSetup.ServerNonce[0]] == _cryptSetup.ClientNonce[1])
                 {
                     Array.Copy(saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
                     Debug.LogError("Crypt: 3");
@@ -260,9 +271,9 @@ namespace Mumble
                 }
             }
 
-            var newsrc = new byte[plainLength];
-            Array.Copy(source, 4, newsrc, 0, plainLength);
-            OcbDecrypt(newsrc, dst, _cryptSetup.ServerNonce, tag);
+            int plainLength = length - 4;
+            var dst = new byte[plainLength];
+            OcbDecrypt(source, plainLength, dst, _cryptSetup.ServerNonce, tag, 4);
 
             if (tag[0] != source[1]
                 || tag[1] != source[2]
@@ -277,10 +288,11 @@ namespace Mumble
                 Debug.LogError("Crypt: 4");
                 return null;
             }
-            _decryptHistory[_cryptSetup.ServerNonce[0] & 0xFF] = _cryptSetup.ServerNonce[1];
+            _decryptHistory[_cryptSetup.ServerNonce[0]] = _cryptSetup.ServerNonce[1];
 
             if (restore)
             {
+                //Debug.Log("Restoring");
                 Array.Copy(saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
             }
 
@@ -293,31 +305,26 @@ namespace Mumble
 
         private void OcbDecrypt(
             byte[] encrypted,
+            int len,
             byte[] plain,
             byte[] nonce,
-            byte[] tag)
+            byte[] tag,
+            int encrypted_offset)
         {
-            var checksum = new byte[AES_BLOCK_SIZE];
-            var tmp = new byte[AES_BLOCK_SIZE];
-            var delta = new byte[AES_BLOCK_SIZE];
+
+            ZERO(checksum);
             _encryptor.TransformBlock(nonce, 0, AES_BLOCK_SIZE, delta, 0);
 
-
             int offset = 0;
-            int len = encrypted.Length;
             while (len > AES_BLOCK_SIZE)
             {
-                var buffer = new byte[AES_BLOCK_SIZE];
                 S2(delta);
-                Array.Copy(encrypted, offset, buffer, 0, AES_BLOCK_SIZE);
-
-                Xor(tmp, delta, buffer);
+                Xor(tmp, delta, encrypted, 0, 0, offset + encrypted_offset);
                 _decryptor.TransformBlock(tmp, 0, AES_BLOCK_SIZE, tmp, 0);
 
-                Xor(buffer, delta, tmp);
-                Array.Copy(buffer, 0, plain, offset, AES_BLOCK_SIZE);
+                Xor(plain, delta, tmp, offset, 0, 0);
+                Xor(checksum, checksum, plain, 0, 0, offset);
 
-                Xor(checksum, checksum, buffer);
                 len -= AES_BLOCK_SIZE;
                 offset += AES_BLOCK_SIZE;
             }
@@ -326,15 +333,14 @@ namespace Mumble
             ZERO(tmp);
 
             long num = len*8;
-            tmp[AES_BLOCK_SIZE - 2] = (byte) ((num >> 8) & 0xFF);
+            tmp[AES_BLOCK_SIZE - 2] = (byte)((num >> 8) & 0xFF);
             tmp[AES_BLOCK_SIZE - 1] = (byte) (num & 0xFF);
             Xor(tmp, tmp, delta);
 
-            var pad = new byte[AES_BLOCK_SIZE];
             _encryptor.TransformBlock(tmp, 0, AES_BLOCK_SIZE, pad, 0);
 
             ZERO(tmp);
-            Array.Copy(encrypted, offset, tmp, 0, len);
+            Array.Copy(encrypted, offset + encrypted_offset, tmp, 0, len);
 
             Xor(tmp, tmp, pad);
             Xor(checksum, checksum, tmp);
