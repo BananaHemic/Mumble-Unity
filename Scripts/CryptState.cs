@@ -247,7 +247,7 @@ namespace Mumble
                 else if ((ivbyte < _cryptSetup.ServerNonce[0]) && (diff > 0))
                 {
                     // Lost a few packets, and wrapped around
-                    lost = 256 - (_cryptSetup.ServerNonce[0] & 0xFF) + ivbyte - 1;
+                    lost = 256 - _cryptSetup.ServerNonce[0] + ivbyte - 1;
                     _cryptSetup.ServerNonce[0] = ivbyte;
                     for (int i = 1; i < AES_BLOCK_SIZE; i++)
                     {
@@ -279,13 +279,10 @@ namespace Mumble
                 || tag[1] != source[2]
                 || tag[2] != source[3])
             {
-                Debug.Log(tag[0] + " " + source[1] + "\n"
-                    + tag[1] + " " + source[2] + "\n"
-                    + tag[2] + " " + source[3]
-                    );
 
                 Array.Copy(saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
                 Debug.LogError("Crypt: 4");
+                //Debug.LogError("Crypt: 4 good:" + _good + " lost: " + _lost + " late: " + _late);
                 return null;
             }
             _decryptHistory[_cryptSetup.ServerNonce[0]] = _cryptSetup.ServerNonce[1];
@@ -332,7 +329,7 @@ namespace Mumble
             S2(delta);
             ZERO(tmp);
 
-            long num = len*8;
+            long num = len * 8;
             tmp[AES_BLOCK_SIZE - 2] = (byte)((num >> 8) & 0xFF);
             tmp[AES_BLOCK_SIZE - 1] = (byte) (num & 0xFF);
             Xor(tmp, tmp, delta);

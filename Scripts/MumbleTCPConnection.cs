@@ -53,7 +53,7 @@ namespace Mumble
             _username = username;
             _password = password;
             _tcpClient.BeginConnect(_host.Address, _host.Port, new AsyncCallback(OnTcpConnected), null);
-            Debug.Log("Attempting to connect to " + _host);
+            //Debug.Log("Attempting to connect to " + _host);
         }
         private void OnTcpConnected(IAsyncResult connectionResult)
         {
