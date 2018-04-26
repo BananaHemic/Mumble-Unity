@@ -153,25 +153,16 @@ namespace Mumble
         }
         internal void AddUser(UserState newUserState)
         {
-            if (!AllUsers.ContainsKey(newUserState.Session))
+            UserState userState;
+            if (!AllUsers.TryGetValue(newUserState.Session, out userState))
             {
-                //Debug.Log("Adding user: " + newUserState.Name);
                 //Debug.Log("New audio buffer with session: " + newUserState.Session);
                 AllUsers[newUserState.Session] = newUserState;
-                AudioDecodingBuffer buffer = new AudioDecodingBuffer();
-                _audioDecodingBuffers.Add(newUserState.Session, buffer);
-                EventProcessor.Instance.QueueEvent(() =>
-                {
-                    // We also create a new audio player for each user
-                    MumbleAudioPlayer newPlayer = _audioPlayerCreator(newUserState.Name, newUserState.Session);
-                    _mumbleAudioPlayers.Add(newUserState.Session, newPlayer);
-                    newPlayer.Initialize(this, newUserState.Session);
-                });
+                userState = newUserState;
             }
             else
             {
                 // Copy over the things that have changed
-                UserState userState = AllUsers[newUserState.Session];
                 if (newUserState.ShouldSerializeActor())
                     userState.Actor = newUserState.Actor;
                 if(newUserState.ShouldSerializeName())
@@ -195,36 +186,99 @@ namespace Mumble
                     //Debug.Log("User " + userState.Name + " has been muted");
 
                 // If this is us, and it's signaling that we've changed channels, notify the delegate on the main thread
-                if(newUserState.Session == OurUserState.Session && newUserState.ShouldSerializeChannelId())
+                if(OurUserState != null && userState.Session == OurUserState.Session && newUserState.ShouldSerializeChannelId())
                 {
                     Debug.Log("Our Channel changed! #" + newUserState.ChannelId);
-                    AllUsers[newUserState.Session].ChannelId = newUserState.ChannelId;
+                    //AllUsers[newUserState.Session].ChannelId = newUserState.ChannelId;
                     EventProcessor.Instance.QueueEvent(() =>
                     {
                         if(OnChannelChanged != null)
                             OnChannelChanged(Channels[newUserState.ChannelId]);
                     });
+
+                    // Re-evaluate all users to see if they need decoding buffers
+                    ReevaluateAllDecodingBuffers();
                 }
+            }
+
+            if (OurUserState == null)
+                return;
+
+            // Create the audio player if the user is in the same room, and is not muted
+            if(userState.ChannelId == OurUserState.ChannelId
+                && !userState.Mute)
+            {
+                AddDecodingBuffer(userState);
+            }else
+            {
+                // Otherwise remove the audio decoding buffer and audioPlayer if it exists
+                TryRemoveDecodingBuffer(userState.Session);
+            }
+        }
+        private void AddDecodingBuffer(UserState userState)
+        {
+            // Make sure we don't double add
+            if (_audioDecodingBuffers.ContainsKey(userState.Session))
+                return;
+            //Debug.Log("Adding decoder session #" + userState.Session);
+            AudioDecodingBuffer buffer = new AudioDecodingBuffer();
+            _audioDecodingBuffers.Add(userState.Session, buffer);
+            EventProcessor.Instance.QueueEvent(() =>
+            {
+                //Debug.Log("Adding audioPlayer session #" + userState.Session);
+                // We also create a new audio player for the user
+                MumbleAudioPlayer newPlayer = _audioPlayerCreator(userState.Name, userState.Session);
+                _mumbleAudioPlayers.Add(userState.Session, newPlayer);
+                newPlayer.Initialize(this, userState.Session);
+            });
+        }
+        private void TryRemoveDecodingBuffer(UInt32 session)
+        {
+            AudioDecodingBuffer buffer;
+            if(_audioDecodingBuffers.TryGetValue(session, out buffer))
+            {
+                //Debug.Log("Removing decoder session #" + session);
+                _audioDecodingBuffers.Remove(session);
+                buffer.Dispose();
+
+                // We have to check/remove the Audio Player on the main thread
+                // This is because we add it on the main thread
+                EventProcessor.Instance.QueueEvent(() =>
+                {
+                    //Debug.Log("Removing audioPlayer session #" + session);
+                    MumbleAudioPlayer oldAudioPlayer;
+                    if(_mumbleAudioPlayers.TryGetValue(session, out oldAudioPlayer))
+                    {
+                        _mumbleAudioPlayers.Remove(session);
+                        _audioPlayerDestroyer(session, oldAudioPlayer);
+                    }
+                });
+            }
+        }
+        private void ReevaluateAllDecodingBuffers()
+        {
+            // TODO we should index more intelligently to speed this up
+            foreach(KeyValuePair<uint, UserState> user in AllUsers)
+            {
+                if (user.Value.ChannelId == OurUserState.ChannelId
+                    && !user.Value.Mute)
+                    AddDecodingBuffer(user.Value);
+                else
+                    TryRemoveDecodingBuffer(user.Key);
             }
         }
         internal void SetServerSync(ServerSync sync)
         {
             ServerSync = sync;
             OurUserState = AllUsers[ServerSync.Session];
+            // Now that we know who we are, we can determine which users need decoding buffers
+            ReevaluateAllDecodingBuffers();
         }
         internal void RemoveUser(uint removedUserSession)
         {
             AllUsers.Remove(removedUserSession);
-            // Try to remove the audio player if it exists
-            MumbleAudioPlayer oldAudioPlayer;
-            if(_mumbleAudioPlayers.TryGetValue(removedUserSession, out oldAudioPlayer))
-            {
-                _mumbleAudioPlayers.Remove(removedUserSession);
-                EventProcessor.Instance.QueueEvent(() =>
-                {
-                    _audioPlayerDestroyer(removedUserSession, oldAudioPlayer);
-                });
-            }
+            // Try to remove the audio player and decoding buffer if it exists
+            TryRemoveDecodingBuffer(removedUserSession);
         }
         public void Connect(string username, string password)
         {
