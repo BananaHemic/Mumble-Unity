@@ -18,14 +18,23 @@ namespace Mumble
         private int _late;
         private int _lost;
 
+        // Used by Encrypt
+        private readonly byte[] _enc_tag = new byte[AES_BLOCK_SIZE];
+
+        // Used by OCB Encrypt
+        private readonly byte[] _enc_checksum = new byte[AES_BLOCK_SIZE];
+        private readonly byte[] _enc_tmp = new byte[AES_BLOCK_SIZE];
+        private readonly byte[] _enc_delta = new byte[AES_BLOCK_SIZE];
+        private readonly byte[] _enc_pad = new byte[AES_BLOCK_SIZE];
+
         // Used by Decrypt
-        private readonly byte[] saveiv = new byte[AES_BLOCK_SIZE];
-        private readonly byte[] tag = new byte[AES_BLOCK_SIZE];
+        private readonly byte[] _dec_saveiv = new byte[AES_BLOCK_SIZE];
+        private readonly byte[] _dec_tag = new byte[AES_BLOCK_SIZE];
         // Used by OCB Decrypt
-        private readonly byte[] checksum = new byte[AES_BLOCK_SIZE];
-        private readonly byte[] tmp = new byte[AES_BLOCK_SIZE];
-        private readonly byte[] delta = new byte[AES_BLOCK_SIZE];
-        private readonly byte[] pad = new byte[AES_BLOCK_SIZE];
+        private readonly byte[] _dec_checksum = new byte[AES_BLOCK_SIZE];
+        private readonly byte[] _dec_tmp = new byte[AES_BLOCK_SIZE];
+        private readonly byte[] _dec_delta = new byte[AES_BLOCK_SIZE];
+        private readonly byte[] _dec_pad = new byte[AES_BLOCK_SIZE];
 
         public CryptSetup CryptSetup
         {
@@ -74,7 +83,6 @@ namespace Mumble
         }
         private void Xor(byte[] dst, byte[] a, byte[] b, int dst_offset, int a_offset, int b_offset)
         {
-            
             for (int i = 0; i < AES_BLOCK_SIZE; i++)
             {
                 dst[dst_offset + i] = (byte) (a[a_offset + i] ^ b[b_offset + i]);
@@ -95,74 +103,56 @@ namespace Mumble
                     break;
             }
 
-//            _logger.Debug("Encrypting " + length + " bytes");
-            var tag = new byte[AES_BLOCK_SIZE];
+            var dst = new byte[length + 4];
+            OcbEncrypt(inBytes, length, dst, _cryptSetup.ClientNonce, _enc_tag, 4);
+            dst[0] = _cryptSetup.ClientNonce[0];
+            dst[1] = _enc_tag[0];
+            dst[2] = _enc_tag[1];
+            dst[3] = _enc_tag[2];
 
-            var dst = new byte[length];
-            OcbEncrypt(inBytes, length, dst, _cryptSetup.ClientNonce, tag);
-
-            var fdst = new byte[dst.Length + 4];
-//            _logger.Debug("IV: " + (int) _cryptSetup.ClientNonce[0]);
-            fdst[0] = _cryptSetup.ClientNonce[0];
-            fdst[1] = tag[0];
-            fdst[2] = tag[1];
-            fdst[3] = tag[2];
-
-            dst.CopyTo(fdst, 4);
-            return fdst;
+            return dst;
         }
 
-        private void OcbEncrypt(byte[] plain, int plainLength, byte[] encrypted, byte[] nonce, byte[] tag)
+        private void OcbEncrypt(byte[] plain, int plainLength, byte[] encrypted, byte[] nonce, byte[] tag, int encrypted_offset)
         {
-            var checksum = new byte[AES_BLOCK_SIZE];
-            var tmp = new byte[AES_BLOCK_SIZE];
-
-//            byte[] delta = encryptCipher.doFinal(nonce);
-            var delta = new byte[AES_BLOCK_SIZE];
-            _encryptor.TransformBlock(nonce, 0, AES_BLOCK_SIZE, delta, 0);
+            ZERO(_enc_checksum);
+            _encryptor.TransformBlock(nonce, 0, AES_BLOCK_SIZE, _enc_delta, 0);
 
             int offset = 0;
             int len = plainLength;
             while (len > AES_BLOCK_SIZE)
             {
-                var buffer = new byte[AES_BLOCK_SIZE];
-                S2(delta);
-                Array.Copy(plain, offset, buffer, 0, AES_BLOCK_SIZE);
-                Xor(checksum, checksum, buffer);
-                Xor(tmp, delta, buffer);
+                S2(_enc_delta);
+                Xor(_enc_checksum, _enc_checksum, plain, 0, 0, offset);
+                Xor(_enc_tmp, _enc_delta, plain, 0, 0, offset);
 
-//                encryptCipher.doFinal(tmp, 0, AES_BLOCK_SIZE, tmp);
-                _encryptor.TransformBlock(tmp, 0, AES_BLOCK_SIZE, tmp, 0);
+                _encryptor.TransformBlock(_enc_tmp, 0, AES_BLOCK_SIZE, _enc_tmp, 0);
 
-                Xor(buffer, delta, tmp);
-                Array.Copy(buffer, 0, encrypted, offset, AES_BLOCK_SIZE);
+                Xor(encrypted, _enc_delta, _enc_tmp, offset + encrypted_offset, 0, 0);
                 offset += AES_BLOCK_SIZE;
                 len -= AES_BLOCK_SIZE;
             }
 
-            S2(delta);
-            ZERO(tmp);
+            S2(_enc_delta);
+            ZERO(_enc_tmp);
             long num = len*8;
-            tmp[AES_BLOCK_SIZE - 2] = (byte) ((num >> 8) & 0xFF);
-            tmp[AES_BLOCK_SIZE - 1] = (byte) (num & 0xFF);
-            Xor(tmp, tmp, delta);
+            _enc_tmp[AES_BLOCK_SIZE - 2] = (byte) ((num >> 8) & 0xFF);
+            _enc_tmp[AES_BLOCK_SIZE - 1] = (byte) (num & 0xFF);
+            Xor(_enc_tmp, _enc_tmp, _enc_delta);
 
-//            byte[] pad = encryptCipher.doFinal(tmp);
-            var pad = new byte[AES_BLOCK_SIZE];
-            _encryptor.TransformBlock(tmp, 0, AES_BLOCK_SIZE, pad, 0);
+            _encryptor.TransformBlock(_enc_tmp, 0, AES_BLOCK_SIZE, _enc_pad, 0);
 
-            Array.Copy(plain, offset, tmp, 0, len);
-            Array.Copy(pad, len, tmp, len, AES_BLOCK_SIZE - len);
+            Array.Copy(plain, offset, _enc_tmp, 0, len);
+            Array.Copy(_enc_pad, len, _enc_tmp, len, AES_BLOCK_SIZE - len);
 
-            Xor(checksum, checksum, tmp);
-            Xor(tmp, pad, tmp);
-            Array.Copy(tmp, 0, encrypted, offset, len);
+            Xor(_enc_checksum, _enc_checksum, _enc_tmp);
+            Xor(_enc_tmp, _enc_pad, _enc_tmp);
+            Array.Copy(_enc_tmp, 0, encrypted, offset + encrypted_offset, len);
 
-            S3(delta);
-            Xor(tmp, delta, checksum);
+            S3(_enc_delta);
+            Xor(_enc_tmp, _enc_delta, _enc_checksum);
 
-//            encryptCipher.doFinal(tmp, 0, AES_BLOCK_SIZE, tag);
-            _encryptor.TransformBlock(tmp, 0, AES_BLOCK_SIZE, tag, 0);
+            _encryptor.TransformBlock(_enc_tmp, 0, AES_BLOCK_SIZE, tag, 0);
         }
 
         public byte[] Decrypt(byte[] source, int length)
@@ -179,7 +169,7 @@ namespace Mumble
             int lost = 0;
             int late = 0;
 
-            Array.Copy(_cryptSetup.ServerNonce, 0, saveiv, 0, AES_BLOCK_SIZE);
+            Array.Copy(_cryptSetup.ServerNonce, 0, _dec_saveiv, 0, AES_BLOCK_SIZE);
 
             if (((_cryptSetup.ServerNonce[0] + 1) & 0xFF) == ivbyte)
             {
@@ -265,7 +255,7 @@ namespace Mumble
                 //TODO should ClientNonce end in 0?
                 if (_decryptHistory[_cryptSetup.ServerNonce[0]] == _cryptSetup.ClientNonce[1])
                 {
-                    Array.Copy(saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
+                    Array.Copy(_dec_saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
                     Debug.LogError("Crypt: 3");
                     return null;
                 }
@@ -273,14 +263,14 @@ namespace Mumble
 
             int plainLength = length - 4;
             var dst = new byte[plainLength];
-            OcbDecrypt(source, plainLength, dst, _cryptSetup.ServerNonce, tag, 4);
+            OcbDecrypt(source, plainLength, dst, _cryptSetup.ServerNonce, _dec_tag, 4);
 
-            if (tag[0] != source[1]
-                || tag[1] != source[2]
-                || tag[2] != source[3])
+            if (_dec_tag[0] != source[1]
+                || _dec_tag[1] != source[2]
+                || _dec_tag[2] != source[3])
             {
 
-                Array.Copy(saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
+                Array.Copy(_dec_saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
                 Debug.LogError("Crypt: 4");
                 //Debug.LogError("Crypt: 4 good:" + _good + " lost: " + _lost + " late: " + _late);
                 return null;
@@ -290,7 +280,7 @@ namespace Mumble
             if (restore)
             {
                 //Debug.Log("Restoring");
-                Array.Copy(saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
+                Array.Copy(_dec_saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
             }
 
             _good++;
@@ -309,44 +299,44 @@ namespace Mumble
             int encrypted_offset)
         {
 
-            ZERO(checksum);
-            _encryptor.TransformBlock(nonce, 0, AES_BLOCK_SIZE, delta, 0);
+            ZERO(_dec_checksum);
+            _encryptor.TransformBlock(nonce, 0, AES_BLOCK_SIZE, _dec_delta, 0);
 
             int offset = 0;
             while (len > AES_BLOCK_SIZE)
             {
-                S2(delta);
-                Xor(tmp, delta, encrypted, 0, 0, offset + encrypted_offset);
-                _decryptor.TransformBlock(tmp, 0, AES_BLOCK_SIZE, tmp, 0);
+                S2(_dec_delta);
+                Xor(_dec_tmp, _dec_delta, encrypted, 0, 0, offset + encrypted_offset);
+                _decryptor.TransformBlock(_dec_tmp, 0, AES_BLOCK_SIZE, _dec_tmp, 0);
 
-                Xor(plain, delta, tmp, offset, 0, 0);
-                Xor(checksum, checksum, plain, 0, 0, offset);
+                Xor(plain, _dec_delta, _dec_tmp, offset, 0, 0);
+                Xor(_dec_checksum, _dec_checksum, plain, 0, 0, offset);
 
                 len -= AES_BLOCK_SIZE;
                 offset += AES_BLOCK_SIZE;
             }
 
-            S2(delta);
-            ZERO(tmp);
+            S2(_dec_delta);
+            ZERO(_dec_tmp);
 
             long num = len * 8;
-            tmp[AES_BLOCK_SIZE - 2] = (byte)((num >> 8) & 0xFF);
-            tmp[AES_BLOCK_SIZE - 1] = (byte) (num & 0xFF);
-            Xor(tmp, tmp, delta);
+            _dec_tmp[AES_BLOCK_SIZE - 2] = (byte)((num >> 8) & 0xFF);
+            _dec_tmp[AES_BLOCK_SIZE - 1] = (byte) (num & 0xFF);
+            Xor(_dec_tmp, _dec_tmp, _dec_delta);
 
-            _encryptor.TransformBlock(tmp, 0, AES_BLOCK_SIZE, pad, 0);
+            _encryptor.TransformBlock(_dec_tmp, 0, AES_BLOCK_SIZE, _dec_pad, 0);
 
-            ZERO(tmp);
-            Array.Copy(encrypted, offset + encrypted_offset, tmp, 0, len);
+            ZERO(_dec_tmp);
+            Array.Copy(encrypted, offset + encrypted_offset, _dec_tmp, 0, len);
 
-            Xor(tmp, tmp, pad);
-            Xor(checksum, checksum, tmp);
+            Xor(_dec_tmp, _dec_tmp, _dec_pad);
+            Xor(_dec_checksum, _dec_checksum, _dec_tmp);
 
-            Array.Copy(tmp, 0, plain, offset, len);
+            Array.Copy(_dec_tmp, 0, plain, offset, len);
 
-            S3(delta);
-            Xor(tmp, delta, checksum);
-            _encryptor.TransformBlock(tmp, 0, AES_BLOCK_SIZE, tag, 0);
+            S3(_dec_delta);
+            Xor(_dec_tmp, _dec_delta, _dec_checksum);
+            _encryptor.TransformBlock(_dec_tmp, 0, AES_BLOCK_SIZE, tag, 0);
         }
     }
 }
