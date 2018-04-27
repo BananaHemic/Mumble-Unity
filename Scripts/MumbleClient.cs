@@ -352,6 +352,7 @@ namespace Mumble
                 return;
             //Debug.Log("Will decode for " + session);
 
+            //TODO use bool to show if loading worked or not
             AudioDecodingBuffer decodingBuffer;
             if (_audioDecodingBuffers.TryGetValue(session, out decodingBuffer))
                 decodingBuffer.Read(pcmArray, offset, length);
@@ -399,6 +400,12 @@ namespace Mumble
 
             Debug.LogError("Could not get current channel");
             return null;
+        }
+        public uint GetSession()
+        {
+            if (OurUserState != null)
+                return OurUserState.Session;
+            return 0;
         }
         internal void AddChannel(ChannelState channelToAdd)
         {

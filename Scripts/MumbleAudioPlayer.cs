@@ -9,6 +9,11 @@ namespace Mumble {
 
         public float Gain = 1;
         public UInt32 Session { get; private set; }
+        /// <summary>
+        /// Notification that a new audio sample is available for processing
+        /// It will be called on the audio thread
+        /// </summary>
+        public Action<float[]> OnAudioSample;
 
         private MumbleClient _mumbleClient;
         private AudioSource _audioSource;
@@ -40,6 +45,9 @@ namespace Mumble {
                 return;
 
             _mumbleClient.LoadArrayWithVoiceData(Session, data, 0, data.Length);
+
+            if (OnAudioSample != null)
+                OnAudioSample(data);
 
             //Debug.Log("playing audio with avg: " + data.Average() + " and max " + data.Max());
             if (Gain == 1)

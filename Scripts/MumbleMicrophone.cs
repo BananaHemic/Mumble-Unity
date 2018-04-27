@@ -34,9 +34,9 @@ namespace Mumble
             }
         }
         public int NumSamplesPerOutgoingPacket { get; private set; }
+        public AudioClip SendAudioClip { get; private set; }
 
         private MumbleClient _mumbleClient;
-        private AudioClip _sendAudioClip;
         private bool isRecording = false;
         private string _currentMic;
         private int _previousPosition = 0;
@@ -79,6 +79,10 @@ namespace Mumble
                 StartSendingAudio(micSampleRate);
             return micSampleRate;
         }
+        public int GetMicPosition()
+        {
+            return Microphone.GetPosition(_currentMic);
+        }
         void SendVoiceIfReady()
         {
             int currentPosition = Microphone.GetPosition(_currentMic);
@@ -98,7 +102,7 @@ namespace Mumble
                 PcmArray newData = _mumbleClient.GetAvailablePcmArray();
 
                 if (!_mumbleClient.UseSyntheticSource)
-                    _sendAudioClip.GetData(newData.Pcm, _totalNumSamplesSent % NumSamplesInMicBuffer);
+                    SendAudioClip.GetData(newData.Pcm, _totalNumSamplesSent % NumSamplesInMicBuffer);
                 else 
                     TestingClipToUse.GetData(newData.Pcm, _totalNumSamplesSent % TestingClipToUse.samples);
                 //Debug.Log(Time.frameCount + " " + currentPosition);
@@ -143,7 +147,7 @@ namespace Mumble
         public void StartSendingAudio(int sampleRate)
         {
             Debug.Log("Starting to send audio");
-            _sendAudioClip = Microphone.Start(_currentMic, true, NumRecordingSeconds, sampleRate);
+            SendAudioClip = Microphone.Start(_currentMic, true, NumRecordingSeconds, sampleRate);
             _previousPosition = 0;
             _numTimesLooped = 0;
             _totalNumSamplesSent = 0;
