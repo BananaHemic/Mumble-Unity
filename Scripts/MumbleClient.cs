@@ -56,6 +56,7 @@ namespace Mumble
         public OnChannelChangedMethod OnChannelChanged;
         private MumbleTcpConnection _tcpConnection;
         private MumbleUdpConnection _udpConnection;
+        private DecodingBufferPool _decodingBufferPool;
         private readonly string _hostName;
         private readonly int _port;
         private ManageAudioSendBuffer _manageSendBuffer;
@@ -117,6 +118,7 @@ namespace Mumble
                     );
             }
             var endpoint = new IPEndPoint(addresses[0], _port);
+            _decodingBufferPool = new DecodingBufferPool();
             _udpConnection = new MumbleUdpConnection(endpoint, this);
             _tcpConnection = new MumbleTcpConnection(endpoint, _hostName, _udpConnection.UpdateOcbServerNonce, _udpConnection, this);
             _udpConnection.SetTcpConnection(_tcpConnection);
@@ -221,7 +223,7 @@ namespace Mumble
             if (_audioDecodingBuffers.ContainsKey(userState.Session))
                 return;
             //Debug.Log("Adding decoder session #" + userState.Session);
-            AudioDecodingBuffer buffer = new AudioDecodingBuffer();
+            AudioDecodingBuffer buffer = _decodingBufferPool.GetDecodingBuffer();
             _audioDecodingBuffers.Add(userState.Session, buffer);
             EventProcessor.Instance.QueueEvent(() =>
             {
@@ -239,7 +241,7 @@ namespace Mumble
             {
                 //Debug.Log("Removing decoder session #" + session);
                 _audioDecodingBuffers.Remove(session);
-                buffer.Dispose();
+                _decodingBufferPool.ReturnDecodingBuffer(buffer);
 
                 // We have to check/remove the Audio Player on the main thread
                 // This is because we add it on the main thread
@@ -331,12 +333,15 @@ namespace Mumble
         public void ReceiveEncodedVoice(UInt32 session, byte[] data, long sequence, bool isLast)
         {
             //Debug.Log("Adding packet for session: " + session);
-
             AudioDecodingBuffer decodingBuffer;
             if (_audioDecodingBuffers.TryGetValue(session, out decodingBuffer))
                 decodingBuffer.AddEncodedPacket(sequence, data, isLast);
             else
-                Debug.LogError("No decoding buffer found for session:" + session);
+            {
+                // This is expected if the user joins a room where people are already talking
+                // Buffers will be dropped until the decoding buffer has been created
+                Debug.LogWarning("No decoding buffer found for session:" + session);
+            }
         }
         public bool HasPlayableAudio(UInt32 session)
         {

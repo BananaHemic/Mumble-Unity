@@ -38,6 +38,12 @@ namespace Mumble {
             _mumbleClient = mumbleClient;
             Session = session;
         }
+        public void Reset()
+        {
+            _mumbleClient = null;
+            Session = 0;
+            OnAudioSample = null;
+        }
         void OnAudioFilterRead(float[] data, int channels)
         {
             //print("On audio read " + _session);

@@ -299,6 +299,25 @@ namespace Mumble {
             }
         }
 
+        public void Reset()
+        {
+            lock (_encodedBuffer)
+            {
+                NumPacketsLost = 0;
+                HasFilledInitialBuffer = false;
+                _decodedCount = 0;
+                _readingOffset = 0;
+                _nextBufferToDecodeInto = 0;
+                _nextSequenceToDecode = 0;
+                _lastReceivedSequence = 0;
+                Array.Clear(_numSamplesInBuffer, 0, _numSamplesInBuffer.Length);
+                Array.Clear(_readOffsetInBuffer, 0, _readOffsetInBuffer.Length);
+                _encodedBuffer.Clear();
+
+                if (_decoder != null)
+                    _decoder.ResetState();
+            }
+        }
         public void Dispose()
         {
             if(_decoder != null)
