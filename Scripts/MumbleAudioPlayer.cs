@@ -20,7 +20,6 @@ namespace Mumble {
         private bool _isPlaying = false;
 
         void Start() {
-            //print("outout rate " + AudioSettings.outputSampleRate);
             _audioSource = GetComponent<AudioSource>();
         }
         public string GetUsername()

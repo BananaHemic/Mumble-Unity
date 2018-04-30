@@ -40,12 +40,14 @@ namespace Mumble {
         private long _lastReceivedSequence;
         private OpusDecoder _decoder;
 
+        private readonly int _outputSampleRate;
+        private readonly int _outputChannelCount;
         private readonly float[][] _decodedBuffer = new float[NumDecodedSubBuffers][];
         private readonly int[] _numSamplesInBuffer = new int[NumDecodedSubBuffers];
         private readonly int[] _readOffsetInBuffer = new int[NumDecodedSubBuffers];
         private readonly Queue<BufferPacket> _encodedBuffer = new Queue<BufferPacket>();
-        const int NumDecodedSubBuffers = (int)(MumbleConstants.MAX_LATENCY_SECONDS * (MumbleConstants.SAMPLE_RATE / MumbleConstants.FRAME_SIZE));
-        const int SubBufferSize = MumbleConstants.FRAME_SIZE * MumbleConstants.MAX_FRAMES_PER_PACKET * MumbleConstants.NUM_CHANNELS;
+        const int NumDecodedSubBuffers = (int)(MumbleConstants.MAX_LATENCY_SECONDS * (MumbleConstants.MAX_SAMPLE_RATE / MumbleConstants.OUTPUT_FRAME_SIZE));
+        const int SubBufferSize = MumbleConstants.OUTPUT_FRAME_SIZE * MumbleConstants.MAX_FRAMES_PER_PACKET * MumbleConstants.MAX_CHANNELS;
         /// <summary>
         /// How many packets go missing before we figure they were lost
         /// Due to murmur
@@ -58,8 +60,10 @@ namespace Mumble {
         /// </summary>
         const int InitialSampleBuffer = 3;
 
-        public AudioDecodingBuffer()
+        public AudioDecodingBuffer(int audioRate, int channelCount)
         {
+            _outputSampleRate = audioRate;
+            _outputChannelCount = channelCount;
         }
         public int Read(float[] buffer, int offset, int count)
         {
@@ -171,7 +175,7 @@ namespace Mumble {
             }
             // Don't make the decoder unless we know that we'll have to
             if(_decoder == null)
-                _decoder = new OpusDecoder(MumbleConstants.SAMPLE_RATE, MumbleConstants.NUM_CHANNELS);
+                _decoder = new OpusDecoder(_outputSampleRate, _outputChannelCount);
 
             if (_decodedBuffer[_nextBufferToDecodeInto] == null)
                 _decodedBuffer[_nextBufferToDecodeInto] = new float[SubBufferSize];
@@ -213,7 +217,7 @@ namespace Mumble {
                     _decodedCount += emptySampleNumRead;
                     _numSamplesInBuffer[_nextBufferToDecodeInto] = emptySampleNumRead;
                     _readOffsetInBuffer[_nextBufferToDecodeInto] = 0;
-                    _nextSequenceToDecode = packet.Value.Sequence + emptySampleNumRead / (MumbleConstants.FRAME_SIZE * MumbleConstants.NUM_CHANNELS);
+                    _nextSequenceToDecode = packet.Value.Sequence + emptySampleNumRead / ((_outputSampleRate / 100) * _outputChannelCount);
                     _nextBufferToDecodeInto++;
                     //Make sure we don't go over our max number of buffers
                     if (_nextBufferToDecodeInto == NumDecodedSubBuffers)
@@ -242,7 +246,7 @@ namespace Mumble {
             //Debug.Log("numRead = " + numRead);
             _lastReceivedSequence = packet.Value.Sequence;
             if (!packet.Value.IsLast)
-                _nextSequenceToDecode = packet.Value.Sequence + numRead / (MumbleConstants.FRAME_SIZE * MumbleConstants.NUM_CHANNELS);
+                _nextSequenceToDecode = packet.Value.Sequence + numRead / ((_outputSampleRate / 100) * _outputChannelCount);
             else
             {
                 //Debug.Log("Resetting decoder");

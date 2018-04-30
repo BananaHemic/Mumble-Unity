@@ -139,10 +139,10 @@ namespace Mumble
             int decoder_size = NativeMethods.opus_decoder_get_size(channelCount);
             IntPtr ptr = Marshal.AllocHGlobal(decoder_size);
 
-            error = NativeMethods.opus_decoder_init(ptr, MumbleConstants.SAMPLE_RATE, channelCount);
+            error = NativeMethods.opus_decoder_init(ptr, sampleRate, channelCount);
             return ptr;
         }
-        internal static int opus_decode(IntPtr decoder, byte[] encodedData, float[] outputPcm, int channelCount)
+        internal static int opus_decode(IntPtr decoder, byte[] encodedData, float[] outputPcm, int channelRate, int channelCount)
         {
             if (decoder == IntPtr.Zero)
             {
@@ -150,7 +150,12 @@ namespace Mumble
                 return 0;
             }
 
-            int length = NativeMethods.opus_decode_float(decoder, encodedData, encodedData != null ? encodedData.Length : 0, outputPcm, encodedData == null ? MumbleConstants.FRAME_SIZE * MumbleConstants.NUM_CHANNELS: outputPcm.Length / channelCount, MumbleConstants.USE_FORWARD_ERROR_CORRECTION);
+            int length = NativeMethods.opus_decode_float(decoder,
+                encodedData,
+                encodedData != null ? encodedData.Length : 0,
+                outputPcm,
+                encodedData == null ? (channelRate / 100) * channelCount: outputPcm.Length / channelCount,
+                MumbleConstants.USE_FORWARD_ERROR_CORRECTION);
             //Debug.Log("Retrieved " + length + " samples");
 
             if (length <= 0)

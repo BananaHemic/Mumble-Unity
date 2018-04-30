@@ -63,6 +63,8 @@ namespace Mumble
         private MumbleMicrophone _mumbleMic;
         private readonly AudioPlayerCreatorMethod _audioPlayerCreator;
         private readonly AudioPlayerRemoverMethod _audioPlayerDestroyer;
+        private readonly int _outputSampleRate;
+        private readonly int _outputChannelCount;
 
         private DebugValues _debugValues;
         private readonly Dictionary<uint, UserState> AllUsers = new Dictionary<uint, UserState>();
@@ -101,6 +103,39 @@ namespace Mumble
             _audioPlayerCreator = createMumbleAudioPlayerMethod;
             _audioPlayerDestroyer = removeMumbleAudioPlayerMethod;
 
+            switch (AudioSettings.outputSampleRate)
+            {
+                case 8000:
+                case 12000:
+                case 16000:
+                case 24000:
+                case 48000:
+                    _outputSampleRate = AudioSettings.outputSampleRate;
+                    break;
+                default:
+                    Debug.LogError("Incorrect sample rate of:" + AudioSettings.outputSampleRate + ". It should be 48000 please set this in Edit->Audio->SystemSampleRate");
+                    _outputSampleRate = 48000;
+                    break;
+            }
+            Debug.Log("Using output sample rate: " + _outputSampleRate);
+
+            switch (AudioSettings.speakerMode)
+            {
+                case AudioSpeakerMode.Mono:
+                    // TODO sometimes, even though the speaker mode is mono,
+                    // on audiofilterread wants two channels
+                    _outputChannelCount = 1;
+                    break;
+                case AudioSpeakerMode.Stereo:
+                    _outputChannelCount = 2;
+                    break;
+                default:
+                    Debug.LogError("Unsupported speaker mode " + AudioSettings.speakerMode + " please set this in Edit->Audio->DefaultSpeakerMode to either Mono or Stereo");
+                    _outputChannelCount = 2;
+                    break;
+            }
+            Debug.Log("Using output channel count of: " + _outputChannelCount);
+
             if (debugVals == null)
                 debugVals = new DebugValues();
             _debugValues = debugVals;
@@ -118,7 +153,7 @@ namespace Mumble
                     );
             }
             var endpoint = new IPEndPoint(addresses[0], _port);
-            _decodingBufferPool = new DecodingBufferPool();
+            _decodingBufferPool = new DecodingBufferPool(_outputSampleRate, _outputChannelCount);
             _udpConnection = new MumbleUdpConnection(endpoint, this);
             _tcpConnection = new MumbleTcpConnection(endpoint, _hostName, _udpConnection.UpdateOcbServerNonce, _udpConnection, this);
             _udpConnection.SetTcpConnection(_tcpConnection);
