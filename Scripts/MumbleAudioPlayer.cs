@@ -22,10 +22,6 @@ namespace Mumble {
         void Start() {
             //print("outout rate " + AudioSettings.outputSampleRate);
             _audioSource = GetComponent<AudioSource>();
-            if (Application.platform == RuntimePlatform.Android)
-            {
-                _audioSource.pitch = 2;
-            }
         }
         public string GetUsername()
         {
