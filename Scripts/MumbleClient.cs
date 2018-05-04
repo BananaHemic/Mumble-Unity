@@ -7,6 +7,13 @@ using System.Collections.Generic;
 
 namespace Mumble
 {
+    public enum SpeakerCreationMode
+    {
+        ALL, // All users on the server
+        IN_ROOM, // All users in the same room
+        IN_ROOM_NOT_SERVER_MUTED, // All users in the same room that are not server muted
+        IN_ROOM_NO_MUTE // All users in the same room that are not muted by the server and not self muted
+    };
     public delegate void UpdateOcbServerNonce(byte[] cryptSetup);
     [Serializable]
     public class DebugValues {
@@ -65,6 +72,7 @@ namespace Mumble
         private readonly AudioPlayerRemoverMethod _audioPlayerDestroyer;
         private readonly int _outputSampleRate;
         private readonly int _outputChannelCount;
+        private readonly SpeakerCreationMode _speakerCreationMode;
 
         private DebugValues _debugValues;
         private readonly Dictionary<uint, UserState> AllUsers = new Dictionary<uint, UserState>();
@@ -89,7 +97,7 @@ namespace Mumble
         public const uint Minor = 2;
         public const uint Patch = 8;
 
-        public MumbleClient(string hostName, int port, AudioPlayerCreatorMethod createMumbleAudioPlayerMethod, AudioPlayerRemoverMethod removeMumbleAudioPlayerMethod, bool async=false, DebugValues debugVals=null)
+        public MumbleClient(string hostName, int port, AudioPlayerCreatorMethod createMumbleAudioPlayerMethod, AudioPlayerRemoverMethod removeMumbleAudioPlayerMethod, bool async=false, SpeakerCreationMode speakerCreationMode=SpeakerCreationMode.ALL, DebugValues debugVals=null)
         {
             _hostName = hostName;
             _port = port;
@@ -102,6 +110,7 @@ namespace Mumble
             }
             _audioPlayerCreator = createMumbleAudioPlayerMethod;
             _audioPlayerDestroyer = removeMumbleAudioPlayerMethod;
+            _speakerCreationMode = speakerCreationMode;
 
             switch (AudioSettings.outputSampleRate)
             {
@@ -139,7 +148,6 @@ namespace Mumble
             if (debugVals == null)
                 debugVals = new DebugValues();
             _debugValues = debugVals;
-
         }
         private void Init(IPAddress[] addresses)
         {
@@ -242,8 +250,7 @@ namespace Mumble
                 return;
 
             // Create the audio player if the user is in the same room, and is not muted
-            if(userState.ChannelId == OurUserState.ChannelId
-                && !userState.Mute)
+            if(ShouldAddAudioPlayerForUser(userState))
             {
                 AddDecodingBuffer(userState);
             }else
@@ -252,11 +259,31 @@ namespace Mumble
                 TryRemoveDecodingBuffer(userState.Session);
             }
         }
+        private bool ShouldAddAudioPlayerForUser(UserState other)
+        {
+            switch (_speakerCreationMode)
+            {
+                case SpeakerCreationMode.ALL:
+                    return true;
+                case SpeakerCreationMode.IN_ROOM:
+                    return other.ChannelId == OurUserState.ChannelId;
+                case SpeakerCreationMode.IN_ROOM_NOT_SERVER_MUTED:
+                    return other.ChannelId == OurUserState.ChannelId
+                        && !other.Mute;
+                case SpeakerCreationMode.IN_ROOM_NO_MUTE:
+                    return other.ChannelId == OurUserState.ChannelId
+                        && !other.Mute
+                        && !other.SelfMute;
+                default:
+                    return false;
+            }
+        }
         private void AddDecodingBuffer(UserState userState)
         {
             // Make sure we don't double add
             if (_audioDecodingBuffers.ContainsKey(userState.Session))
                 return;
+            //Debug.Log("Adding : " + userState.Name + " #" + userState.Session);
             //Debug.Log("Adding decoder session #" + userState.Session);
             AudioDecodingBuffer buffer = _decodingBufferPool.GetDecodingBuffer();
             _audioDecodingBuffers.Add(userState.Session, buffer);
@@ -274,7 +301,7 @@ namespace Mumble
             AudioDecodingBuffer buffer;
             if(_audioDecodingBuffers.TryGetValue(session, out buffer))
             {
-                //Debug.Log("Removing decoder session #" + session);
+                //Debug.LogWarning("Removing decoder session #" + session);
                 _audioDecodingBuffers.Remove(session);
                 _decodingBufferPool.ReturnDecodingBuffer(buffer);
 
@@ -297,8 +324,7 @@ namespace Mumble
             // TODO we should index more intelligently to speed this up
             foreach(KeyValuePair<uint, UserState> user in AllUsers)
             {
-                if (user.Value.ChannelId == OurUserState.ChannelId
-                    && !user.Value.Mute)
+                if(ShouldAddAudioPlayerForUser(user.Value))
                     AddDecodingBuffer(user.Value);
                 else
                     TryRemoveDecodingBuffer(user.Key);

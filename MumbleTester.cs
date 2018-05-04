@@ -34,7 +34,7 @@ public class MumbleTester : MonoBehaviour {
             return;
         }
         Application.runInBackground = true;
-        _mumbleClient = new MumbleClient(HostName, Port, CreateMumbleAudioPlayerFromPrefab, DestroyMumbleAudioPlayer, ConnectAsyncronously, DebuggingVariables);
+        _mumbleClient = new MumbleClient(HostName, Port, CreateMumbleAudioPlayerFromPrefab, DestroyMumbleAudioPlayer, ConnectAsyncronously, SpeakerCreationMode.ALL, DebuggingVariables);
 
         if (DebuggingVariables.UseRandomUsername)
             Username += UnityEngine.Random.Range(0, 100f);
