@@ -67,7 +67,7 @@ namespace Mumble
             int micSampleRate = MumbleClient.GetNearestSupportedSampleRate(maxFreq);
             NumSamplesPerOutgoingPacket = MumbleConstants.NUM_FRAMES_PER_OUTGOING_PACKET * micSampleRate / 100;
 
-            print("Device:  " + _currentMic + " has freq: " + minFreq + " to " + maxFreq + " setting to: " + micSampleRate);
+            Debug.Log("Device:  " + _currentMic + " has freq: " + minFreq + " to " + maxFreq + " setting to: " + micSampleRate);
             if (micSampleRate != 48000)
                 Debug.LogWarning("Using a possibly unsupported sample rate of " + micSampleRate + " things might get weird");
             _currentMic = Microphone.devices[MicNumberToUse];

@@ -34,18 +34,21 @@ namespace Mumble {
         public void Initialize(MumbleClient mumbleClient, UInt32 session)
         {
             //Debug.Log("Initialized " + session, this);
-            _mumbleClient = mumbleClient;
             Session = session;
+            _mumbleClient = mumbleClient;
         }
         public void Reset()
         {
             _mumbleClient = null;
             Session = 0;
             OnAudioSample = null;
+            _isPlaying = false;
+            if(_audioSource != null)
+                _audioSource.Stop();
         }
         void OnAudioFilterRead(float[] data, int channels)
         {
-            //print("On audio read " + _session);
+            //Debug.Log("On audio read " + Session);
             if (_mumbleClient == null || !_mumbleClient.ConnectionSetupFinished)
                 return;
 

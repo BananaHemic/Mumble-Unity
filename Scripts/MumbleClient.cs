@@ -467,7 +467,7 @@ namespace Mumble
             Debug.LogError("Could not get current channel");
             return null;
         }
-        public uint GetSession()
+        public uint GetOurSession()
         {
             if (OurUserState != null)
                 return OurUserState.Session;
