@@ -7,7 +7,7 @@ namespace Mumble
 {
     public class CryptState
     {
-        private static readonly int AES_BLOCK_SIZE = 16;
+        const int AES_BLOCK_SIZE = 16;
         private readonly byte[] _decryptHistory = new byte[256];
 
         private CryptSetup _cryptSetup;

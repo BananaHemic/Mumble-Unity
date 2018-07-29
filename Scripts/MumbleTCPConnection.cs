@@ -103,7 +103,7 @@ namespace Mumble
         {
             lock (_ssl)
             {
-                //if(mt != MessageType.Ping && mt != MessageType.UDPTunnel)
+                //if (mt != MessageType.Ping && mt != MessageType.UDPTunnel)
                     //Debug.Log("Sending " + mt + " message");
                 //_writer.Write(IPAddress.HostToNetworkOrder((Int16) mt));
                 //Serializer.SerializeWithLengthPrefix(_ssl, message, PrefixStyle.Fixed32BigEndian);
@@ -308,14 +308,20 @@ namespace Mumble
         {
             if (cryptSetup.Key != null && cryptSetup.ClientNonce != null && cryptSetup.ServerNonce != null)
             {
+                // Apply the key and client/server nonce values provided
                 _mumbleClient.CryptSetup = cryptSetup;
-                SendMessage(MessageType.CryptSetup, new CryptSetup {ClientNonce = cryptSetup.ClientNonce});
                 _mumbleClient.ConnectUdp();
             }
             else if(cryptSetup.ServerNonce != null)
+            {
+                Debug.Log("Updating server nonce");
                 _updateOcbServerNonce(cryptSetup.ServerNonce);
+            }
             else
+            {
+                // This generally means that the server is requesting our nonce
                 SendMessage(MessageType.CryptSetup, new CryptSetup { ClientNonce = _mumbleClient.GetLatestClientNonce() });
+            }
         }
 
         internal void Close()
