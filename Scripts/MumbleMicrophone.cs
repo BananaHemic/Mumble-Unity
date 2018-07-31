@@ -119,7 +119,10 @@ namespace Mumble
                     else
                     {
                         if (_totalNumSamplesSent > _sampleNumberOfLastMinAmplitudeVoice + _voiceHoldSamples)
+                        {
+                            _mumbleClient.ReleasePcmArray(newData);
                             continue;
+                        }
                         _mumbleClient.SendVoicePacket(newData);
                         // If this is the sample before the hold turns off, stop sending after it's sent
                         if (_totalNumSamplesSent + NumSamplesPerOutgoingPacket > _sampleNumberOfLastMinAmplitudeVoice + _voiceHoldSamples)

@@ -67,10 +67,7 @@ namespace Mumble
 
                     TargettedSpeech speech = _unencodedBuffer.Dequeue();
                     isStop = isStop || speech.IsStop;
-
                     nextPcmToSend = speech.PcmData;
-                    if(nextPcmToSend != null)
-                        nextPcmToSend.IsAvailable = true;
 
                     if (isStop)
                         _isWaitingToSendLastPacket = false;
@@ -81,6 +78,9 @@ namespace Mumble
                 isEmpty = true;
 
             encoder_buffer = isEmpty ? EmptyByteSegment : encoder.Encode(nextPcmToSend.Pcm);
+
+            if(nextPcmToSend != null)
+                nextPcmToSend.IsAvailable = true;
 
             if (isStop)
             {

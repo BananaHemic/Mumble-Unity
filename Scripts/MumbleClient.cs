@@ -189,6 +189,10 @@ namespace Mumble
         {
             return _manageSendBuffer.GetAvailablePcmArray();
         }
+        internal void ReleasePcmArray(PcmArray pcmArray)
+        {
+            _manageSendBuffer.ReleasePcmArray(pcmArray);
+        }
         internal UserState GetUserFromSession(uint session)
         {
             UserState state;
@@ -387,7 +391,10 @@ namespace Mumble
             // Don't send anything out if we're muted
             if (OurUserState == null
                 || OurUserState.Mute)
+            {
+                ReleasePcmArray(floatData);
                 return;
+            }
             if(_manageSendBuffer != null)
                 _manageSendBuffer.SendVoice(floatData, SpeechTarget.Normal, 0);
         }

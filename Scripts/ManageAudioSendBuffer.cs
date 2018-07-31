@@ -55,18 +55,24 @@ namespace Mumble
                 if (ray.IsAvailable)
                 {
                     ray.IsAvailable = false;
+                    //Debug.Log("re-using buffer");
                     return ray;
                 }
             }
             PcmArray newArray = new PcmArray(_mumbleClient.NumSamplesPerOutgoingPacket, _pcmArrays.Count);
             _pcmArrays.Add(newArray);
 
+            if(_pcmArrays.Count > 10)
+            {
+                Debug.LogWarning(_pcmArrays.Count + " audio buffers in-use. There may be a leak");
+            }
             //Debug.Log("New buffer length is: " + _pcmArrays.Count);
             return newArray;
         }
-        public void ReleasePcmArray(int indexOfFreedArray)
+        public void ReleasePcmArray(PcmArray pcmArray)
         {
-            _pcmArrays[indexOfFreedArray].IsAvailable = true;
+            //Debug.Log("releasing pcm");
+            pcmArray.IsAvailable = true;
         }
         public void SendVoice(PcmArray pcm, SpeechTarget target, uint targetId)
         {
