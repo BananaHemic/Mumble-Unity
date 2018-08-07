@@ -140,11 +140,6 @@ namespace Mumble
                     Array.Copy(opusHeader, 0, finalPacket, 1 + sequence.Length, opusHeader.Length);
                     Array.Copy(packet.Array, packet.Offset, finalPacket, 1 + sequence.Length + opusHeader.Length, packet.Count);
 
-                    while (_udpConnection._isSending)
-                    {
-                        //Debug.Log("waiting");
-                        Thread.Sleep(1);
-                    }
                     //Debug.Log("seq: " + sequenceIndex + " | " + finalPacket.Length);
                     _udpConnection.SendVoicePacket(finalPacket);
                     sequenceIndex += MumbleConstants.NUM_FRAMES_PER_OUTGOING_PACKET;

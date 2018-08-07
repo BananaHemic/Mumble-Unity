@@ -17,7 +17,6 @@ namespace Mumble
         private CryptState _cryptState;
         private Timer _udpTimer;
         private bool _isConnected = false;
-        internal volatile bool _isSending = false;
         internal volatile int NumPacketsSent = 0;
         internal volatile int NumPacketsRecv = 0;
         internal volatile bool _useTcp = false;
@@ -175,9 +174,6 @@ namespace Mumble
                 return;
             }
 
-            while (_isSending)
-                System.Threading.Thread.Sleep(1);
-            _isSending = true;
             if(!_useTcp && _numPingsOutstanding >= MumbleConstants.MAX_CONSECUTIVE_MISSED_UDP_PINGS)
             {
                 Debug.LogWarning("Error establishing UDP connection, will switch to TCP");
@@ -185,7 +181,10 @@ namespace Mumble
             }
             //Debug.Log(_numPingsSent - _numPingsReceived);
             _numPingsOutstanding++;
-            _udpClient.BeginSend(encryptedData, encryptedData.Length, new AsyncCallback(OnSent), null);
+            lock (_udpClient)
+            {
+                _udpClient.Send(encryptedData, encryptedData.Length);
+            }
         }
 
         internal void Close()
@@ -220,8 +219,7 @@ namespace Mumble
                     byte[] encrypted = _cryptState.Encrypt(voicePacket, voicePacket.Length);
                     lock (_udpClient)
                     {
-                        _isSending = true;
-                        _udpClient.BeginSend(encrypted, encrypted.Length, new AsyncCallback(OnSent), null);
+                        _udpClient.Send(encrypted, encrypted.Length);
                     }
                 }
                 NumPacketsSent++;
@@ -229,10 +227,6 @@ namespace Mumble
             {
                 Debug.LogError("Error sending packet: " + e);
             }
-        }
-        void OnSent(IAsyncResult result)
-        {
-            _isSending = false;
         }
         internal byte[] GetLatestClientNonce()
         {
