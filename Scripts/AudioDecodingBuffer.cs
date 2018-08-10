@@ -40,6 +40,12 @@ namespace Mumble {
         private long _lastReceivedSequence;
         private OpusDecoder _decoder;
 
+        /// <summary>
+        /// Name of the speaker being decoded
+        /// Only used for debugging
+        /// </summary>
+        private string _name;
+
         private readonly int _outputSampleRate;
         private readonly int _outputChannelCount;
         private readonly float[][] _decodedBuffer = new float[NumDecodedSubBuffers][];
@@ -64,6 +70,11 @@ namespace Mumble {
         {
             _outputSampleRate = audioRate;
             _outputChannelCount = channelCount;
+        }
+        public void Init(string name)
+        {
+            Debug.Log("Init decoding buffer for: " + name);
+            _name = name;
         }
         public int Read(float[] buffer, int offset, int count)
         {
@@ -292,7 +303,8 @@ namespace Mumble {
                 int count = _encodedBuffer.Count;
                 if (count > MumbleConstants.RECEIVED_PACKET_BUFFER_SIZE)
                 {
-                    Debug.LogWarning("Max recv buffer size reached, dropping");
+                    // TODO this seems to happen at times
+                    Debug.LogWarning("Max recv buffer size reached, dropping for user " + _name);
                     return;
                 }
 
@@ -307,6 +319,7 @@ namespace Mumble {
         {
             lock (_encodedBuffer)
             {
+                _name = null;
                 NumPacketsLost = 0;
                 HasFilledInitialBuffer = false;
                 _decodedCount = 0;

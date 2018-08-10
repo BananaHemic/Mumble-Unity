@@ -290,6 +290,7 @@ namespace Mumble
             //Debug.Log("Adding : " + userState.Name + " #" + userState.Session);
             //Debug.Log("Adding decoder session #" + userState.Session);
             AudioDecodingBuffer buffer = _decodingBufferPool.GetDecodingBuffer();
+            buffer.Init(userState.Name);
             _audioDecodingBuffers.Add(userState.Session, buffer);
             EventProcessor.Instance.QueueEvent(() =>
             {
