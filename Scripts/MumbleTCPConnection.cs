@@ -152,156 +152,157 @@ namespace Mumble
 
         private void ProcessTcpData()
         {
-            try
+            // This thread is aborted in Close()
+            while (true)
             {
-                var messageType = (MessageType) IPAddress.NetworkToHostOrder(_reader.ReadInt16());
-                //Debug.Log("Processing data of type: " + messageType);
-
-                switch (messageType)
+                try
                 {
-                    case MessageType.Version:
-                        _mumbleClient.RemoteVersion = Serializer.DeserializeWithLengthPrefix<Version>(_ssl,
-                            PrefixStyle.Fixed32BigEndian);
-                        //Debug.Log("Server version: " + _mc.RemoteVersion.release);
-                        var authenticate = new Authenticate
-                        {
-                            Username = _username,
-                            Password = _password,
-                            Opus = true
-                        };
-                        SendMessage(MessageType.Authenticate, authenticate);
-                        break;
-                    case MessageType.CryptSetup:
-                        var cryptSetup = Serializer.DeserializeWithLengthPrefix<CryptSetup>(_ssl,
-                            PrefixStyle.Fixed32BigEndian);
-                        ProcessCryptSetup(cryptSetup);
-                        //Debug.Log("Got crypt");
-                        break;
-                    case MessageType.CodecVersion:
-                        _mumbleClient.CodecVersion = Serializer.DeserializeWithLengthPrefix<CodecVersion>(_ssl,
-                            PrefixStyle.Fixed32BigEndian);
-                        //Debug.Log("Got codec version");
-                        break;
-                    case MessageType.ChannelState:
-                        ChannelState ChannelState = Serializer.DeserializeWithLengthPrefix<ChannelState>(_ssl,
-                            PrefixStyle.Fixed32BigEndian);
-                        /*
-                        Debug.Log("Channel state Name = " + ChannelState.name);
-                        Debug.Log("Channel state ID = " + ChannelState.channel_id);
-                        Debug.Log("Channel state Position = " + ChannelState.position);
-                        Debug.Log("Channel state Temporary = " + ChannelState.temporary);
-                        Debug.Log("Channel state Parent = " + ChannelState.parent);
-                        Debug.Log("Channel state Description = " + ChannelState.description);
-                        */
-                        _mumbleClient.AddChannel(ChannelState);
-                        break;
-                    case MessageType.PermissionQuery:
-                        _mumbleClient.PermissionQuery = Serializer.DeserializeWithLengthPrefix<PermissionQuery>(_ssl,
-                            PrefixStyle.Fixed32BigEndian);
-                        //Debug.Log("Permission Query = " + _mumbleClient.PermissionQuery.permissions);
-                        //Debug.Log("Permission Channel = " + _mumbleClient.PermissionQuery.channel_id);
-                        break;
-                    case MessageType.UserState:
-                        //This is called for every user in the room, including us
-                        UserState user = Serializer.DeserializeWithLengthPrefix<UserState>(_ssl,
-                            PrefixStyle.Fixed32BigEndian);
-                        
-                        //Debug.Log("Name: " + user.Name);
-                        //Debug.Log("Session: " + user.Session);
-                        //Debug.Log("actor: " + user.Actor);
-                        //Debug.Log("Chan: " + user.ChannelId);
-                        //Debug.Log("ID: " + user.UserId);
-                        _mumbleClient.AddUser(user);
-                        break;
-                    case MessageType.ServerSync:
-                        //This is where we get our session Id
-                        //Debug.Log("Will server sync!");
-                        _mumbleClient.SetServerSync(Serializer.DeserializeWithLengthPrefix<ServerSync>(_ssl,
-                            PrefixStyle.Fixed32BigEndian));
-                        //Debug.Log("Server Sync Session= " + _mumbleClient.ServerSync.session);
-                        _mumbleClient.ConnectionSetupFinished = true;
-                        break;
-                    case MessageType.ServerConfig:
-                        _mumbleClient.ServerConfig = Serializer.DeserializeWithLengthPrefix<ServerConfig>(_ssl,
-                            PrefixStyle.Fixed32BigEndian);
-                        //Debug.Log("Sever config = " + _mumbleClient.ServerConfig);
-                        Debug.Log("Mumble is Connected!");
-                        _validConnection = true; // handshake complete
-                        break;
-                    case MessageType.SuggestConfig:
-                        //Contains suggested configuratio options from the server
-                        //like whether to send positional data, client version, etc.
-                        Serializer.DeserializeWithLengthPrefix<SuggestConfig>(_ssl,
-                            PrefixStyle.Fixed32BigEndian);
-                        break;
-                    case MessageType.TextMessage:
-                        TextMessage textMessage = Serializer.DeserializeWithLengthPrefix<TextMessage>(_ssl,
-                            PrefixStyle.Fixed32BigEndian);
-                        
-                        Debug.Log("Text message = " + textMessage.Message);
-                        Debug.Log("Text actor = " + textMessage.Actor);
-                        //Debug.Log("Text channel = " + textMessage.channel_id[0]);
-                        //Debug.Log("Text session Length = " + textMessage.Sessions.Length);
-                        //Debug.Log("Text Tree Length = " + textMessage.TreeIds.Length);
-                        break;
-                    case MessageType.UDPTunnel:
-                        var length = IPAddress.NetworkToHostOrder(_reader.ReadInt32());
-                        //Debug.Log("Received UDP tunnel of length: " + length);
-                        //At this point the message is already decrypted
-                        _udpConnection.UnpackOpusVoicePacket(_reader.ReadBytes(length));
-                        /*
-                        //var udpTunnel = Serializer.DeserializeWithLengthPrefix<UDPTunnel>(_ssl,
-                            PrefixStyle.Fixed32BigEndian);
-                        */
-                        break;
-                    case MessageType.Ping:
-                        Serializer.DeserializeWithLengthPrefix<MumbleProto.Ping>(_ssl,
-                            PrefixStyle.Fixed32BigEndian);
-                        break;
-                    case MessageType.Reject:
-                        // This is called, for example, when the max number of users has been hit
-                        var reject = Serializer.DeserializeWithLengthPrefix<Reject>(_ssl,
-                            PrefixStyle.Fixed32BigEndian);
-                        _validConnection = false;
-                        Debug.LogError("Mumble server reject: " + reject.Reason);
-                        // The server connection is over, so we return
-                        return;
-                    case MessageType.UserRemove:
-                        var removal = Serializer.DeserializeWithLengthPrefix<UserRemove>(_ssl,
-                            PrefixStyle.Fixed32BigEndian);
-                        Debug.Log("Removing " + removal.Session);
-                        _mumbleClient.RemoveUser(removal.Session);
-                        break;
-                    case MessageType.ChannelRemove:
-                        var removedChan = Serializer.DeserializeWithLengthPrefix<ChannelRemove>(_ssl,
-                            PrefixStyle.Fixed32BigEndian);
-                        _mumbleClient.RemoveChannel(removedChan.ChannelId);
-                        Debug.Log("Removing channel " + removedChan.ChannelId);
-                        break;
-                    case MessageType.PermissionDenied:
-                        var denial = Serializer.DeserializeWithLengthPrefix<PermissionDenied>(_ssl,
-                            PrefixStyle.Fixed32BigEndian);
-                        Debug.LogError("Permission denied with fields Name: " + denial.Name +", Type: " + denial.Type + ", Reason: " + denial.Reason);
-                        break;
-                    default:
-                        Debug.LogError("Message type " + messageType + " not implemented");
-                        break;
+                    var messageType = (MessageType)IPAddress.NetworkToHostOrder(_reader.ReadInt16());
+                    //Debug.Log("Processing data of type: " + messageType);
+
+                    switch (messageType)
+                    {
+                        case MessageType.Version:
+                            _mumbleClient.RemoteVersion = Serializer.DeserializeWithLengthPrefix<Version>(_ssl,
+                                PrefixStyle.Fixed32BigEndian);
+                            //Debug.Log("Server version: " + _mc.RemoteVersion.release);
+                            var authenticate = new Authenticate
+                            {
+                                Username = _username,
+                                Password = _password,
+                                Opus = true
+                            };
+                            SendMessage(MessageType.Authenticate, authenticate);
+                            break;
+                        case MessageType.CryptSetup:
+                            var cryptSetup = Serializer.DeserializeWithLengthPrefix<CryptSetup>(_ssl,
+                                PrefixStyle.Fixed32BigEndian);
+                            ProcessCryptSetup(cryptSetup);
+                            //Debug.Log("Got crypt");
+                            break;
+                        case MessageType.CodecVersion:
+                            _mumbleClient.CodecVersion = Serializer.DeserializeWithLengthPrefix<CodecVersion>(_ssl,
+                                PrefixStyle.Fixed32BigEndian);
+                            //Debug.Log("Got codec version");
+                            break;
+                        case MessageType.ChannelState:
+                            ChannelState ChannelState = Serializer.DeserializeWithLengthPrefix<ChannelState>(_ssl,
+                                PrefixStyle.Fixed32BigEndian);
+                            /*
+                            Debug.Log("Channel state Name = " + ChannelState.name);
+                            Debug.Log("Channel state ID = " + ChannelState.channel_id);
+                            Debug.Log("Channel state Position = " + ChannelState.position);
+                            Debug.Log("Channel state Temporary = " + ChannelState.temporary);
+                            Debug.Log("Channel state Parent = " + ChannelState.parent);
+                            Debug.Log("Channel state Description = " + ChannelState.description);
+                            */
+                            _mumbleClient.AddChannel(ChannelState);
+                            break;
+                        case MessageType.PermissionQuery:
+                            _mumbleClient.PermissionQuery = Serializer.DeserializeWithLengthPrefix<PermissionQuery>(_ssl,
+                                PrefixStyle.Fixed32BigEndian);
+                            //Debug.Log("Permission Query = " + _mumbleClient.PermissionQuery.permissions);
+                            //Debug.Log("Permission Channel = " + _mumbleClient.PermissionQuery.channel_id);
+                            break;
+                        case MessageType.UserState:
+                            //This is called for every user in the room, including us
+                            UserState user = Serializer.DeserializeWithLengthPrefix<UserState>(_ssl,
+                                PrefixStyle.Fixed32BigEndian);
+
+                            //Debug.Log("Name: " + user.Name);
+                            //Debug.Log("Session: " + user.Session);
+                            //Debug.Log("actor: " + user.Actor);
+                            //Debug.Log("Chan: " + user.ChannelId);
+                            //Debug.Log("ID: " + user.UserId);
+                            _mumbleClient.AddUser(user);
+                            break;
+                        case MessageType.ServerSync:
+                            //This is where we get our session Id
+                            //Debug.Log("Will server sync!");
+                            _mumbleClient.SetServerSync(Serializer.DeserializeWithLengthPrefix<ServerSync>(_ssl,
+                                PrefixStyle.Fixed32BigEndian));
+                            //Debug.Log("Server Sync Session= " + _mumbleClient.ServerSync.session);
+                            _mumbleClient.ConnectionSetupFinished = true;
+                            break;
+                        case MessageType.ServerConfig:
+                            _mumbleClient.ServerConfig = Serializer.DeserializeWithLengthPrefix<ServerConfig>(_ssl,
+                                PrefixStyle.Fixed32BigEndian);
+                            //Debug.Log("Sever config = " + _mumbleClient.ServerConfig);
+                            Debug.Log("Mumble is Connected!");
+                            _validConnection = true; // handshake complete
+                            break;
+                        case MessageType.SuggestConfig:
+                            //Contains suggested configuratio options from the server
+                            //like whether to send positional data, client version, etc.
+                            Serializer.DeserializeWithLengthPrefix<SuggestConfig>(_ssl,
+                                PrefixStyle.Fixed32BigEndian);
+                            break;
+                        case MessageType.TextMessage:
+                            TextMessage textMessage = Serializer.DeserializeWithLengthPrefix<TextMessage>(_ssl,
+                                PrefixStyle.Fixed32BigEndian);
+
+                            Debug.Log("Text message = " + textMessage.Message);
+                            Debug.Log("Text actor = " + textMessage.Actor);
+                            //Debug.Log("Text channel = " + textMessage.channel_id[0]);
+                            //Debug.Log("Text session Length = " + textMessage.Sessions.Length);
+                            //Debug.Log("Text Tree Length = " + textMessage.TreeIds.Length);
+                            break;
+                        case MessageType.UDPTunnel:
+                            var length = IPAddress.NetworkToHostOrder(_reader.ReadInt32());
+                            //Debug.Log("Received UDP tunnel of length: " + length);
+                            //At this point the message is already decrypted
+                            _udpConnection.UnpackOpusVoicePacket(_reader.ReadBytes(length));
+                            /*
+                            //var udpTunnel = Serializer.DeserializeWithLengthPrefix<UDPTunnel>(_ssl,
+                                PrefixStyle.Fixed32BigEndian);
+                            */
+                            break;
+                        case MessageType.Ping:
+                            Serializer.DeserializeWithLengthPrefix<MumbleProto.Ping>(_ssl,
+                                PrefixStyle.Fixed32BigEndian);
+                            break;
+                        case MessageType.Reject:
+                            // This is called, for example, when the max number of users has been hit
+                            var reject = Serializer.DeserializeWithLengthPrefix<Reject>(_ssl,
+                                PrefixStyle.Fixed32BigEndian);
+                            _validConnection = false;
+                            Debug.LogError("Mumble server reject: " + reject.Reason);
+                            // The server connection is over, so we return
+                            return;
+                        case MessageType.UserRemove:
+                            var removal = Serializer.DeserializeWithLengthPrefix<UserRemove>(_ssl,
+                                PrefixStyle.Fixed32BigEndian);
+                            Debug.Log("Removing " + removal.Session);
+                            _mumbleClient.RemoveUser(removal.Session);
+                            break;
+                        case MessageType.ChannelRemove:
+                            var removedChan = Serializer.DeserializeWithLengthPrefix<ChannelRemove>(_ssl,
+                                PrefixStyle.Fixed32BigEndian);
+                            _mumbleClient.RemoveChannel(removedChan.ChannelId);
+                            Debug.Log("Removing channel " + removedChan.ChannelId);
+                            break;
+                        case MessageType.PermissionDenied:
+                            var denial = Serializer.DeserializeWithLengthPrefix<PermissionDenied>(_ssl,
+                                PrefixStyle.Fixed32BigEndian);
+                            Debug.LogError("Permission denied with fields Name: " + denial.Name + ", Type: " + denial.Type + ", Reason: " + denial.Reason);
+                            break;
+                        default:
+                            Debug.LogError("Message type " + messageType + " not implemented");
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (ex is EndOfStreamException)
+                        Debug.LogError("EOS Exception: " + ex);//This happens when we connect again with the same username
+                                                               //These just means the app stopped, it's ok
+                    else if (ex is ObjectDisposedException) { }
+                    else if (ex is ThreadAbortException) { }
+                    else
+                        Debug.LogError("Unhandled error: " + ex);
+                    return;
                 }
             }
-            catch (Exception ex)
-            {
-                if (ex is EndOfStreamException)
-                    Debug.LogError("EOS Exception: " + ex);//This happens when we connect again with the same username
-                //These just means the app stopped, it's ok
-                else if (ex is ObjectDisposedException) { }
-                else if (ex is ThreadAbortException) { }
-                else
-                    Debug.LogError("Unhandled error: " + ex);
-                return;
-            }
-
-            //Get the next response
-            ProcessTcpData();
         }
 
         private void ProcessCryptSetup(CryptSetup cryptSetup)
@@ -328,14 +329,19 @@ namespace Mumble
         {
             if(_ssl != null)
                 _ssl.Close();
+            _ssl = null;
             if(_tcpTimer != null)
                 _tcpTimer.Close();
+            _tcpTimer = null;
             if(_processThread != null)
                 _processThread.Abort();
+            _processThread = null;
             if(_reader != null)
                 _reader.Close();
+            _reader = null;
             if(_writer != null)
                 _writer.Close();
+            _writer = null;
             if(_tcpClient != null)
                 _tcpClient.Close();
         }
