@@ -101,13 +101,6 @@ namespace Mumble
         {
             _hostName = hostName;
             _port = port;
-            if (async)
-                Dns.BeginGetHostAddresses(hostName, OnHostRecv, null);
-            else
-            {
-                IPAddress[] addresses = Dns.GetHostAddresses(hostName);
-                Init(addresses);
-            }
             _audioPlayerCreator = createMumbleAudioPlayerMethod;
             _audioPlayerDestroyer = removeMumbleAudioPlayerMethod;
             _speakerCreationMode = speakerCreationMode;
@@ -148,6 +141,14 @@ namespace Mumble
             if (debugVals == null)
                 debugVals = new DebugValues();
             _debugValues = debugVals;
+
+            if (async)
+                Dns.BeginGetHostAddresses(hostName, OnHostRecv, null);
+            else
+            {
+                IPAddress[] addresses = Dns.GetHostAddresses(hostName);
+                Init(addresses);
+            }
         }
         private void Init(IPAddress[] addresses)
         {
