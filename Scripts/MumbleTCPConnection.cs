@@ -251,7 +251,7 @@ namespace Mumble
                             var length = IPAddress.NetworkToHostOrder(_reader.ReadInt32());
                             //Debug.Log("Received UDP tunnel of length: " + length);
                             //At this point the message is already decrypted
-                            _udpConnection.UnpackOpusVoicePacket(_reader.ReadBytes(length));
+                            _udpConnection.UnpackOpusVoicePacket(_reader.ReadBytes(length), false);
                             /*
                             //var udpTunnel = Serializer.DeserializeWithLengthPrefix<UDPTunnel>(_ssl,
                                 PrefixStyle.Fixed32BigEndian);

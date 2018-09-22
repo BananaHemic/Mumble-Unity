@@ -91,7 +91,7 @@ namespace Mumble
             switch ((UDPType)type)
             {
                 case UDPType.Opus:
-                    UnpackOpusVoicePacket(message);
+                    UnpackOpusVoicePacket(message, false);
                     break;
                 case UDPType.Ping:
                     OnPing(message);
@@ -112,7 +112,7 @@ namespace Mumble
                 _useTcp = false;
             }
         }
-        internal void UnpackOpusVoicePacket(byte[] plainTextMessage)
+        internal void UnpackOpusVoicePacket(byte[] plainTextMessage, bool isLoopback)
         {
             NumPacketsRecv++;
             //byte typeByte = plainTextMessage[0];
@@ -122,7 +122,7 @@ namespace Mumble
             using (var reader = new UdpPacketReader(new MemoryStream(plainTextMessage, 1, plainTextMessage.Length - 1)))
             {
                 UInt32 session = 0;
-                if (!_mumbleClient.UseLocalLoopBack)
+                if (!isLoopback)
                     session = (uint)reader.ReadVarInt64();
                 else
                     session = _mumbleClient.OurUserState.Session;
@@ -147,7 +147,9 @@ namespace Mumble
                 
                 if (data == null || data.Length != size)
                 {
-                    Debug.LogError("empty or wrong sized packet");
+                    Debug.LogError("empty or wrong sized packet. Recv: " + (data != null ? data.Length.ToString() : "null")
+                        + " expected: " + size + " plain len: " + plainTextMessage.Length
+                        + " seq: " + sequence + " isLoop: " + isLoopback);
                     return;
                 }
 
@@ -203,7 +205,7 @@ namespace Mumble
             try
             {
                 if (_mumbleClient.UseLocalLoopBack)
-                    UnpackOpusVoicePacket(voicePacket);
+                    UnpackOpusVoicePacket(voicePacket, true);
                 //Debug.Log("Sending UDP packet! Length = " + voicePacket.Length);
 
                 if (_useTcp)
