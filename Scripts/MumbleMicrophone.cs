@@ -81,6 +81,8 @@ namespace Mumble
         }
         public int GetMicPosition()
         {
+            if (_currentMic == null)
+                return 0;
             return Microphone.GetPosition(_currentMic);
         }
         void SendVoiceIfReady()
@@ -149,6 +151,11 @@ namespace Mumble
         }
         public void StartSendingAudio(int sampleRate)
         {
+            if (_currentMic == null)
+            {
+                Debug.Log("Not sending audio, no current mic");
+                return;
+            }
             Debug.Log("Starting to send audio");
             SendAudioClip = Microphone.Start(_currentMic, true, NumRecordingSeconds, sampleRate);
             _previousPosition = 0;

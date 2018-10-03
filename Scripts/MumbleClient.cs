@@ -431,6 +431,8 @@ namespace Mumble
             AudioDecodingBuffer decodingBuffer;
             if (_audioDecodingBuffers.TryGetValue(session, out decodingBuffer))
                 decodingBuffer.Read(pcmArray, offset, length);
+            else
+                Debug.LogWarning("Decode buffer not found for session " + session);
         }
         public bool JoinChannel(string channelToJoin)
         {
