@@ -46,12 +46,20 @@ namespace Mumble {
         /// </summary>
         private string _name;
 
+        /// <summary>
+        /// Has this buffer had to drop samples
+        /// Because there were too many unprocessed?
+        /// Used only for debugging, currently
+        /// </summary>
+        private bool _hasOverflowed;
+
         private readonly int _outputSampleRate;
         private readonly int _outputChannelCount;
         private readonly float[][] _decodedBuffer = new float[NumDecodedSubBuffers][];
         private readonly int[] _numSamplesInBuffer = new int[NumDecodedSubBuffers];
         private readonly int[] _readOffsetInBuffer = new int[NumDecodedSubBuffers];
         private readonly Queue<BufferPacket> _encodedBuffer = new Queue<BufferPacket>();
+        private readonly object _bufferLock = new object();
         const int NumDecodedSubBuffers = (int)(MumbleConstants.MAX_LATENCY_SECONDS * (MumbleConstants.MAX_SAMPLE_RATE / MumbleConstants.OUTPUT_FRAME_SIZE));
         const int SubBufferSize = MumbleConstants.OUTPUT_FRAME_SIZE * MumbleConstants.MAX_FRAMES_PER_PACKET * MumbleConstants.MAX_CHANNELS;
         /// <summary>
@@ -82,11 +90,13 @@ namespace Mumble {
             if (!HasFilledInitialBuffer)
             {
                 Array.Clear(buffer, offset, count);
+                if(_hasOverflowed)
+                    Debug.Log(_name + " waiting on initial audio buffer");
                 return 0;
             }
 
             /*
-            lock (_encodedBuffer)
+            lock (_bufferLock)
             {
                 Debug.Log("We now have " + _encodedBuffer.Count + " encoded packets");
             }
@@ -116,6 +126,9 @@ namespace Mumble {
             {
                 //Debug.Log(".");
             }
+
+            if (_hasOverflowed)
+                Debug.Log(_name + " decoding buffer read: " + readCount);
             
             return readCount;
         }
@@ -123,7 +136,7 @@ namespace Mumble {
         private BufferPacket? GetNextEncodedData()
         {
             BufferPacket? packet = null;
-            lock (_encodedBuffer)
+            lock (_bufferLock)
             {
                 if (_encodedBuffer.Count != 0)
                     packet = _encodedBuffer.Dequeue();
@@ -260,9 +273,13 @@ namespace Mumble {
                 _nextSequenceToDecode = packet.Value.Sequence + numRead / ((_outputSampleRate / 100) * _outputChannelCount);
             else
             {
-                //Debug.Log("Resetting decoder");
+                Debug.Log("Resetting " + _name + "'s decoder");
                 _nextSequenceToDecode = 0;
-                HasFilledInitialBuffer = false;
+                // Re-evaluate whether we need to fill up a buffer of audio before playing
+                lock (_bufferLock)
+                {
+                    HasFilledInitialBuffer = (_encodedBuffer.Count + 1 >= InitialSampleBuffer);
+                }
                 _decoder.ResetState();
             }
             if(numRead > 0)
@@ -298,18 +315,19 @@ namespace Mumble {
             };
 
             //Debug.Log("Adding #" + sequence);
-            lock (_encodedBuffer)
+            lock (_bufferLock)
             {
                 int count = _encodedBuffer.Count;
                 if (count > MumbleConstants.RECEIVED_PACKET_BUFFER_SIZE)
                 {
                     // TODO this seems to happen at times
-                    Debug.LogWarning("Max recv buffer size reached, dropping for user " + _name);
+                    Debug.LogWarning("Max recv buffer size reached, dropping for user " + _name + "seq: " + sequence);
+                    _hasOverflowed = true;
                     return;
                 }
 
                 _encodedBuffer.Enqueue(packet);
-                if (!HasFilledInitialBuffer && count + 1 >= InitialSampleBuffer)
+                if (!HasFilledInitialBuffer && (count + 1 >= InitialSampleBuffer))
                     HasFilledInitialBuffer = true;
                 //Debug.Log("Count is now: " + _encodedBuffer.Count);
             }
@@ -317,11 +335,12 @@ namespace Mumble {
 
         public void Reset()
         {
-            lock (_encodedBuffer)
+            lock (_bufferLock)
             {
                 _name = null;
                 NumPacketsLost = 0;
                 HasFilledInitialBuffer = false;
+                _hasOverflowed = false;
                 _decodedCount = 0;
                 _readingOffset = 0;
                 _nextBufferToDecodeInto = 0;
