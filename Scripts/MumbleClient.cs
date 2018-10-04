@@ -44,7 +44,7 @@ namespace Mumble
             }
         }
         public bool ReadyToConnect { get; private set; }
-        public bool ConnectionSetupFinished { get; internal set; }
+        public bool ConnectionSetupFinished { get; private set; }
         /// <summary>
         /// Methods to create or delete the Unity audio players
         /// These are NOT! Multithread safe, as they can call Unity functions
@@ -73,6 +73,9 @@ namespace Mumble
         private readonly int _outputSampleRate;
         private readonly int _outputChannelCount;
         private readonly SpeakerCreationMode _speakerCreationMode;
+        // The mute that we're waiting to set
+        // Either null, true, or false
+        private bool? _pendingMute = null;
 
         private DebugValues _debugValues;
         private readonly Dictionary<uint, UserState> AllUsers = new Dictionary<uint, UserState>();
@@ -201,7 +204,7 @@ namespace Mumble
                 return AllUsers[session];
             return null;
         }
-        internal void AddUser(UserState newUserState)
+        internal void AddOrUpdateUser(UserState newUserState)
         {
             UserState userState;
             if (!AllUsers.TryGetValue(newUserState.Session, out userState))
@@ -342,6 +345,11 @@ namespace Mumble
             OurUserState = AllUsers[ServerSync.Session];
             // Now that we know who we are, we can determine which users need decoding buffers
             ReevaluateAllDecodingBuffers();
+            ConnectionSetupFinished = true;
+
+            // Do the stuff we were waiting to do
+            if (_pendingMute.HasValue)
+                SetSelfMute(_pendingMute.Value);
         }
         internal void RemoveUser(uint removedUserSession)
         {
@@ -451,6 +459,26 @@ namespace Mumble
             Debug.Log("Attempting to join channel Id: " + state.ChannelId);
             _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
             return true;
+        }
+        internal void SetSelfMute(bool mute)
+        {
+            if (OurUserState == null)
+            {
+                _pendingMute = mute;
+                return;
+            }
+
+            UserState state = new UserState();
+            state.SelfMute = mute;
+            OurUserState.SelfMute = mute;
+            Debug.Log("Will set our self mute to: " + mute);
+            _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
+        }
+        public bool GetSelfMute()
+        {
+            if (OurUserState == null)
+                return false;
+            return OurUserState.SelfMute;
         }
         private bool TryGetChannelByName(string channelName, out ChannelState channelState)
         {

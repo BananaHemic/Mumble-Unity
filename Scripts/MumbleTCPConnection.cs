@@ -214,7 +214,7 @@ namespace Mumble
                             //Debug.Log("actor: " + user.Actor);
                             //Debug.Log("Chan: " + user.ChannelId);
                             //Debug.Log("ID: " + user.UserId);
-                            _mumbleClient.AddUser(user);
+                            _mumbleClient.AddOrUpdateUser(user);
                             break;
                         case MessageType.ServerSync:
                             //This is where we get our session Id
@@ -222,7 +222,6 @@ namespace Mumble
                             _mumbleClient.SetServerSync(Serializer.DeserializeWithLengthPrefix<ServerSync>(_ssl,
                                 PrefixStyle.Fixed32BigEndian));
                             //Debug.Log("Server Sync Session= " + _mumbleClient.ServerSync.session);
-                            _mumbleClient.ConnectionSetupFinished = true;
                             break;
                         case MessageType.ServerConfig:
                             _mumbleClient.ServerConfig = Serializer.DeserializeWithLengthPrefix<ServerConfig>(_ssl,
