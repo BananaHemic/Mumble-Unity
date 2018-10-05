@@ -476,8 +476,12 @@ namespace Mumble
         }
         public bool GetSelfMute()
         {
+            // The default self mute is false
             if (OurUserState == null)
                 return false;
+            if (!OurUserState.ShouldSerializeSelfMute())
+                return false;
+
             return OurUserState.SelfMute;
         }
         private bool TryGetChannelByName(string channelName, out ChannelState channelState)
