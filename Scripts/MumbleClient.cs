@@ -460,6 +460,8 @@ namespace Mumble
                 Session = OurUserState.Session,
                 SelfMute = (_pendingMute != null) ? _pendingMute.Value : OurUserState.SelfMute
             };
+            _pendingMute = null;
+
             Debug.Log("Attempting to join channel Id: " + state.ChannelId);
             _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
             return true;
