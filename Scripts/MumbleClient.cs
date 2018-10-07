@@ -239,7 +239,7 @@ namespace Mumble
                     //Debug.Log("User " + userState.Name + " has been muted");
 
                 // If this is us, and it's signaling that we've changed channels, notify the delegate on the main thread
-                if(OurUserState != null && userState.Session == OurUserState.Session && newUserState.ShouldSerializeChannelId())
+                if (OurUserState != null && userState.Session == OurUserState.Session && newUserState.ShouldSerializeChannelId())
                 {
                     Debug.Log("Our Channel changed! #" + newUserState.ChannelId);
                     //AllUsers[newUserState.Session].ChannelId = newUserState.ChannelId;
@@ -350,6 +350,7 @@ namespace Mumble
             // Do the stuff we were waiting to do
             if (_pendingMute.HasValue)
                 SetSelfMute(_pendingMute.Value);
+            _pendingMute = null;
         }
         internal void RemoveUser(uint removedUserSession)
         {
@@ -452,10 +453,13 @@ namespace Mumble
                 Debug.LogError("Channel " + channelToJoin + " not found!");
                 return false;
             }
-            UserState state = new UserState();
-            state.ChannelId = channel.ChannelId;
-            state.Actor = OurUserState.Session;
-            state.Session = OurUserState.Session;
+            UserState state = new UserState
+            {
+                ChannelId = channel.ChannelId,
+                Actor = OurUserState.Session,
+                Session = OurUserState.Session,
+                SelfMute = (_pendingMute != null) ? _pendingMute.Value : OurUserState.SelfMute
+            };
             Debug.Log("Attempting to join channel Id: " + state.ChannelId);
             _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
             return true;
@@ -464,24 +468,34 @@ namespace Mumble
         {
             if (OurUserState == null)
             {
+                //Debug.Log("Setting pending self mute: " + mute);
                 _pendingMute = mute;
                 return;
             }
+            _pendingMute = null;
 
             UserState state = new UserState();
             state.SelfMute = mute;
             OurUserState.SelfMute = mute;
-            Debug.Log("Will set our self mute to: " + mute);
+            //Debug.Log("Will set our self mute to: " + mute);
             _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
         }
-        public bool GetSelfMute()
+        public bool IsSelfMuted()
         {
             // The default self mute is false
             if (OurUserState == null)
                 return false;
+
+            if (_pendingMute.HasValue)
+            {
+                Debug.Log("Pending mute: " + _pendingMute.HasValue);
+                return _pendingMute.Value;
+            }
+
             if (!OurUserState.ShouldSerializeSelfMute())
                 return false;
 
+            Debug.Log("Our Self Mute is " + OurUserState.SelfMute);
             return OurUserState.SelfMute;
         }
         private bool TryGetChannelByName(string channelName, out ChannelState channelState)
@@ -538,7 +552,7 @@ namespace Mumble
         /// <summary>
         /// Tell the encoder to send the last audio packet, then reset the sequence number
         /// </summary>
-        public void StopSendingVoice()
+        internal void StopSendingVoice()
         {
             if(_manageSendBuffer != null)
                 _manageSendBuffer.SendVoiceStopSignal();

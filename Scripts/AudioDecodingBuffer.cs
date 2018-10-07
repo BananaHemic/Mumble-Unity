@@ -127,8 +127,8 @@ namespace Mumble {
                 //Debug.Log(".");
             }
 
-            if (_hasOverflowed)
-                Debug.Log(_name + " decoding buffer read: " + readCount);
+            //if (_hasOverflowed)
+                //Debug.Log(_name + " decoding buffer read: " + readCount);
             
             return readCount;
         }

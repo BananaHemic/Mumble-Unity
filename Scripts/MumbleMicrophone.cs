@@ -77,8 +77,7 @@ namespace Mumble
             if (SendAudioOnStart && (VoiceSendingType == MicType.AlwaysSend
                 || VoiceSendingType == MicType.Amplitude))
                 StartSendingAudio(micSampleRate);
-            else
-                _mumbleClient.SetSelfMute(true);
+
             return micSampleRate;
         }
         public int GetMicPosition()
@@ -172,7 +171,6 @@ namespace Mumble
             Microphone.End(_currentMic);
             _mumbleClient.StopSendingVoice();
             isRecording = false;
-            _mumbleClient.SetSelfMute(true);
         }
         void Update()
         {
