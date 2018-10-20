@@ -52,6 +52,7 @@ namespace Mumble
         /// <returns></returns>
         public delegate MumbleAudioPlayer AudioPlayerCreatorMethod(string username, uint session);
         public delegate void AudioPlayerRemoverMethod(uint session, MumbleAudioPlayer audioPlayerToRemove);
+        public delegate void OtherUserStateChangedMethod(uint session, UserState updatedDeltaState, UserState fullUserState);
         /// <summary>
         /// Delegate called whenever Mumble changes channels, either by joining a room or
         /// by being moved
@@ -70,6 +71,7 @@ namespace Mumble
         private MumbleMicrophone _mumbleMic;
         private readonly AudioPlayerCreatorMethod _audioPlayerCreator;
         private readonly AudioPlayerRemoverMethod _audioPlayerDestroyer;
+        private readonly OtherUserStateChangedMethod _otherUserStateChange;
         private readonly int _outputSampleRate;
         private readonly int _outputChannelCount;
         private readonly SpeakerCreationMode _speakerCreationMode;
@@ -100,13 +102,14 @@ namespace Mumble
         public const uint Minor = 2;
         public const uint Patch = 8;
 
-        public MumbleClient(string hostName, int port, AudioPlayerCreatorMethod createMumbleAudioPlayerMethod, AudioPlayerRemoverMethod removeMumbleAudioPlayerMethod, bool async=false, SpeakerCreationMode speakerCreationMode=SpeakerCreationMode.ALL, DebugValues debugVals=null)
+        public MumbleClient(string hostName, int port, AudioPlayerCreatorMethod createMumbleAudioPlayerMethod, AudioPlayerRemoverMethod removeMumbleAudioPlayerMethod, OtherUserStateChangedMethod otherChangeMethod=null, bool async=false, SpeakerCreationMode speakerCreationMode=SpeakerCreationMode.ALL, DebugValues debugVals=null)
         {
             _hostName = hostName;
             _port = port;
             _audioPlayerCreator = createMumbleAudioPlayerMethod;
             _audioPlayerDestroyer = removeMumbleAudioPlayerMethod;
             _speakerCreationMode = speakerCreationMode;
+            _otherUserStateChange = otherChangeMethod;
 
             switch (AudioSettings.outputSampleRate)
             {
@@ -206,6 +209,8 @@ namespace Mumble
         }
         internal void AddOrUpdateUser(UserState newUserState)
         {
+            bool isOurUser = OurUserState != null && newUserState.Session == OurUserState.Session;
+
             UserState userState;
             if (!AllUsers.TryGetValue(newUserState.Session, out userState))
             {
@@ -236,16 +241,16 @@ namespace Mumble
                     userState.ChannelId = newUserState.ChannelId;
 
                 //if (newUserState.ShouldSerializeMute() && userState.Mute)
-                    //Debug.Log("User " + userState.Name + " has been muted");
+                //Debug.Log("User " + userState.Name + " has been muted");
 
                 // If this is us, and it's signaling that we've changed channels, notify the delegate on the main thread
-                if (OurUserState != null && userState.Session == OurUserState.Session && newUserState.ShouldSerializeChannelId())
+                if (isOurUser && newUserState.ShouldSerializeChannelId())
                 {
                     Debug.Log("Our Channel changed! #" + newUserState.ChannelId);
                     //AllUsers[newUserState.Session].ChannelId = newUserState.ChannelId;
                     EventProcessor.Instance.QueueEvent(() =>
                     {
-                        if(OnChannelChanged != null)
+                        if (OnChannelChanged != null)
                             OnChannelChanged(Channels[newUserState.ChannelId]);
                     });
 
@@ -265,6 +270,16 @@ namespace Mumble
             {
                 // Otherwise remove the audio decoding buffer and audioPlayer if it exists
                 TryRemoveDecodingBuffer(userState.Session);
+            }
+
+            // If this isn't our user, send out updates
+            if (!isOurUser)
+            {
+                EventProcessor.Instance.QueueEvent(() =>
+                {
+                    if (_otherUserStateChange != null)
+                        _otherUserStateChange(newUserState.Session, newUserState, userState);
+                });
             }
         }
         private bool ShouldAddAudioPlayerForUser(UserState other)
