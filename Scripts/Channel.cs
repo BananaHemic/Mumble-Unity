@@ -32,6 +32,9 @@ namespace Mumble
         {
             _channelState = initialState;
             _sharedAudioChannels = new List<Channel>();
+
+            // Link updates happen in a sorta weird way
+            UpdateLinks(initialState.LinksAdds, initialState.LinksRemoves);
         }
 
         public bool DoesShareAudio(Channel other)
@@ -104,10 +107,12 @@ namespace Mumble
 
         void UpdateLinks(uint[] addedLinks, uint[] removedLinks)
         {
+            //Debug.Log("Was: " + Links2String());
             // If we have no current links, then we just use the new links
-            if(_channelState.Links == null)
+            if(_channelState.Links == null || _channelState.Links.Length == 0)
             {
                 _channelState.Links = addedLinks;
+                //Debug.Log("Channel " + Name + " now has links: " + Links2String());
                 return;
             }
             
@@ -146,7 +151,7 @@ namespace Mumble
             if(addedLinks != null)
                 Array.Copy(addedLinks, 0, _channelState.Links, dstIdx, addedLinks.Length);
 
-            Debug.Log("Channel " + Name + " now has links: " + Links2String());
+            //Debug.Log("Channel " + Name + " now has links: " + Links2String());
         }
 
         internal void UpdateFromState(ChannelState deltaState)
@@ -165,7 +170,13 @@ namespace Mumble
                 _channelState.Position = deltaState.Position;
 
             // Link updates happen in a sorta weird way
+            if (deltaState.Links != null)
+                _channelState.Links = deltaState.Links;
             UpdateLinks(deltaState.LinksAdds, deltaState.LinksRemoves);
+            //Debug.LogWarning("Updated channel: " + Name);
+            //Debug.Log("Set: " + (deltaState.Links == null ? 0 : deltaState.Links.Length));
+            //Debug.Log("Added: " + (deltaState.LinksAdds == null ? 0 : deltaState.LinksAdds.Length));
+            //Debug.Log("Removed: " + (deltaState.LinksRemoves == null ? 0 : deltaState.LinksRemoves.Length));
         }
     }
 }

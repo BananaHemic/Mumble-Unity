@@ -52,7 +52,7 @@ namespace Mumble
         /// <returns></returns>
         public delegate MumbleAudioPlayer AudioPlayerCreatorMethod(string username, uint session);
         public delegate void AudioPlayerRemoverMethod(uint session, MumbleAudioPlayer audioPlayerToRemove);
-        public delegate void OtherUserStateChangedMethod(uint session, UserState updatedDeltaState, UserState fullUserState);
+        public delegate void AnyUserStateChangedMethod(uint session, UserState updatedDeltaState, UserState fullUserState);
         /// <summary>
         /// Delegate called whenever Mumble changes channels, either by joining a room or
         /// by being moved
@@ -71,7 +71,7 @@ namespace Mumble
         private MumbleMicrophone _mumbleMic;
         private readonly AudioPlayerCreatorMethod _audioPlayerCreator;
         private readonly AudioPlayerRemoverMethod _audioPlayerDestroyer;
-        private readonly OtherUserStateChangedMethod _otherUserStateChange;
+        private readonly AnyUserStateChangedMethod _anyUserStateChange;
         private readonly int _outputSampleRate;
         private readonly int _outputChannelCount;
         private readonly SpeakerCreationMode _speakerCreationMode;
@@ -103,14 +103,14 @@ namespace Mumble
         public const uint Minor = 2;
         public const uint Patch = 8;
 
-        public MumbleClient(string hostName, int port, AudioPlayerCreatorMethod createMumbleAudioPlayerMethod, AudioPlayerRemoverMethod removeMumbleAudioPlayerMethod, OtherUserStateChangedMethod otherChangeMethod=null, bool async=false, SpeakerCreationMode speakerCreationMode=SpeakerCreationMode.ALL, DebugValues debugVals=null)
+        public MumbleClient(string hostName, int port, AudioPlayerCreatorMethod createMumbleAudioPlayerMethod, AudioPlayerRemoverMethod removeMumbleAudioPlayerMethod, AnyUserStateChangedMethod anyChangeMethod=null, bool async=false, SpeakerCreationMode speakerCreationMode=SpeakerCreationMode.ALL, DebugValues debugVals=null)
         {
             _hostName = hostName;
             _port = port;
             _audioPlayerCreator = createMumbleAudioPlayerMethod;
             _audioPlayerDestroyer = removeMumbleAudioPlayerMethod;
             _speakerCreationMode = speakerCreationMode;
-            _otherUserStateChange = otherChangeMethod;
+            _anyUserStateChange = anyChangeMethod;
 
             switch (AudioSettings.outputSampleRate)
             {
@@ -215,7 +215,7 @@ namespace Mumble
             UserState userState;
             if (!AllUsers.TryGetValue(newUserState.Session, out userState))
             {
-                Debug.Log("New audio buffer with session: " + newUserState.Session);
+                Debug.Log("New audio buffer with session: " + newUserState.Session + " name: " + newUserState.Name);
                 AllUsers[newUserState.Session] = newUserState;
                 userState = newUserState;
             }
@@ -273,19 +273,15 @@ namespace Mumble
                 TryRemoveDecodingBuffer(userState.Session);
             }
 
-            // If this isn't our user, send out updates
-            if (!isOurUser)
+            // We check if otherUserStateChange is null multiple times just to
+            // be extra safe
+            if(_anyUserStateChange != null)
             {
-                // We check if otherUserStateChange is null multiple times just to
-                // be extra safe
-                if(_otherUserStateChange != null)
+                EventProcessor.Instance.QueueEvent(() =>
                 {
-                    EventProcessor.Instance.QueueEvent(() =>
-                    {
-                        if (_otherUserStateChange != null)
-                            _otherUserStateChange(newUserState.Session, newUserState, userState);
-                    });
-                }
+                    if (_anyUserStateChange != null)
+                        _anyUserStateChange(newUserState.Session, newUserState, userState);
+                });
             }
         }
         private bool ShouldAddAudioPlayerForUser(UserState other)
