@@ -34,7 +34,7 @@ public class MumbleTester : MonoBehaviour {
             return;
         }
         Application.runInBackground = true;
-        _mumbleClient = new MumbleClient(HostName, Port, CreateMumbleAudioPlayerFromPrefab, DestroyMumbleAudioPlayer, ConnectAsyncronously, SpeakerCreationMode.ALL, DebuggingVariables);
+        _mumbleClient = new MumbleClient(HostName, Port, CreateMumbleAudioPlayerFromPrefab, DestroyMumbleAudioPlayer, OnOtherUserStateChange, ConnectAsyncronously, SpeakerCreationMode.ALL, DebuggingVariables);
 
         if (DebuggingVariables.UseRandomUsername)
             Username += UnityEngine.Random.Range(0, 100f);
@@ -76,6 +76,11 @@ public class MumbleTester : MonoBehaviour {
         MumbleAudioPlayer newPlayer = newObj.GetComponent<MumbleAudioPlayer>();
         Debug.Log("Adding audio player for: " + username);
         return newPlayer;
+    }
+    private void OnOtherUserStateChange(uint session, MumbleProto.UserState updatedDeltaState, MumbleProto.UserState fullUserState)
+    {
+        print("User #" + session + " had their user state change");
+        // Here we can do stuff like update a UI with users' current channel/mute etc.
     }
     private void DestroyMumbleAudioPlayer(uint session, MumbleAudioPlayer playerToDestroy)
     {

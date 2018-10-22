@@ -59,7 +59,7 @@ namespace Mumble
         /// </summary>
         /// <param name="newChannelName"></param>
         /// <param name="newChannelID"></param>
-        public delegate void OnChannelChangedMethod(ChannelState channelWereNowIn);
+        public delegate void OnChannelChangedMethod(Channel channelWereNowIn);
 
         public OnChannelChangedMethod OnChannelChanged;
         private MumbleTcpConnection _tcpConnection;
@@ -80,8 +80,9 @@ namespace Mumble
         private bool? _pendingMute = null;
 
         private DebugValues _debugValues;
+        // TODO there are data structures that would be a lot faster here
         private readonly Dictionary<uint, UserState> AllUsers = new Dictionary<uint, UserState>();
-        private readonly Dictionary<uint, ChannelState> Channels = new Dictionary<uint, ChannelState>();
+        private readonly Dictionary<uint, Channel> Channels = new Dictionary<uint, Channel>();
         private readonly Dictionary<UInt32, AudioDecodingBuffer> _audioDecodingBuffers = new Dictionary<uint, AudioDecodingBuffer>();
         private readonly Dictionary<UInt32, MumbleAudioPlayer> _mumbleAudioPlayers = new Dictionary<uint, MumbleAudioPlayer>();
 
@@ -202,10 +203,10 @@ namespace Mumble
         }
         internal UserState GetUserFromSession(uint session)
         {
-            UserState state;
-            if(AllUsers.TryGetValue(session, out state))
-                return AllUsers[session];
-            return null;
+            UserState state = null;
+            if(!AllUsers.TryGetValue(session, out state))
+                Debug.LogWarning("User state not found for session " + session);
+            return state;
         }
         internal void AddOrUpdateUser(UserState newUserState)
         {
@@ -214,7 +215,7 @@ namespace Mumble
             UserState userState;
             if (!AllUsers.TryGetValue(newUserState.Session, out userState))
             {
-                //Debug.Log("New audio buffer with session: " + newUserState.Session);
+                Debug.Log("New audio buffer with session: " + newUserState.Session);
                 AllUsers[newUserState.Session] = newUserState;
                 userState = newUserState;
             }
@@ -275,11 +276,16 @@ namespace Mumble
             // If this isn't our user, send out updates
             if (!isOurUser)
             {
-                EventProcessor.Instance.QueueEvent(() =>
+                // We check if otherUserStateChange is null multiple times just to
+                // be extra safe
+                if(_otherUserStateChange != null)
                 {
-                    if (_otherUserStateChange != null)
-                        _otherUserStateChange(newUserState.Session, newUserState, userState);
-                });
+                    EventProcessor.Instance.QueueEvent(() =>
+                    {
+                        if (_otherUserStateChange != null)
+                            _otherUserStateChange(newUserState.Session, newUserState, userState);
+                    });
+                }
             }
         }
         private bool ShouldAddAudioPlayerForUser(UserState other)
@@ -289,12 +295,15 @@ namespace Mumble
                 case SpeakerCreationMode.ALL:
                     return true;
                 case SpeakerCreationMode.IN_ROOM:
-                    return other.ChannelId == OurUserState.ChannelId;
-                case SpeakerCreationMode.IN_ROOM_NOT_SERVER_MUTED:
                     return other.ChannelId == OurUserState.ChannelId
+                        || Channels[OurUserState.ChannelId].DoesShareAudio(Channels[other.ChannelId]);
+                case SpeakerCreationMode.IN_ROOM_NOT_SERVER_MUTED:
+                    return (other.ChannelId == OurUserState.ChannelId
+                        || Channels[OurUserState.ChannelId].DoesShareAudio(Channels[other.ChannelId]))
                         && !other.Mute;
                 case SpeakerCreationMode.IN_ROOM_NO_MUTE:
-                    return other.ChannelId == OurUserState.ChannelId
+                    return (other.ChannelId == OurUserState.ChannelId
+                        || Channels[OurUserState.ChannelId].DoesShareAudio(Channels[other.ChannelId]))
                         && !other.Mute
                         && !other.SelfMute;
                 default:
@@ -462,7 +471,7 @@ namespace Mumble
         {
             if (OurUserState == null)
                 return false;
-            ChannelState channel;
+            Channel channel;
             if (!TryGetChannelByName(channelToJoin, out channel))
             {
                 Debug.LogError("Channel " + channelToJoin + " not found!");
@@ -515,7 +524,7 @@ namespace Mumble
             Debug.Log("Our Self Mute is " + OurUserState.SelfMute);
             return OurUserState.SelfMute;
         }
-        private bool TryGetChannelByName(string channelName, out ChannelState channelState)
+        private bool TryGetChannelByName(string channelName, out Channel channelState)
         {
             foreach(uint key in Channels.Keys)
             {
@@ -534,7 +543,7 @@ namespace Mumble
             if (Channels == null
                 || OurUserState == null)
                 return null;
-            ChannelState ourChannel;
+            Channel ourChannel;
             if(Channels.TryGetValue(OurUserState.ChannelId, out ourChannel))
                 return ourChannel.Name;
 
@@ -550,21 +559,27 @@ namespace Mumble
         internal void AddChannel(ChannelState channelToAdd)
         {
             // If the channel already exists, just copy over the non-null data
-            if (Channels.ContainsKey(channelToAdd.ChannelId))
-            {
-                ChannelState previousChannelState = Channels[channelToAdd.ChannelId];
-                if (string.IsNullOrEmpty(channelToAdd.Name))
-                    channelToAdd.Name = previousChannelState.Name;
-                if (string.IsNullOrEmpty(channelToAdd.Description))
-                    channelToAdd.Description = previousChannelState.Description;
-            }
-            Channels[channelToAdd.ChannelId] = channelToAdd;
+            Channel existingChannel;
+            if (Channels.TryGetValue(channelToAdd.ChannelId, out existingChannel))
+                existingChannel.UpdateFromState(channelToAdd);
+            else
+                Channels[channelToAdd.ChannelId] = new Channel(channelToAdd);
+
+            // Update all the channel audio sharing settings
+            // We can probably do this less, but we're cautious
+            foreach(KeyValuePair<uint, Channel> kvp in Channels)
+                kvp.Value.UpdateSharedAudioChannels(Channels);
         }
         internal void RemoveChannel(uint channelIdToRemove)
         {
             if (channelIdToRemove == OurUserState.ChannelId)
                 Debug.LogWarning("Removed current channel");
             Channels.Remove(channelIdToRemove);
+
+            // Update all the channel audio sharing settings
+            // We can probably do this less, but we're cautious
+            foreach(KeyValuePair<uint, Channel> kvp in Channels)
+                kvp.Value.UpdateSharedAudioChannels(Channels);
         }
         /// <summary>
         /// Tell the encoder to send the last audio packet, then reset the sequence number
