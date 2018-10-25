@@ -168,6 +168,7 @@ namespace Mumble
         }
         public void StopSendingAudio()
         {
+            Debug.Log("Stopping sending audio");
             Microphone.End(_currentMic);
             _mumbleClient.StopSendingVoice();
             isRecording = false;
