@@ -13,6 +13,14 @@ namespace Mumble
             PushToTalk,
             MethodBased // Start / Stop speaking based on calls to this method
         }
+        /// <summary>
+        /// Delegate called when the user sends out a sample of their audio
+        /// Use when you want to plug in your own audio pre-processor
+        /// </summary>
+        /// <param name="array"></param>
+        public delegate void OnMicrophoneData(PcmArray array);
+        public OnMicrophoneData OnMicData;
+
         public bool SendAudioOnStart = true;
         public int MicNumberToUse;
         /// <summary>
@@ -91,13 +99,12 @@ namespace Mumble
             int currentPosition = Microphone.GetPosition(_currentMic);
             //Debug.Log(currentPosition + " " + Microphone.IsRecording(_currentMic));
 
-            if(currentPosition < _previousPosition)
+            if (currentPosition < _previousPosition)
                 _numTimesLooped++;
 
-            //int numSourceSamples = !_mumbleClient.UseSyntheticSource ? NumSamplesInMicBuffer : TestingClipToUse.samples;
+            //Debug.Log("mic position: " + currentPosition + " was: " + _previousPosition + " looped: " + _numTimesLooped);
 
             int totalSamples = currentPosition + _numTimesLooped * NumSamplesInMicBuffer;
-            //int totalSamples = currentPosition + _numTimesLooped * numSourceSamples;
             _previousPosition = currentPosition;
 
             while(totalSamples - _totalNumSamplesSent >= NumSamplesPerOutgoingPacket)
@@ -117,22 +124,31 @@ namespace Mumble
                     if (AmplitudeHigherThan(MinAmplitude, newData.Pcm))
                     {
                         _sampleNumberOfLastMinAmplitudeVoice = _totalNumSamplesSent;
+                        if (OnMicData != null)
+                            OnMicData(newData);
                         _mumbleClient.SendVoicePacket(newData);
                     }
                     else
                     {
                         if (_totalNumSamplesSent > _sampleNumberOfLastMinAmplitudeVoice + _voiceHoldSamples)
                         {
-                            _mumbleClient.ReleasePcmArray(newData);
+                            newData.UnRef();
                             continue;
                         }
+                        if (OnMicData != null)
+                            OnMicData(newData);
                         _mumbleClient.SendVoicePacket(newData);
                         // If this is the sample before the hold turns off, stop sending after it's sent
                         if (_totalNumSamplesSent + NumSamplesPerOutgoingPacket > _sampleNumberOfLastMinAmplitudeVoice + _voiceHoldSamples)
                             _mumbleClient.StopSendingVoice();
                     }
-                }else
+                }
+                else
+                {
+                    if (OnMicData != null)
+                        OnMicData(newData);
                     _mumbleClient.SendVoicePacket(newData);
+                }
             }
         }
         private static bool AmplitudeHigherThan(float minAmplitude, float[] pcm)

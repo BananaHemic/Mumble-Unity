@@ -79,8 +79,8 @@ namespace Mumble
 
             encoder_buffer = isEmpty ? EmptyByteSegment : encoder.Encode(nextPcmToSend.Pcm);
 
-            if(nextPcmToSend != null)
-                nextPcmToSend.IsAvailable = true;
+            if (nextPcmToSend != null)
+                nextPcmToSend.UnRef();
 
             if (isStop)
             {

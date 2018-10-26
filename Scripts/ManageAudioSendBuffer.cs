@@ -52,9 +52,9 @@ namespace Mumble
         {
             foreach(PcmArray ray in _pcmArrays)
             {
-                if (ray.IsAvailable)
+                if (ray._refCount == 0)
                 {
-                    ray.IsAvailable = false;
+                    ray.Ref();
                     //Debug.Log("re-using buffer");
                     return ray;
                 }
@@ -68,11 +68,6 @@ namespace Mumble
             }
             //Debug.Log("New buffer length is: " + _pcmArrays.Count);
             return newArray;
-        }
-        public void ReleasePcmArray(PcmArray pcmArray)
-        {
-            //Debug.Log("releasing pcm");
-            pcmArray.IsAvailable = true;
         }
         public void SendVoice(PcmArray pcm, SpeechTarget target, uint targetId)
         {
@@ -165,17 +160,28 @@ namespace Mumble
     }
     /// <summary>
     /// Small class to help this script re-use float arrays after their data has become encoded
+    /// Obviously, it's weird to ref-count in a managed environment, but it really
+    /// Does help identify leaks and makes zero-copy buffer sharing easier
     /// </summary>
     public class PcmArray
     {
-        public bool IsAvailable = true;
         public readonly int Index;
         public float[] Pcm;
+        internal int _refCount;
 
         public PcmArray(int pcmLength, int index)
         {
             Pcm = new float[pcmLength];
             Index = index;
+            _refCount = 1;
+        }
+        public void Ref()
+        {
+            _refCount++;
+        }
+        public void UnRef()
+        {
+            _refCount--;
         }
     }
 }
