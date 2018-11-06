@@ -52,6 +52,12 @@ namespace Mumble
         /// <returns></returns>
         public delegate MumbleAudioPlayer AudioPlayerCreatorMethod(string username, uint session);
         public delegate void AudioPlayerRemoverMethod(uint session, MumbleAudioPlayer audioPlayerToRemove);
+        /// <summary>
+        /// When any user's state changes
+        /// </summary>
+        /// <param name="session">session of the user</param>
+        /// <param name="updatedDeltaState">the change to the user state NOTE: will be null on user removed</param>
+        /// <param name="fullUserState">The full, updated user state</param>
         public delegate void AnyUserStateChangedMethod(uint session, UserState updatedDeltaState, UserState fullUserState);
         /// <summary>
         /// Delegate called whenever Mumble changes channels, either by joining a room or
@@ -370,7 +376,22 @@ namespace Mumble
         }
         internal void RemoveUser(uint removedUserSession)
         {
-            AllUsers.Remove(removedUserSession);
+            UserState removedUserState;
+            if(AllUsers.TryGetValue(removedUserSession, out removedUserState))
+            {
+                AllUsers.Remove(removedUserSession);
+
+                // We check if otherUserStateChange is null multiple times just to
+                // be extra safe
+                if(_anyUserStateChange != null)
+                {
+                    EventProcessor.Instance.QueueEvent(() =>
+                    {
+                        if (_anyUserStateChange != null)
+                            _anyUserStateChange(removedUserSession, null, removedUserState);
+                    });
+                }
+            }
             // Try to remove the audio player and decoding buffer if it exists
             TryRemoveDecodingBuffer(removedUserSession);
         }
@@ -481,6 +502,22 @@ namespace Mumble
             Debug.Log("Attempting to join channel Id: " + state.ChannelId);
             _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
             return true;
+        }
+        /// <summary>
+        /// Returns the dictionary of all user states
+        /// NOTE: This is NOT a copy, so do not edit the returned dictionary
+        /// </summary>
+        public Dictionary<uint, UserState> GetAllUsers()
+        {
+            return AllUsers;
+        }
+        /// <summary>
+        /// Returns the dictionary of all channels
+        /// NOTE: This is NOT a copy, so do not edit the returned dictionary
+        /// </summary>
+        public Dictionary<uint, Channel> GetAllChannels()
+        {
+            return Channels;
         }
         internal void SetSelfMute(bool mute)
         {
