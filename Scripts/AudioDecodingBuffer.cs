@@ -321,7 +321,7 @@ namespace Mumble {
                 if (count > MumbleConstants.RECEIVED_PACKET_BUFFER_SIZE)
                 {
                     // TODO this seems to happen at times
-                    Debug.LogWarning("Max recv buffer size reached, dropping for user " + _name + "seq: " + sequence);
+                    Debug.LogWarning("Max recv buffer size reached, dropping for user " + _name + " seq: " + sequence);
                     _hasOverflowed = true;
                     return;
                 }

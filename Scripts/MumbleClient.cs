@@ -286,7 +286,7 @@ namespace Mumble
                 });
             }
         }
-        private bool ShouldAddAudioPlayerForUser(UserState other)
+        public bool ShouldAddAudioPlayerForUser(UserState other)
         {
             switch (_speakerCreationMode)
             {

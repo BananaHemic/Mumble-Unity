@@ -48,7 +48,6 @@ namespace Mumble {
         }
         void OnAudioFilterRead(float[] data, int channels)
         {
-            //Debug.Log("On audio read " + Session);
             if (_mumbleClient == null || !_mumbleClient.ConnectionSetupFinished)
                 return;
 
