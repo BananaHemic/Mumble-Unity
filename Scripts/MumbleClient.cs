@@ -67,6 +67,11 @@ namespace Mumble
         /// <param name="newChannelID"></param>
         public delegate void OnChannelChangedMethod(Channel channelWereNowIn);
 
+        // Actions for non-main threaded events
+        public Action<uint> OnNewDecodeBufferThreaded;
+        public Action<uint> OnRemovedDecodeBufferThreaded;
+        public Action<uint> OnRecvAudioThreaded;
+
         public OnChannelChangedMethod OnChannelChanged;
         private MumbleTcpConnection _tcpConnection;
         private MumbleUdpConnection _udpConnection;
@@ -326,6 +331,8 @@ namespace Mumble
                 _mumbleAudioPlayers.Add(userState.Session, newPlayer);
                 newPlayer.Initialize(this, userState.Session);
             });
+            if (OnNewDecodeBufferThreaded != null)
+                OnNewDecodeBufferThreaded(userState.Session);
         }
         private void TryRemoveDecodingBuffer(UInt32 session)
         {
@@ -348,6 +355,8 @@ namespace Mumble
                         _audioPlayerDestroyer(session, oldAudioPlayer);
                     }
                 });
+                if (OnRemovedDecodeBufferThreaded != null)
+                    OnRemovedDecodeBufferThreaded(session);
             }
         }
         private void ReevaluateAllDecodingBuffers()
@@ -451,7 +460,12 @@ namespace Mumble
             //Debug.Log("Adding packet for session: " + session);
             AudioDecodingBuffer decodingBuffer;
             if (_audioDecodingBuffers.TryGetValue(session, out decodingBuffer))
+            {
                 decodingBuffer.AddEncodedPacket(sequence, data, isLast);
+
+                if (OnRecvAudioThreaded != null)
+                    OnRecvAudioThreaded(session);
+            }
             else
             {
                 // This is expected if the user joins a room where people are already talking
@@ -467,18 +481,18 @@ namespace Mumble
             else
                 return false;
         }
-        public void LoadArrayWithVoiceData(UInt32 session, float[] pcmArray, int offset, int length)
+        public int LoadArrayWithVoiceData(UInt32 session, float[] pcmArray, int offset, int length)
         {
             if (session == ServerSync.Session && !_debugValues.UseLocalLoopback)
-                return;
+                return 0;
             //Debug.Log("Will decode for " + session);
 
-            //TODO use bool to show if loading worked or not
             AudioDecodingBuffer decodingBuffer;
             if (_audioDecodingBuffers.TryGetValue(session, out decodingBuffer))
-                decodingBuffer.Read(pcmArray, offset, length);
+                return decodingBuffer.Read(pcmArray, offset, length);
             else
                 Debug.LogWarning("Decode buffer not found for session " + session);
+            return -1;
         }
         public bool JoinChannel(string channelToJoin)
         {
