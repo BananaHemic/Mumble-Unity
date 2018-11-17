@@ -71,6 +71,8 @@ namespace Mumble
         public Action<uint> OnNewDecodeBufferThreaded;
         public Action<uint> OnRemovedDecodeBufferThreaded;
         public Action<uint> OnRecvAudioThreaded;
+        public Action<Channel> OnChannelAddedThreaded;
+        public Action<Channel> OnChannelRemovedThreaded;
 
         public OnChannelChangedMethod OnChannelChanged;
         private MumbleTcpConnection _tcpConnection;
@@ -602,27 +604,45 @@ namespace Mumble
         internal void AddChannel(ChannelState channelToAdd)
         {
             // If the channel already exists, just copy over the non-null data
-            Channel existingChannel;
-            if (Channels.TryGetValue(channelToAdd.ChannelId, out existingChannel))
-                existingChannel.UpdateFromState(channelToAdd);
+            Channel channel;
+            bool isExistingChannel = Channels.TryGetValue(channelToAdd.ChannelId, out channel);
+
+            if (isExistingChannel)
+            {
+                channel.UpdateFromState(channelToAdd);
+            }
             else
-                Channels[channelToAdd.ChannelId] = new Channel(channelToAdd);
+            {
+                channel = new Channel(channelToAdd);
+                Channels[channelToAdd.ChannelId] = channel;
+            }
 
             // Update all the channel audio sharing settings
             // We can probably do this less, but we're cautious
             foreach(KeyValuePair<uint, Channel> kvp in Channels)
                 kvp.Value.UpdateSharedAudioChannels(Channels);
+
+            if (!isExistingChannel
+                && OnChannelAddedThreaded != null)
+                OnChannelAddedThreaded(channel);
         }
         internal void RemoveChannel(uint channelIdToRemove)
         {
             if (channelIdToRemove == OurUserState.ChannelId)
                 Debug.LogWarning("Removed current channel");
-            Channels.Remove(channelIdToRemove);
+
+            Channel channelToRemove;
+            if(Channels.TryGetValue(channelIdToRemove, out channelToRemove))
+                Channels.Remove(channelIdToRemove);
 
             // Update all the channel audio sharing settings
             // We can probably do this less, but we're cautious
             foreach(KeyValuePair<uint, Channel> kvp in Channels)
                 kvp.Value.UpdateSharedAudioChannels(Channels);
+
+            if (channelToRemove != null
+                && OnChannelRemovedThreaded != null)
+                OnChannelRemovedThreaded(channelToRemove);
         }
         /// <summary>
         /// Tell the encoder to send the last audio packet, then reset the sequence number
