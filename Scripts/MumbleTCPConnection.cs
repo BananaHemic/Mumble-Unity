@@ -266,6 +266,7 @@ namespace Mumble
                                 PrefixStyle.Fixed32BigEndian);
                             _validConnection = false;
                             Debug.LogError("Mumble server reject: " + reject.Reason);
+                            _mumbleClient.OnConnectionDisconnect();
                             // The server connection is over, so we return
                             return;
                         case MessageType.UserRemove:
@@ -293,8 +294,16 @@ namespace Mumble
                 catch (Exception ex)
                 {
                     if (ex is EndOfStreamException)
+                    {
                         Debug.LogError("EOS Exception: " + ex);//This happens when we connect again with the same username
-                                                               //These just means the app stopped, it's ok
+                        _mumbleClient.OnConnectionDisconnect();
+                    }
+                    else if (ex is IOException)
+                    {
+                        Debug.LogError("IO Exception: " + ex);
+                        _mumbleClient.OnConnectionDisconnect();
+                    }
+                   //These just means the app stopped, it's ok
                     else if (ex is ObjectDisposedException) { }
                     else if (ex is ThreadAbortException) { }
                     else

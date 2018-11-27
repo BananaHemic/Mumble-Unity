@@ -67,6 +67,8 @@ namespace Mumble
         /// <param name="newChannelID"></param>
         public delegate void OnChannelChangedMethod(Channel channelWereNowIn);
 
+        public delegate void OnDisconnectedMethod();
+
         // Actions for non-main threaded events
         public Action<uint> OnNewDecodeBufferThreaded;
         public Action<uint> OnRemovedDecodeBufferThreaded;
@@ -75,6 +77,7 @@ namespace Mumble
         public Action<Channel> OnChannelRemovedThreaded;
 
         public OnChannelChangedMethod OnChannelChanged;
+        public OnDisconnectedMethod OnDisconnected;
         private MumbleTcpConnection _tcpConnection;
         private MumbleUdpConnection _udpConnection;
         private DecodingBufferPool _decodingBufferPool;
@@ -258,10 +261,12 @@ namespace Mumble
                 {
                     Debug.Log("Our Channel changed! #" + newUserState.ChannelId);
                     //AllUsers[newUserState.Session].ChannelId = newUserState.ChannelId;
+                    Channel ourChannel = Channels[newUserState.ChannelId];
+
                     EventProcessor.Instance.QueueEvent(() =>
                     {
                         if (OnChannelChanged != null)
-                            OnChannelChanged(Channels[newUserState.ChannelId]);
+                            OnChannelChanged(ourChannel);
                     });
 
                     // Re-evaluate all users to see if they need decoding buffers
@@ -657,6 +662,21 @@ namespace Mumble
             if(_udpConnection != null)
                 return _udpConnection.GetLatestClientNonce();
             return null;
+        }
+        internal void OnConnectionDisconnect()
+        {
+            Debug.LogError("Mumble connection disconnected");
+            //TODO reset our internal state so that
+            // we can easily restart without making
+            // a new MumbleClient object
+            if (OnDisconnected != null)
+            {
+                EventProcessor.Instance.QueueEvent(() =>
+                {
+                    if (OnDisconnected != null)
+                        OnDisconnected();
+                });
+            }
         }
         public static int GetNearestSupportedSampleRate(int listedRate)
         {
