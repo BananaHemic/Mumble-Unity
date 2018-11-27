@@ -1,4 +1,4 @@
-﻿#define EVENT_DEBUG
+﻿//#define EVENT_DEBUG
 using UnityEngine;
 using System;
 using System.Collections.Generic;
