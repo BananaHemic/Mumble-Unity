@@ -105,8 +105,9 @@ namespace Mumble
 
                     if (isEmpty && !isLastPacket)
                     {
+                        // This should not normally occur
                         Thread.Sleep(Mumble.MumbleConstants.FRAME_SIZE_MS);
-                        //Debug.LogWarning("Empty Packet");
+                        Debug.LogWarning("Empty Packet");
                         continue;
                     }
                     if (isLastPacket)

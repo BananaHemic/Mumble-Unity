@@ -7,6 +7,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Threading;
 
 namespace Mumble
 {
@@ -17,6 +18,7 @@ namespace Mumble
         //TODO not certain on this
         public readonly ArraySegment<byte> EmptyByteSegment = new ArraySegment<byte>(new byte[0] {});
 
+        private readonly object _bufferLock = new System.Object();
         private volatile bool _isWaitingToSendLastPacket = false;
 
         /// <summary>
@@ -27,15 +29,16 @@ namespace Mumble
         /// <param name="targetId"></param>
         public void Add(PcmArray pcm, SpeechTarget target, uint targetId)
         {
-            lock (_unencodedBuffer)
+            lock (_bufferLock)
             {
                 _unencodedBuffer.Enqueue(new TargettedSpeech(pcm, target, targetId));
+                Monitor.Pulse(_bufferLock);
             }
         }
 
         public void Stop()
         {
-            lock (_unencodedBuffer)
+            lock (_bufferLock)
             {
                 //If we still have an item in the queue, mark the last one as last
                 _isWaitingToSendLastPacket = true;
@@ -46,6 +49,7 @@ namespace Mumble
                 }
                 else
                     Debug.Log("Marking last packet");
+                Monitor.Pulse(_bufferLock);
             }
         }
 
@@ -56,8 +60,14 @@ namespace Mumble
             PcmArray nextPcmToSend = null;
             ArraySegment<byte> encoder_buffer;
 
-            lock (_unencodedBuffer)
+
+            lock (_bufferLock)
             {
+                // Make sure we have data, or an end event
+                if (_unencodedBuffer.Count == 0)
+                    Monitor.Wait(_bufferLock);
+
+                // If there are still no unencoded buffers, then we return an empty packet
                 if (_unencodedBuffer.Count == 0)
                     isEmpty = true;
                 else
