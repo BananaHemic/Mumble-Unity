@@ -5,6 +5,7 @@ using System.Timers;
 using UnityEngine;
 using System.IO;
 using MumbleProto;
+using System.Threading;
 
 namespace Mumble
 {
@@ -13,15 +14,17 @@ namespace Mumble
         private readonly IPEndPoint _host;
         private readonly UdpClient _udpClient;
         private readonly MumbleClient _mumbleClient;
+        private readonly System.Object _sendLock = new System.Object();
         private MumbleTcpConnection _tcpConnection;
         private CryptState _cryptState;
-        private Timer _udpTimer;
+        private System.Timers.Timer _udpTimer;
         private bool _isConnected = false;
         internal volatile int NumPacketsSent = 0;
         internal volatile int NumPacketsRecv = 0;
         internal volatile bool _useTcp = false;
         // These are used for switching to TCP audio and back. Don't rely on them for anything else
         private volatile int _numPingsOutstanding = 0;
+        private Thread _receiveThread;
 
         internal MumbleUdpConnection(IPEndPoint host, MumbleClient mumbleClient)
         {
@@ -42,34 +45,46 @@ namespace Mumble
         internal void Connect()
         {
             //Debug.Log("Establishing UDP connection");
-            _cryptState = new CryptState();
-            _cryptState.CryptSetup = _mumbleClient.CryptSetup;
+            _cryptState = new CryptState
+            {
+                CryptSetup = _mumbleClient.CryptSetup
+            };
             _udpClient.Connect(_host);
             _isConnected = true;
 
-            _udpTimer = new Timer(MumbleConstants.PING_INTERVAL_MS);
+            _udpTimer = new System.Timers.Timer(MumbleConstants.PING_INTERVAL_MS);
             _udpTimer.Elapsed += RunPing;
             _udpTimer.Enabled = true;
 
             SendPing();
-            _udpClient.BeginReceive(ReceiveUdpMessage, null);
+            _receiveThread = new Thread(ReceiveUDP)
+            {
+                IsBackground = true
+            };
+            _receiveThread.Start();
         }
 
         private void RunPing(object sender, ElapsedEventArgs elapsedEventArgs)
         {
              SendPing();
         }
-        private void ReceiveUdpMessage(byte[] encrypted)
+        private void ReceiveUDP()
         {
-            ProcessUdpMessage(encrypted);
-            _udpClient.BeginReceive(ReceiveUdpMessage, null);
-        }
-        private void ReceiveUdpMessage(IAsyncResult res)
-        {
-            //Debug.Log("Received message");
-            IPEndPoint remoteIpEndPoint = _host;
-            byte[] encrypted = _udpClient.EndReceive(res, ref remoteIpEndPoint);
-            ReceiveUdpMessage(encrypted);
+            while (true)
+            {
+                try
+                {
+                    IPEndPoint remoteIpEndPoint = _host;
+                    byte[] encrypted = _udpClient.Receive(ref remoteIpEndPoint);
+                    ProcessUdpMessage(encrypted);
+                }catch(Exception ex)
+                {
+                    if (ex is ObjectDisposedException) { }
+                    else if (ex is ThreadAbortException) { }
+                    else
+                        Debug.LogError("Unhandled UDP receive error: " + ex);
+                }
+            }
         }
         internal void ProcessUdpMessage(byte[] encrypted)
         {
@@ -183,7 +198,7 @@ namespace Mumble
             }
             //Debug.Log(_numPingsSent - _numPingsReceived);
             _numPingsOutstanding++;
-            lock (_udpClient)
+            lock (_sendLock)
             {
                 _udpClient.Send(encryptedData, encryptedData.Length);
             }
@@ -191,9 +206,13 @@ namespace Mumble
 
         internal void Close()
         {
-            _udpClient.Close();
+            if (_receiveThread != null)
+                _receiveThread.Abort();
+            _receiveThread = null;
             if(_udpTimer != null)
                 _udpTimer.Close();
+            _udpTimer = null;
+            _udpClient.Close();
         }
         internal void SendVoicePacket(byte[] voicePacket)
         {
@@ -219,7 +238,7 @@ namespace Mumble
                 else
                 {
                     byte[] encrypted = _cryptState.Encrypt(voicePacket, voicePacket.Length);
-                    lock (_udpClient)
+                    lock (_sendLock)
                     {
                         _udpClient.Send(encrypted, encrypted.Length);
                     }

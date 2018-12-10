@@ -128,5 +128,10 @@ public class MumbleTester : MonoBehaviour {
             print("Will attempt to join channel " + ChannelToJoin);
             _mumbleClient.JoinChannel(ChannelToJoin);
         }
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            print("Will join root");
+            _mumbleClient.JoinChannel("Root");
+        }
 	}
 }
