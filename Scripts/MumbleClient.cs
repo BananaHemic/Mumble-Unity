@@ -505,6 +505,8 @@ namespace Mumble
         {
             if (OurUserState == null)
                 return false;
+            if (!ConnectionSetupFinished)
+                return false;
             Channel channel;
             if (!TryGetChannelByName(channelToJoin, out channel))
             {
@@ -542,7 +544,8 @@ namespace Mumble
         }
         internal void SetSelfMute(bool mute)
         {
-            if (OurUserState == null)
+            if (OurUserState == null
+                || !ConnectionSetupFinished)
             {
                 //Debug.Log("Setting pending self mute: " + mute);
                 _pendingMute = mute;
