@@ -12,8 +12,11 @@ namespace Mumble {
         /// <summary>
         /// Notification that a new audio sample is available for processing
         /// It will be called on the audio thread
+        /// It will contain the audio data, which you may want to process in
+        /// your own code, and it contains the percent of the data left
+        /// un-read
         /// </summary>
-        public Action<float[]> OnAudioSample;
+        public Action<float[], float> OnAudioSample;
 
         private MumbleClient _mumbleClient;
         private AudioSource _audioSource;
@@ -51,10 +54,11 @@ namespace Mumble {
             if (_mumbleClient == null || !_mumbleClient.ConnectionSetupFinished)
                 return;
 
-            _mumbleClient.LoadArrayWithVoiceData(Session, data, 0, data.Length);
+            int numRead = _mumbleClient.LoadArrayWithVoiceData(Session, data, 0, data.Length);
+            float percentUnderrun = 1f - numRead / data.Length;
 
             if (OnAudioSample != null)
-                OnAudioSample(data);
+                OnAudioSample(data, percentUnderrun);
 
             //Debug.Log("playing audio with avg: " + data.Average() + " and max " + data.Max());
             if (Gain == 1)
