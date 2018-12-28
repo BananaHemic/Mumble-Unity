@@ -67,6 +67,11 @@ namespace Mumble
         /// <param name="newChannelID"></param>
         public delegate void OnChannelChangedMethod(Channel channelWereNowIn);
 
+        /// <summary>
+        /// Delegate called when the mumble client disconnects
+        /// After this is called, you should be able to immediately
+        /// call Connect()
+        /// </summary>
         public delegate void OnDisconnectedMethod();
 
         // Actions for non-main threaded events
@@ -81,6 +86,7 @@ namespace Mumble
         private MumbleTcpConnection _tcpConnection;
         private MumbleUdpConnection _udpConnection;
         private DecodingBufferPool _decodingBufferPool;
+        private IPAddress[] _addresses;
         private readonly string _hostName;
         private readonly int _port;
         private ManageAudioSendBuffer _manageSendBuffer;
@@ -173,6 +179,13 @@ namespace Mumble
                 Init(addresses);
             }
         }
+        public string GetServerIP()
+        {
+            if (_addresses == null
+                || _addresses.Length < 1)
+                return null;
+            return _addresses[0].ToString(); 
+        }
         private void Init(IPAddress[] addresses)
         {
             //Debug.Log("Host addresses recv");
@@ -184,7 +197,8 @@ namespace Mumble
                     _hostName
                     );
             }
-            var endpoint = new IPEndPoint(addresses[0], _port);
+            _addresses = addresses;
+            var endpoint = new IPEndPoint(_addresses[0], _port);
             _decodingBufferPool = new DecodingBufferPool(_outputSampleRate, _outputChannelCount);
             _udpConnection = new MumbleUdpConnection(endpoint, this);
             _tcpConnection = new MumbleTcpConnection(endpoint, _hostName, _udpConnection.UpdateOcbServerNonce, _udpConnection, this);
@@ -669,11 +683,19 @@ namespace Mumble
         internal void OnConnectionDisconnect()
         {
             Debug.LogError("Mumble connection disconnected");
-            //TODO reset our internal state so that
-            // we can easily restart without making
-            // a new MumbleClient object
+            ReadyToConnect = false;
+            EventProcessor.Instance.QueueEvent(() =>
+            {
+                // Reset the internal state
+                Close();
+                Debug.Log("Closed");
+                Init(_addresses);
+                Debug.Log("Init");
+            });
+
             if (OnDisconnected != null)
             {
+                //Debug.Log("Sending disconnect");
                 EventProcessor.Instance.QueueEvent(() =>
                 {
                     if (OnDisconnected != null)
