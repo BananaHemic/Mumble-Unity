@@ -440,15 +440,15 @@ namespace Mumble
         }
         public void Close()
         {
+            if(_manageSendBuffer != null)
+                _manageSendBuffer.Dispose();
+            _manageSendBuffer = null;
             if(_tcpConnection != null)
                 _tcpConnection.Close();
             _tcpConnection = null;
             if(_udpConnection != null)
                 _udpConnection.Close();
             _udpConnection = null;
-            if(_manageSendBuffer != null)
-                _manageSendBuffer.Dispose();
-            _manageSendBuffer = null;
         }
         public void SendTextMessage(string textMessage)
         {
@@ -684,6 +684,15 @@ namespace Mumble
         {
             Debug.LogError("Mumble connection disconnected");
             ReadyToConnect = false;
+            ConnectionSetupFinished = false;
+            OurUserState = null;
+            RemoteVersion = null;
+            CryptSetup = null;
+            ServerSync = null;
+            CodecVersion = null;
+            PermissionQuery = null;
+            ServerConfig = null;
+
             EventProcessor.Instance.QueueEvent(() =>
             {
                 // Reset the internal state

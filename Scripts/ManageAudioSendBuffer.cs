@@ -13,6 +13,7 @@ namespace Mumble
         private readonly MumbleClient _mumbleClient;
         private readonly AutoResetEvent _waitHandle;
         private OpusEncoder _encoder;
+        private bool _isRunning;
 
         private Thread _encodingThread;
         private UInt32 sequenceIndex;
@@ -20,6 +21,7 @@ namespace Mumble
 
         public ManageAudioSendBuffer(MumbleUdpConnection udpConnection, MumbleClient mumbleClient)
         {
+            _isRunning = true;
             _udpConnection = udpConnection;
             _mumbleClient = mumbleClient;
             _pcmArrays = new List<PcmArray>();
@@ -82,8 +84,15 @@ namespace Mumble
         }
         public void Dispose()
         {
+            _isRunning = false;
+            _waitHandle.Set();
+
             if(_encodingThread != null)
                 _encodingThread.Abort();
+            _encodingThread = null;
+            if(_encoder != null)
+                _encoder.Dispose();
+            _encoder = null;
         }
         private void EncodingThreadEntry()
         {
@@ -94,12 +103,16 @@ namespace Mumble
 
             while (true)
             {
+                if(!_isRunning)
+                    return;
                 try
                 {
                     // Keep running until a stop has been requested and we've encoded the rest of the buffer
                     // Then wait for a new voice packet
                     while (_stopSendingRequested && isLastPacket)
                         _waitHandle.WaitOne();
+                    if(!_isRunning)
+                        return;
                     bool isEmpty;
                     ArraySegment<byte> packet = _encodingBuffer.Encode(_encoder, out isLastPacket, out isEmpty);
 
@@ -156,7 +169,6 @@ namespace Mumble
                 }
             }
             Debug.Log("Terminated encoding thread");
-            _encodingThread = null;
         }
     }
     /// <summary>
