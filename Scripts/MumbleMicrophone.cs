@@ -66,7 +66,10 @@ namespace Mumble
         {
             //Make sure the requested mic index exists
             if (Microphone.devices.Length <= MicNumberToUse)
+            {
+                Debug.LogWarning("No microphone connected!");
                 return -1;
+            }
 
             int minFreq;
             int maxFreq;
@@ -165,6 +168,10 @@ namespace Mumble
                     return true;
             }
             return currentSum / pcm.Length > minAmplitude;
+        }
+        public bool HasMic()
+        {
+            return _currentMic != null;
         }
         public void StartSendingAudio(int sampleRate)
         {
