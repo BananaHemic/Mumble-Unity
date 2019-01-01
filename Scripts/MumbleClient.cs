@@ -460,7 +460,7 @@ namespace Mumble
                 ChannelIds = new uint[] { OurUserState.ChannelId },
                 Actor = ServerSync.Session
             };
-            Debug.Log("Now session length = " + msg.Sessions.Length);
+            //Debug.Log("Now session length = " + msg.Sessions.Length);
 
             _tcpConnection.SendMessage(MessageType.TextMessage, msg);
         }
@@ -515,6 +515,13 @@ namespace Mumble
                 Debug.LogWarning("Decode buffer not found for session " + session);
             return -1;
         }
+        /// <summary>
+        /// Enter the current user into the provided channel
+        /// Keep in mind that there can be multiple channels with the same 
+        /// name
+        /// </summary>
+        /// <param name="channelToJoin">The name of the channel you want to join</param>
+        /// <returns>Whether joining was successful</returns>
         public bool JoinChannel(string channelToJoin)
         {
             if (OurUserState == null)
@@ -540,6 +547,7 @@ namespace Mumble
             _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
             return true;
         }
+
         /// <summary>
         /// Returns the dictionary of all user states
         /// NOTE: This is NOT a copy, so do not edit the returned dictionary
