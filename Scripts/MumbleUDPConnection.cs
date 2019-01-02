@@ -50,6 +50,10 @@ namespace Mumble
                 CryptSetup = _mumbleClient.CryptSetup
             };
             _udpClient.Connect(_host);
+            // I believe that I need to enable dontfragment in order to make
+            // sure that all packets received are received as discreet datagrams
+            _udpClient.DontFragment = true;
+
             _isConnected = true;
 
             _udpTimer = new System.Timers.Timer(MumbleConstants.PING_INTERVAL_MS);
@@ -70,13 +74,23 @@ namespace Mumble
         }
         private void ReceiveUDP()
         {
+            int prevPacketSize = 0;
             while (true)
             {
                 try
                 {
                     IPEndPoint remoteIpEndPoint = _host;
                     byte[] encrypted = _udpClient.Receive(ref remoteIpEndPoint);
-                    ProcessUdpMessage(encrypted);
+                    bool didProcess = ProcessUdpMessage(encrypted);
+                    if (!didProcess)
+                    {
+                        Debug.LogError("Failed decrypt of: " + encrypted.Length + " bytes. exclusive: "
+                            + _udpClient.ExclusiveAddressUse
+                            + " ttl:" + _udpClient.Ttl
+                            + " avail: " + _udpClient.Available
+                            + " prev pkt size:" + prevPacketSize);
+                    }
+                    prevPacketSize = encrypted.Length;
                 }catch(Exception ex)
                 {
                     if (ex is ObjectDisposedException) { }
@@ -86,7 +100,7 @@ namespace Mumble
                 }
             }
         }
-        internal void ProcessUdpMessage(byte[] encrypted)
+        internal bool ProcessUdpMessage(byte[] encrypted)
         {
             //Debug.Log("encrypted length: " + encrypted.Length);
             //TODO sometimes this fails and I have no idea why
@@ -94,7 +108,7 @@ namespace Mumble
             byte[] message = _cryptState.Decrypt(encrypted, encrypted.Length);
 
             if (message == null)
-                return;
+                return false;
 
             // figure out type of message
             int type = message[0] >> 5 & 0x7;
@@ -113,8 +127,9 @@ namespace Mumble
                     break;
                 default:
                     Debug.LogError("Not implemented: " + ((UDPType)type));
-                    break;
+                    return false;
             }
+            return true;
         }
         internal void OnPing(byte[] message)
         {
