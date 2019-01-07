@@ -18,7 +18,7 @@ namespace Mumble {
         public long NumPacketsLost { get; private set; }
         public bool HasFilledInitialBuffer { get; private set; }
         /// <summary>
-        /// How many samples have been decoded
+        /// How many samples are currently decoded
         /// </summary>
         private int _decodedCount;
         /// <summary>
@@ -42,6 +42,11 @@ namespace Mumble {
         /// </summary>
         private long _lastSequenceReceived;
 
+        private uint _numSamplesDroppedOverflow;
+        private uint _numSamplesDroppedConnection;
+        private uint _numSamplesRecv;
+
+
         private OpusDecoder _decoder;
 
         /// <summary>
@@ -49,6 +54,7 @@ namespace Mumble {
         /// Only used for debugging
         /// </summary>
         private string _name;
+        private uint _session;
 
         /// <summary>
         /// Has this buffer had to drop samples
@@ -83,10 +89,11 @@ namespace Mumble {
             _outputSampleRate = audioRate;
             _outputChannelCount = channelCount;
         }
-        public void Init(string name)
+        public void Init(string name, uint session)
         {
-            Debug.Log("Init decoding buffer for: " + name);
+            Debug.Log("Init decoding buffer for: " + name + " Session #" + session);
             _name = name;
+            _session = session;
         }
         public int Read(float[] buffer, int offset, int count)
         {
@@ -119,11 +126,11 @@ namespace Mumble {
             //Return silence if there was no data available
             if (readCount == 0)
             {
-                //Debug.LogWarning("Returning silence");
+                Debug.LogWarning("Returning silence");
                 Array.Clear(buffer, offset, count);
             } else if (readCount < count)
             {
-                //Debug.LogWarning("Buffer underrun: " + (count - readCount) + " samples. Asked: " + count + " provided: " + readCount + " numDec: " + _decodedCount);
+                Debug.LogWarning("Buffer underrun: " + (count - readCount) + " samples. Asked: " + count + " provided: " + readCount + " numDec: " + _decodedCount);
                 Array.Clear(buffer, offset + readCount, count - readCount);
             }
             else
@@ -137,9 +144,9 @@ namespace Mumble {
             return readCount;
         }
 
-        private BufferPacket? GetNextEncodedData()
+        private BufferPacket GetNextEncodedData()
         {
-            BufferPacket? packet = null;
+            BufferPacket packet = null;
             lock (_bufferLock)
             {
                 if (_encodedBuffer.Count > 0)
@@ -193,7 +200,7 @@ namespace Mumble {
         private bool FillBuffer()
         {
             var packet = GetNextEncodedData();
-            if (!packet.HasValue)
+            if (packet == null)
             {
                 //Debug.Log("empty");
                 return false;
@@ -205,10 +212,13 @@ namespace Mumble {
             if (_decodedBuffer[_nextBufferToDecodeInto] == null)
                 _decodedBuffer[_nextBufferToDecodeInto] = new float[SubBufferSize];
 
+            if (_numSamplesInBuffer[_nextBufferToDecodeInto] != 0)
+                Debug.LogWarning("Overwriting existing samples!");
+
             //Debug.Log("decoding " + packet.Value.Sequence + "  expected=" + _nextSequenceToDecode + " last=" + _lastReceivedSequence + " len=" + packet.Value.Data.Length);
             if (_nextSequenceToDecode != 0)
             {
-                long seqDiff = packet.Value.Sequence - _nextSequenceToDecode;
+                long seqDiff = packet.Sequence - _nextSequenceToDecode;
 
                 // If new packet is VERY late, then the sequence number has probably reset
                 if(seqDiff < -MaxMissingPackets)
@@ -218,45 +228,64 @@ namespace Mumble {
                 }
                 // If the packet came before we were expecting it to, but after the last packet, the sampling has probably changed
                 // unless the packet is a last packet (in which case the sequence may have only increased by 1)
-                else if (packet.Value.Sequence > _lastDecodedSequence && seqDiff < 0 && !packet.Value.IsLast)
+                else if (packet.Sequence > _lastDecodedSequence && seqDiff < 0 && !packet.IsLast)
                 {
                     Debug.Log("Mumble sample rate may have changed");
                 }
                 // If the sequence number changes abruptly (which happens with push to talk)
                 else if (seqDiff > MaxMissingPackets)
                 {
-                    Debug.Log("Mumble packet sequence changed abruptly pkt: " + packet.Value.Sequence + " last: " + _lastDecodedSequence);
+                    Debug.Log("Mumble packet sequence changed abruptly pkt: " + packet.Sequence + " last: " + _lastDecodedSequence);
                 }
                 // If the packet is a bit late, drop it
-                else if (seqDiff < 0 && !packet.Value.IsLast)
+                else if (seqDiff < 0 && !packet.IsLast)
                 {
-                    Debug.LogWarning("Received old packet " + packet.Value.Sequence + " expecting " + _nextSequenceToDecode);
+                    Debug.LogWarning("Received old packet " + packet.Sequence + " expecting " + _nextSequenceToDecode);
                     return false;
                 }
                 // If we missed a packet, add a null packet to tell the decoder what happened
                 else if (seqDiff > 0)
                 {
-                    Debug.LogWarning("dropped packet, recv: " + packet.Value.Sequence + ", expected " + _nextSequenceToDecode);
-                    NumPacketsLost += packet.Value.Sequence - _nextSequenceToDecode;
+                    NumPacketsLost += packet.Sequence - _nextSequenceToDecode;
                     int emptySampleNumRead =_decoder.Decode(null, _decodedBuffer[_nextBufferToDecodeInto]);
-                    _decodedCount += emptySampleNumRead;
-                    _numSamplesInBuffer[_nextBufferToDecodeInto] = emptySampleNumRead;
-                    _readOffsetInBuffer[_nextBufferToDecodeInto] = 0;
-                    _nextSequenceToDecode = packet.Value.Sequence + emptySampleNumRead / ((_outputSampleRate / 100) * _outputChannelCount);
-                    // Switch to the next decode buffer
-                    if (emptySampleNumRead > 0)
-                        _nextBufferToDecodeInto = (_nextBufferToDecodeInto + 1) % NumDecodedSubBuffers;
-                    else
-                        Debug.LogWarning("Failed reading null sample");
-                    if (_decodedBuffer[_nextBufferToDecodeInto] == null)
-                        _decodedBuffer[_nextBufferToDecodeInto] = new float[SubBufferSize];
+
+                    // This is expected for two cases:
+                    // 1) Packets were lost from the network being UDP
+                    // 2) Ping momentarily spiked, so we can a period w/o any packets, then a period 
+                    //  with too many packets
+                    Debug.LogWarning("dropped packet, recv: " + packet.Sequence + ", expected " + _nextSequenceToDecode
+                        + " total dropped from connection: " + _numSamplesDroppedConnection
+                        + " total dropped from overflow: " + _numSamplesDroppedOverflow
+                        + " total recv: " + _numSamplesRecv
+                        + " empty decode: " + emptySampleNumRead
+                        + " pkt lost before this one: " + packet.PrecededLostPkt);
+
+                    // If a packet was lost due to an overflow, then we shouldn't use the extra
+                    // decoded data. Otherwise, we'll keep having extra decoded audio and will
+                    // keep dropping data
+                    // So we only decode a null for network-based lost packets
+                    if (packet.PrecededLostPkt)
+                    {
+                        //Debug.Log("Added empty read to decoded buffer");
+                        _decodedCount += emptySampleNumRead;
+                        _numSamplesInBuffer[_nextBufferToDecodeInto] = emptySampleNumRead;
+                        _readOffsetInBuffer[_nextBufferToDecodeInto] = 0;
+                        _nextSequenceToDecode = packet.Sequence + emptySampleNumRead / ((_outputSampleRate / 100) * _outputChannelCount);
+                        // Switch to the next decode buffer
+                        if (emptySampleNumRead > 0)
+                            _nextBufferToDecodeInto = (_nextBufferToDecodeInto + 1) % NumDecodedSubBuffers;
+                        else
+                            Debug.LogWarning("Failed reading null sample");
+                        if (_decodedBuffer[_nextBufferToDecodeInto] == null)
+                            _decodedBuffer[_nextBufferToDecodeInto] = new float[SubBufferSize];
+                    }
                     //Debug.Log("Null read returned: " + emptySampleNumRead + " samples");
                 }
             }
 
             int numRead = 0;
-            if (packet.Value.Data.Length != 0)
-                numRead = _decoder.Decode(packet.Value.Data, _decodedBuffer[_nextBufferToDecodeInto]);
+            if (packet.Data.Length != 0)
+                numRead = _decoder.Decode(packet.Data, _decodedBuffer[_nextBufferToDecodeInto]);
             else
             {
                 //Debug.Log("empty packet data?");
@@ -276,9 +305,9 @@ namespace Mumble {
             _numSamplesInBuffer[_nextBufferToDecodeInto] = numRead;
             _readOffsetInBuffer[_nextBufferToDecodeInto] = 0;
             //Debug.Log("numRead = " + numRead);
-            _lastDecodedSequence = packet.Value.Sequence;
-            if (!packet.Value.IsLast)
-                _nextSequenceToDecode = packet.Value.Sequence + numRead / ((_outputSampleRate / 100) * _outputChannelCount);
+            _lastDecodedSequence = packet.Sequence;
+            if (!packet.IsLast)
+                _nextSequenceToDecode = packet.Sequence + numRead / ((_outputSampleRate / 100) * _outputChannelCount);
             else
             {
                 Debug.Log("Resetting " + _name + "'s decoder");
@@ -312,12 +341,16 @@ namespace Mumble {
                 return;
             }
             */
+            _numSamplesRecv++;
+            bool precededLostPkt = false;
             if(_lastSequenceReceived >= sequence)
             {
                 Debug.LogWarning("Non-increasing sequence, " + _lastSequenceReceived + "->" + sequence);
             }else if(sequence - _lastSequenceReceived != 2)
             {
                 Debug.LogWarning("Jump sequence, " + _lastSequenceReceived + "->" + sequence);
+                _numSamplesDroppedConnection++;
+                precededLostPkt = false;
             }
             _lastSequenceReceived = sequence;
 
@@ -325,7 +358,8 @@ namespace Mumble {
             {
                 Data = data,
                 Sequence = sequence,
-                IsLast = isLast
+                IsLast = isLast,
+                PrecededLostPkt = precededLostPkt
             };
 
             //Debug.Log("Adding #" + sequence);
@@ -334,10 +368,13 @@ namespace Mumble {
                 int count = _encodedBuffer.Count;
                 if (count > MumbleConstants.RECEIVED_PACKET_BUFFER_SIZE)
                 {
-                    // TODO this seems to happen at times
-                    Debug.LogWarning("Max recv buffer size reached, dropping for user " + _name + " seq: " + sequence);
+                    //Debug.LogWarning("Max recv buffer size reached, dropping for user " + _name + " seq: " + sequence + " session#" + _session + " has filled init buffer: " + HasFilledInitialBuffer);
+
                     _hasOverflowed = true;
-                    return;
+                    _numSamplesDroppedOverflow++;
+                    // Dequeue from the front so that we play the most
+                    // up to date audio
+                    _encodedBuffer.Dequeue();
                 }
 
                 _encodedBuffer.Enqueue(packet);
@@ -379,11 +416,22 @@ namespace Mumble {
             }
         }
 
-        private struct BufferPacket
+        private class BufferPacket
         {
             public byte[] Data;
             public long Sequence;
             public bool IsLast;
+            /// <summary>
+            /// Whether or not we lost a packet(s) before
+            /// receiving this one.
+            /// We track this so that we know whether or
+            /// not to fill in lost data.
+            /// If data was lost from network, we should
+            /// replace it, but if it was lost b/c of
+            /// an overflow, then we should not decode
+            /// extra data
+            /// </summary>
+            public bool PrecededLostPkt;
         }
     }
 }
