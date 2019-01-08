@@ -126,11 +126,11 @@ namespace Mumble {
             //Return silence if there was no data available
             if (readCount == 0)
             {
-                Debug.LogWarning("Returning silence");
+                //Debug.LogWarning("Returning silence");
                 Array.Clear(buffer, offset, count);
             } else if (readCount < count)
             {
-                Debug.LogWarning("Buffer underrun: " + (count - readCount) + " samples. Asked: " + count + " provided: " + readCount + " numDec: " + _decodedCount);
+                //Debug.LogWarning("Buffer underrun: " + (count - readCount) + " samples. Asked: " + count + " provided: " + readCount + " numDec: " + _decodedCount);
                 Array.Clear(buffer, offset + readCount, count - readCount);
             }
             else
@@ -253,7 +253,8 @@ namespace Mumble {
                     // 1) Packets were lost from the network being UDP
                     // 2) Ping momentarily spiked, so we can a period w/o any packets, then a period 
                     //  with too many packets
-                    Debug.LogWarning("dropped packet, recv: " + packet.Sequence + ", expected " + _nextSequenceToDecode
+                    Debug.LogWarning("Session #" + _session
+                        + " dropped packet, recv: " + packet.Sequence + ", expected " + _nextSequenceToDecode
                         + " total dropped from connection: " + _numSamplesDroppedConnection
                         + " total dropped from overflow: " + _numSamplesDroppedOverflow
                         + " total recv: " + _numSamplesRecv
@@ -345,10 +346,10 @@ namespace Mumble {
             bool precededLostPkt = false;
             if(_lastSequenceReceived >= sequence)
             {
-                Debug.LogWarning("Non-increasing sequence, " + _lastSequenceReceived + "->" + sequence);
+                //Debug.LogWarning("Non-increasing sequence, " + _lastSequenceReceived + "->" + sequence);
             }else if(sequence - _lastSequenceReceived != 2)
             {
-                Debug.LogWarning("Jump sequence, " + _lastSequenceReceived + "->" + sequence);
+                //Debug.LogWarning("Jump sequence, " + _lastSequenceReceived + "->" + sequence);
                 _numSamplesDroppedConnection++;
                 precededLostPkt = false;
             }
