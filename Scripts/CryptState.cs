@@ -18,6 +18,21 @@ namespace Mumble
         private int _late;
         private int _lost;
 
+        /// <summary>
+        /// In principal, I don't believe a lock is really
+        /// needed here, presuming that decryption / encryption
+        /// are handled in their own threads.
+        /// However, interacting with this script from multiple
+        /// threads seems to cause decode issues, specifically
+        /// Crypt 4 errors. My current belief is that under the
+        /// hood, Mono has special restrictions on AesManaged
+        /// for security, that end up causing issues with
+        /// threading. It may make sense to re-evaluate the
+        /// need for this lock with later versions of Unity.
+        /// This was last validated with Unity 2017.4.1
+        /// </summary>
+        private static readonly System.Object _cryptLock = new System.Object();
+
         // Used by Encrypt
         private readonly byte[] _enc_tag = new byte[AES_BLOCK_SIZE];
 
@@ -41,16 +56,19 @@ namespace Mumble
             get { return _cryptSetup; }
             set
             {
-                _cryptSetup = value;
-                var aesAlg = new AesManaged
+                lock (_cryptLock)
                 {
-                    BlockSize = AES_BLOCK_SIZE*8,
-                    Key = _cryptSetup.Key,
-                    Mode = CipherMode.ECB,
-                    Padding = PaddingMode.None
-                };
-                _encryptor = aesAlg.CreateEncryptor();
-                _decryptor = aesAlg.CreateDecryptor();
+                    _cryptSetup = value;
+                    var aesAlg = new AesManaged
+                    {
+                        BlockSize = AES_BLOCK_SIZE * 8,
+                        Key = _cryptSetup.Key,
+                        Mode = CipherMode.ECB,
+                        Padding = PaddingMode.None
+                    };
+                    _encryptor = aesAlg.CreateEncryptor();
+                    _decryptor = aesAlg.CreateDecryptor();
+                }
             }
         }
 
@@ -97,18 +115,22 @@ namespace Mumble
         // buffer + amount of useful bytes in buffer
         public byte[] Encrypt(byte[] inBytes, int length)
         {
-            for (int i = 0; i < AES_BLOCK_SIZE; i++)
-            {
-                if (++_cryptSetup.ClientNonce[i] != 0)
-                    break;
-            }
-
             var dst = new byte[length + 4];
-            OcbEncrypt(inBytes, length, dst, _cryptSetup.ClientNonce, _enc_tag, 4);
-            dst[0] = _cryptSetup.ClientNonce[0];
-            dst[1] = _enc_tag[0];
-            dst[2] = _enc_tag[1];
-            dst[3] = _enc_tag[2];
+
+            lock (_cryptLock)
+            {
+                for (int i = 0; i < AES_BLOCK_SIZE; i++)
+                {
+                    if (++_cryptSetup.ClientNonce[i] != 0)
+                        break;
+                }
+
+                OcbEncrypt(inBytes, length, dst, _cryptSetup.ClientNonce, _enc_tag, 4);
+                dst[0] = _cryptSetup.ClientNonce[0];
+                dst[1] = _enc_tag[0];
+                dst[2] = _enc_tag[1];
+                dst[3] = _enc_tag[2];
+            }
 
             return dst;
         }
@@ -162,130 +184,135 @@ namespace Mumble
                 Debug.LogError("Length less than 4, decryption failed");
                 return null;
             }
+            byte[] dst = null;
 
-            byte ivbyte = source[0];
-            bool restore = false;
-
-            int lost = 0;
-            int late = 0;
-
-            Array.Copy(_cryptSetup.ServerNonce, 0, _dec_saveiv, 0, AES_BLOCK_SIZE);
-
-            if (((_cryptSetup.ServerNonce[0] + 1) & 0xFF) == ivbyte)
+            lock (_cryptLock)
             {
-                // In order as expected.
-                if (ivbyte > _cryptSetup.ServerNonce[0])
+
+                byte ivbyte = source[0];
+                bool restore = false;
+
+                int lost = 0;
+                int late = 0;
+
+                Array.Copy(_cryptSetup.ServerNonce, 0, _dec_saveiv, 0, AES_BLOCK_SIZE);
+
+                if (((_cryptSetup.ServerNonce[0] + 1) & 0xFF) == ivbyte)
                 {
-                    _cryptSetup.ServerNonce[0] = ivbyte;
-                }
-                else if (ivbyte < _cryptSetup.ServerNonce[0])
-                {
-                    _cryptSetup.ServerNonce[0] = ivbyte;
-                    for (int i = 1; i < AES_BLOCK_SIZE; i++)
+                    // In order as expected.
+                    if (ivbyte > _cryptSetup.ServerNonce[0])
                     {
-                        if ((++_cryptSetup.ServerNonce[i]) != 0)
-                            break;
+                        _cryptSetup.ServerNonce[0] = ivbyte;
+                    }
+                    else if (ivbyte < _cryptSetup.ServerNonce[0])
+                    {
+                        _cryptSetup.ServerNonce[0] = ivbyte;
+                        for (int i = 1; i < AES_BLOCK_SIZE; i++)
+                        {
+                            if ((++_cryptSetup.ServerNonce[i]) != 0)
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogError("Crypt: 1");
+                        return null;
                     }
                 }
                 else
                 {
-                    Debug.LogError("Crypt: 1");
-                    return null;
-                }
-            }
-            else
-            {
-                // This is either out of order or a repeat.
-                int diff = ivbyte - _cryptSetup.ServerNonce[0];
-                if (diff > 128)
-                {
-                    diff = diff - 256;
-                }
-                else if (diff < -128)
-                {
-                    diff = diff + 256;
+                    // This is either out of order or a repeat.
+                    int diff = ivbyte - _cryptSetup.ServerNonce[0];
+                    if (diff > 128)
+                    {
+                        diff = diff - 256;
+                    }
+                    else if (diff < -128)
+                    {
+                        diff = diff + 256;
+                    }
+
+                    if ((ivbyte < _cryptSetup.ServerNonce[0]) && (diff > -30) && (diff < 0))
+                    {
+                        // Late packet, but no wraparound.
+                        late = 1;
+                        lost = -1;
+                        _cryptSetup.ServerNonce[0] = ivbyte;
+                        restore = true;
+                    }
+                    else if ((ivbyte > _cryptSetup.ServerNonce[0]) && (diff > -30) &&
+                             (diff < 0))
+                    {
+                        // Last was 0x02, here comes 0xff from last round
+                        late = 1;
+                        lost = -1;
+                        _cryptSetup.ServerNonce[0] = ivbyte;
+                        for (int i = 1; i < AES_BLOCK_SIZE; i++)
+                        {
+                            if ((_cryptSetup.ServerNonce[i]--) != 0)
+                                break;
+                        }
+                        restore = true;
+                    }
+                    else if ((ivbyte > _cryptSetup.ServerNonce[0]) && (diff > 0))
+                    {
+                        // Lost a few packets, but beyond that we're good.
+                        lost = ivbyte - _cryptSetup.ServerNonce[0] - 1;
+                        _cryptSetup.ServerNonce[0] = ivbyte;
+                    }
+                    else if ((ivbyte < _cryptSetup.ServerNonce[0]) && (diff > 0))
+                    {
+                        // Lost a few packets, and wrapped around
+                        lost = 256 - _cryptSetup.ServerNonce[0] + ivbyte - 1;
+                        _cryptSetup.ServerNonce[0] = ivbyte;
+                        for (int i = 1; i < AES_BLOCK_SIZE; i++)
+                        {
+                            if ((++_cryptSetup.ServerNonce[i]) != 0)
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        // Happens if the packets arrive out of order
+                        Debug.LogError("Crypt: 2");
+                        return null;
+                    }
+
+                    //TODO should ClientNonce end in 0?
+                    if (_decryptHistory[_cryptSetup.ServerNonce[0]] == _cryptSetup.ClientNonce[1])
+                    {
+                        Array.Copy(_dec_saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
+                        Debug.LogError("Crypt: 3");
+                        return null;
+                    }
                 }
 
-                if ((ivbyte < _cryptSetup.ServerNonce[0]) && (diff > -30) && (diff < 0))
-                {
-                    // Late packet, but no wraparound.
-                    late = 1;
-                    lost = -1;
-                    _cryptSetup.ServerNonce[0] = ivbyte;
-                    restore = true;
-                }
-                else if ((ivbyte > _cryptSetup.ServerNonce[0]) && (diff > -30) &&
-                         (diff < 0))
-                {
-                    // Last was 0x02, here comes 0xff from last round
-                    late = 1;
-                    lost = -1;
-                    _cryptSetup.ServerNonce[0] = ivbyte;
-                    for (int i = 1; i < AES_BLOCK_SIZE; i++)
-                    {
-                        if ((_cryptSetup.ServerNonce[i]--) != 0)
-                            break;
-                    }
-                    restore = true;
-                }
-                else if ((ivbyte > _cryptSetup.ServerNonce[0]) && (diff > 0))
-                {
-                    // Lost a few packets, but beyond that we're good.
-                    lost = ivbyte - _cryptSetup.ServerNonce[0] - 1;
-                    _cryptSetup.ServerNonce[0] = ivbyte;
-                }
-                else if ((ivbyte < _cryptSetup.ServerNonce[0]) && (diff > 0))
-                {
-                    // Lost a few packets, and wrapped around
-                    lost = 256 - _cryptSetup.ServerNonce[0] + ivbyte - 1;
-                    _cryptSetup.ServerNonce[0] = ivbyte;
-                    for (int i = 1; i < AES_BLOCK_SIZE; i++)
-                    {
-                        if ((++_cryptSetup.ServerNonce[i]) != 0)
-                            break;
-                    }
-                }
-                else
-                {
-                    // Happens if the packets arrive out of order
-                    Debug.LogError("Crypt: 2");
-                    return null;
-                }
+                int plainLength = length - 4;
+                dst = new byte[plainLength];
+                OcbDecrypt(source, plainLength, dst, _cryptSetup.ServerNonce, _dec_tag, 4);
 
-                //TODO should ClientNonce end in 0?
-                if (_decryptHistory[_cryptSetup.ServerNonce[0]] == _cryptSetup.ClientNonce[1])
+                if (_dec_tag[0] != source[1]
+                    || _dec_tag[1] != source[2]
+                    || _dec_tag[2] != source[3])
                 {
+
                     Array.Copy(_dec_saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
-                    Debug.LogError("Crypt: 3");
+                    Debug.LogError("Crypt: 4");
+                    //Debug.LogError("Crypt: 4 good:" + _good + " lost: " + _lost + " late: " + _late);
                     return null;
                 }
+                _decryptHistory[_cryptSetup.ServerNonce[0]] = _cryptSetup.ServerNonce[1];
+
+                if (restore)
+                {
+                    //Debug.Log("Restoring");
+                    Array.Copy(_dec_saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
+                }
+
+                _good++;
+                _late += late;
+                _lost += lost;
             }
-
-            int plainLength = length - 4;
-            var dst = new byte[plainLength];
-            OcbDecrypt(source, plainLength, dst, _cryptSetup.ServerNonce, _dec_tag, 4);
-
-            if (_dec_tag[0] != source[1]
-                || _dec_tag[1] != source[2]
-                || _dec_tag[2] != source[3])
-            {
-
-                Array.Copy(_dec_saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
-                Debug.LogError("Crypt: 4");
-                //Debug.LogError("Crypt: 4 good:" + _good + " lost: " + _lost + " late: " + _late);
-                return null;
-            }
-            _decryptHistory[_cryptSetup.ServerNonce[0]] = _cryptSetup.ServerNonce[1];
-
-            if (restore)
-            {
-                //Debug.Log("Restoring");
-                Array.Copy(_dec_saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
-            }
-
-            _good++;
-            _late += late;
-            _lost += lost;
 
             return dst;
         }
