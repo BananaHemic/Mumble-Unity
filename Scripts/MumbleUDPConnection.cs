@@ -11,6 +11,7 @@ namespace Mumble
 {
     public class MumbleUdpConnection
     {
+        const int MaxUDPSize = 0x10000;
         private readonly IPEndPoint _host;
         private readonly UdpClient _udpClient;
         private readonly MumbleClient _mumbleClient;
@@ -25,6 +26,8 @@ namespace Mumble
         // These are used for switching to TCP audio and back. Don't rely on them for anything else
         private volatile int _numPingsOutstanding = 0;
         private Thread _receiveThread;
+        private byte[] _recvBuffer;
+        private readonly byte[] _sendPingBuffer = new byte[9];
 
         internal MumbleUdpConnection(IPEndPoint host, MumbleClient mumbleClient)
         {
@@ -75,22 +78,34 @@ namespace Mumble
         private void ReceiveUDP()
         {
             int prevPacketSize = 0;
+            if (_recvBuffer == null)
+                _recvBuffer = new byte[MaxUDPSize];
+
+            EndPoint endPoint = (EndPoint)_host;
             while (true)
             {
                 try
                 {
-                    IPEndPoint remoteIpEndPoint = _host;
-                    byte[] encrypted = _udpClient.Receive(ref remoteIpEndPoint);
-                    bool didProcess = ProcessUdpMessage(encrypted);
+                    //IPEndPoint remoteIpEndPoint = _host;
+                    //byte[] encrypted = _udpClient.Receive(ref remoteIpEndPoint);
+                    //int readLen = encrypted.Length;
+
+                    // We receive the data into a pre-allocated buffer to avoid
+                    // needless allocations
+                    byte[] encrypted;
+                    int readLen = _udpClient.Client.ReceiveFrom(_recvBuffer, ref endPoint);
+                    encrypted = _recvBuffer;
+
+                    bool didProcess = ProcessUdpMessage(encrypted, readLen);
                     if (!didProcess)
                     {
-                        Debug.LogError("Failed decrypt of: " + encrypted.Length + " bytes. exclusive: "
+                        Debug.LogError("Failed decrypt of: " + readLen + " bytes. exclusive: "
                             + _udpClient.ExclusiveAddressUse
                             + " ttl:" + _udpClient.Ttl
                             + " avail: " + _udpClient.Available
                             + " prev pkt size:" + prevPacketSize);
                     }
-                    prevPacketSize = encrypted.Length;
+                    prevPacketSize = readLen;
                 }catch(Exception ex)
                 {
                     if (ex is ObjectDisposedException) { }
@@ -100,12 +115,12 @@ namespace Mumble
                 }
             }
         }
-        internal bool ProcessUdpMessage(byte[] encrypted)
+        internal bool ProcessUdpMessage(byte[] encrypted, int len)
         {
-            //Debug.Log("encrypted length: " + encrypted.Length);
+            //Debug.Log("encrypted length: " + len);
             //TODO sometimes this fails and I have no idea why
             //Debug.Log(encrypted[0] + " " + encrypted[1]);
-            byte[] message = _cryptState.Decrypt(encrypted, encrypted.Length);
+            byte[] message = _cryptState.Decrypt(encrypted, len);
 
             if (message == null)
                 return false;
@@ -126,7 +141,7 @@ namespace Mumble
                     OnPing(message);
                     break;
                 default:
-                    Debug.LogError("Not implemented: " + ((UDPType)type));
+                    Debug.LogError("Not implemented: " + ((UDPType)type) + " #" + type);
                     return false;
             }
             return true;
@@ -195,10 +210,9 @@ namespace Mumble
         {
             ulong unixTimeStamp = (ulong) (DateTime.UtcNow.Ticks - DateTime.Parse("01/01/1970 00:00:00").Ticks);
             byte[] timeBytes = BitConverter.GetBytes(unixTimeStamp);
-            var dgram = new byte[9];
-            timeBytes.CopyTo(dgram, 1);
-            dgram[0] = (1 << 5);
-            var encryptedData = _cryptState.Encrypt(dgram, timeBytes.Length + 1);
+            timeBytes.CopyTo(_sendPingBuffer, 1);
+            _sendPingBuffer[0] = (1 << 5);
+            var encryptedData = _cryptState.Encrypt(_sendPingBuffer, timeBytes.Length + 1);
 
             if (!_isConnected)
             {
@@ -245,8 +259,10 @@ namespace Mumble
                 if (_useTcp)
                 {
                     //Debug.Log("Using TCP!");
-                    UDPTunnel udpMsg = new UDPTunnel();
-                    udpMsg.Packet = voicePacket;
+                    UDPTunnel udpMsg = new UDPTunnel
+                    {
+                        Packet = voicePacket
+                    };
                     _tcpConnection.SendMessage(MessageType.UDPTunnel, udpMsg);
                     return;
                 }

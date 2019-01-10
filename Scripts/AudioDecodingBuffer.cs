@@ -346,12 +346,14 @@ namespace Mumble {
             bool precededLostPkt = false;
             if(_lastSequenceReceived >= sequence)
             {
-                //Debug.LogWarning("Non-increasing sequence, " + _lastSequenceReceived + "->" + sequence);
-            }else if(sequence - _lastSequenceReceived != 2)
+                Debug.LogWarning("Non-increasing sequence, " + _lastSequenceReceived + "->" + sequence);
+            }
+            else if(sequence - _lastSequenceReceived != 2
+                && _lastSequenceReceived != 0)
             {
-                //Debug.LogWarning("Jump sequence, " + _lastSequenceReceived + "->" + sequence);
+                Debug.LogWarning("Jump sequence, " + _lastSequenceReceived + "->" + sequence);
                 _numSamplesDroppedConnection++;
-                precededLostPkt = false;
+                precededLostPkt = true;
             }
             _lastSequenceReceived = sequence;
 
