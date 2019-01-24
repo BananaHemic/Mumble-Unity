@@ -241,7 +241,7 @@ namespace Mumble
             UserState userState;
             if (!AllUsers.TryGetValue(newUserState.Session, out userState))
             {
-                Debug.Log("New audio buffer with session: " + newUserState.Session + " name: " + newUserState.Name);
+                //Debug.Log("New audio buffer with session: " + newUserState.Session + " name: " + newUserState.Name);
                 AllUsers[newUserState.Session] = newUserState;
                 userState = newUserState;
             }
