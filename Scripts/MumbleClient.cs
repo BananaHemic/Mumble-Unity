@@ -97,7 +97,7 @@ namespace Mumble
         private readonly int _outputSampleRate;
         private readonly int _outputChannelCount;
         private readonly SpeakerCreationMode _speakerCreationMode;
-        private readonly int _positionalDataLength;
+        private readonly int _maxPositionalDataLength;
         // The mute that we're waiting to set
         // Either null, true, or false
         private bool? _pendingMute = null;
@@ -129,7 +129,7 @@ namespace Mumble
         public MumbleClient(string hostName, int port, AudioPlayerCreatorMethod createMumbleAudioPlayerMethod,
             AudioPlayerRemoverMethod removeMumbleAudioPlayerMethod, AnyUserStateChangedMethod anyChangeMethod=null,
             bool async=false, SpeakerCreationMode speakerCreationMode=SpeakerCreationMode.ALL,
-            DebugValues debugVals=null, int positionalDataLength=0)
+            DebugValues debugVals=null, int maxPositionalDataLength=0)
         {
             _hostName = hostName;
             _port = port;
@@ -137,7 +137,7 @@ namespace Mumble
             _audioPlayerDestroyer = removeMumbleAudioPlayerMethod;
             _speakerCreationMode = speakerCreationMode;
             _anyUserStateChange = anyChangeMethod;
-            _positionalDataLength = positionalDataLength;
+            _maxPositionalDataLength = maxPositionalDataLength;
 
             switch (AudioSettings.outputSampleRate)
             {
@@ -208,7 +208,7 @@ namespace Mumble
             _udpConnection = new MumbleUdpConnection(endpoint, this);
             _tcpConnection = new MumbleTcpConnection(endpoint, _hostName, _udpConnection.UpdateOcbServerNonce, _udpConnection, this);
             _udpConnection.SetTcpConnection(_tcpConnection);
-            _manageSendBuffer = new ManageAudioSendBuffer(_udpConnection, this, _positionalDataLength);
+            _manageSendBuffer = new ManageAudioSendBuffer(_udpConnection, this, _maxPositionalDataLength);
             ReadyToConnect = true;
         }
         private void OnHostRecv(IAsyncResult result)

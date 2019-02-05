@@ -78,7 +78,7 @@ public class MumbleTester : MonoBehaviour {
     /// of if the user is speaking
     /// </summary>
     /// <param name="posData"></param>
-    private void WritePositionalData(ref byte[] posData)
+    private void WritePositionalData(ref byte[] posData, ref int posDataLength)
     {
         // Get the XYZ position of the camera
         Vector3 pos = Camera.main.transform.position;
@@ -90,6 +90,8 @@ public class MumbleTester : MonoBehaviour {
         Buffer.BlockCopy(BitConverter.GetBytes(pos.y), 0, posData, dstOffset, sizeof(float));
         dstOffset += sizeof(float);
         Buffer.BlockCopy(BitConverter.GetBytes(pos.z), 0, posData, dstOffset, sizeof(float));
+
+        posDataLength = 3 * sizeof(float);
         // The reverse method is in MumbleExamplePositionDisplay
     }
     IEnumerator ConnectAsync()

@@ -26,7 +26,7 @@ namespace Mumble
         /// The length of the positional data is configured in MumbleClient
         /// </summary>
         /// <param name="positionalData"></param>
-        public delegate void WritePositionalData(ref byte[] positionalData);
+        public delegate void WritePositionalData(ref byte[] positionalData, ref int posDataLength);
 
         public bool SendAudioOnStart = true;
         public int MicNumberToUse;
@@ -144,7 +144,9 @@ namespace Mumble
                         if (OnMicData != null)
                             OnMicData(newData);
                         if (_writePositionalDataFunc != null)
-                            _writePositionalDataFunc(ref newData.PositionalData);
+                            _writePositionalDataFunc(ref newData.PositionalData, ref newData.PositionalDataLength);
+                        else
+                            newData.PositionalDataLength = 0;
                         _mumbleClient.SendVoicePacket(newData);
                     }
                     else
@@ -157,7 +159,9 @@ namespace Mumble
                         if (OnMicData != null)
                             OnMicData(newData);
                         if (_writePositionalDataFunc != null)
-                            _writePositionalDataFunc(ref newData.PositionalData);
+                            _writePositionalDataFunc(ref newData.PositionalData, ref newData.PositionalDataLength);
+                        else
+                            newData.PositionalDataLength = 0;
                         _mumbleClient.SendVoicePacket(newData);
                         // If this is the sample before the hold turns off, stop sending after it's sent
                         if (_totalNumSamplesSent + NumSamplesPerOutgoingPacket > _sampleNumberOfLastMinAmplitudeVoice + _voiceHoldSamples)
@@ -169,7 +173,9 @@ namespace Mumble
                     if (OnMicData != null)
                         OnMicData(newData);
                     if (_writePositionalDataFunc != null)
-                        _writePositionalDataFunc(ref newData.PositionalData);
+                        _writePositionalDataFunc(ref newData.PositionalData, ref newData.PositionalDataLength);
+                    else
+                        newData.PositionalDataLength = 0;
                     _mumbleClient.SendVoicePacket(newData);
                 }
             }

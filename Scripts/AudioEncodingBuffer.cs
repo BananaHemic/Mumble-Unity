@@ -89,6 +89,7 @@ namespace Mumble
 
             encoder_buffer = isEmpty ? EmptyByteSegment : encoder.Encode(nextPcmToSend.Pcm);
             byte[] pos = nextPcmToSend == null ? null : nextPcmToSend.PositionalData;
+            int posLen = nextPcmToSend == null ? 0 : nextPcmToSend.PositionalDataLength;
 
             if (nextPcmToSend != null)
                 nextPcmToSend.UnRef();
@@ -103,7 +104,8 @@ namespace Mumble
             CompressedBuffer compressedBuffer = new CompressedBuffer
             {
                 EncodedData = encoder_buffer,
-                PositionalData = pos
+                PositionalData = pos,
+                PositionalDataLength = posLen
             };
             return compressedBuffer;
         }
@@ -112,6 +114,7 @@ namespace Mumble
         {
             public ArraySegment<byte> EncodedData;
             public byte[] PositionalData;
+            public int PositionalDataLength;
         }
 
         /// <summary>

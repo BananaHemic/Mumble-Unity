@@ -18,9 +18,9 @@ namespace Mumble
         private Thread _encodingThread;
         private UInt32 sequenceIndex;
         private bool _stopSendingRequested = false;
-        private int _positionalLength;
+        private int _maxPositionalLength;
 
-        public ManageAudioSendBuffer(MumbleUdpConnection udpConnection, MumbleClient mumbleClient, int positionalLength)
+        public ManageAudioSendBuffer(MumbleUdpConnection udpConnection, MumbleClient mumbleClient, int maxPositionalLength)
         {
             _isRunning = true;
             _udpConnection = udpConnection;
@@ -28,7 +28,7 @@ namespace Mumble
             _pcmArrays = new List<PcmArray>();
             _encodingBuffer = new AudioEncodingBuffer();
             _waitHandle = new AutoResetEvent(false);
-            _positionalLength = positionalLength;
+            _maxPositionalLength = maxPositionalLength;
         }
         internal void InitForSampleRate(int sampleRate)
         {
@@ -63,7 +63,7 @@ namespace Mumble
                     return ray;
                 }
             }
-            PcmArray newArray = new PcmArray(_mumbleClient.NumSamplesPerOutgoingPacket, _pcmArrays.Count, _positionalLength);
+            PcmArray newArray = new PcmArray(_mumbleClient.NumSamplesPerOutgoingPacket, _pcmArrays.Count, _maxPositionalLength);
             _pcmArrays.Add(newArray);
 
             if(_pcmArrays.Count > 10)
@@ -129,7 +129,6 @@ namespace Mumble
                         Debug.Log("Will send last packet");
 
                     ArraySegment<byte> packet = buff.EncodedData;
-                    int posLengthBytes = buff.PositionalData == null ? 0 : buff.PositionalData.Length;
 
                     //Make the header
                     byte type = (byte)4;
@@ -148,7 +147,7 @@ namespace Mumble
                     byte[] opusHeader = Var64.writeVarint64_alternative(opusHeaderNum);
                     //Packet:
                     //[type/target] [sequence] [opus length header] [packet data]
-                    byte[] finalPacket = new byte[1 + sequence.Length + opusHeader.Length + packet.Count + posLengthBytes];
+                    byte[] finalPacket = new byte[1 + sequence.Length + opusHeader.Length + packet.Count + buff.PositionalDataLength];
                     finalPacket[0] = type;
                     int finalOffset = 1;
                     Array.Copy(sequence, 0, finalPacket, finalOffset, sequence.Length);
@@ -158,8 +157,8 @@ namespace Mumble
                     Array.Copy(packet.Array, packet.Offset, finalPacket, finalOffset, packet.Count);
                     finalOffset += packet.Count;
                     // Append positional data, if it exists
-                    if(posLengthBytes > 0)
-                        Array.Copy(buff.PositionalData, 0, finalPacket, finalOffset, buff.PositionalData.Length);
+                    if(buff.PositionalDataLength > 0)
+                        Array.Copy(buff.PositionalData, 0, finalPacket, finalOffset, buff.PositionalDataLength);
 
                     //Debug.Log("seq: " + sequenceIndex + " | " + finalPacket.Length);
                     _udpConnection.SendVoicePacket(finalPacket);
@@ -193,13 +192,14 @@ namespace Mumble
         public readonly int Index;
         public float[] Pcm;
         public byte[] PositionalData;
+        public int PositionalDataLength;
         internal int _refCount;
 
-        public PcmArray(int pcmLength, int index, int positionLengthBytes)
+        public PcmArray(int pcmLength, int index, int maxPositionLengthBytes)
         {
             Pcm = new float[pcmLength];
-            if(positionLengthBytes > 0)
-                PositionalData = new byte[positionLengthBytes];
+            if(maxPositionLengthBytes > 0)
+                PositionalData = new byte[maxPositionLengthBytes];
             Index = index;
             _refCount = 1;
         }
