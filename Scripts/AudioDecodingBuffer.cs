@@ -41,11 +41,17 @@ namespace Mumble {
         /// The last sequence we received
         /// </summary>
         private long _lastSequenceReceived;
+        /// <summary>
+        /// The audio DSP time when we last dequeued a buffer
+        /// </summary>
+        private double _lastBufferTime;
+        private byte[] _previousPosData;
+        private byte[] _nextPosData;
+        private readonly object _posLock = new object();
 
         private uint _numSamplesDroppedOverflow;
         private uint _numSamplesDroppedConnection;
         private uint _numSamplesRecv;
-
 
         private OpusDecoder _decoder;
 
@@ -144,6 +150,17 @@ namespace Mumble {
             return readCount;
         }
 
+        public void GetPreviousNextPositionData(out byte[] previousPos, out byte[] nextPos,
+            out double previousAudioDSP)
+        {
+            lock (_posLock)
+            {
+                previousPos = _previousPosData;
+                nextPos = _nextPosData;
+                previousAudioDSP = _lastBufferTime;
+            }
+        }
+
         private BufferPacket GetNextEncodedData()
         {
             BufferPacket packet = null;
@@ -204,6 +221,19 @@ namespace Mumble {
             {
                 //Debug.Log("empty");
                 return false;
+            }
+            // If we have a packet, let's update the positions
+            lock (_posLock)
+            {
+                _lastBufferTime = AudioSettings.dspTime;
+                _previousPosData = packet.PosData;
+                _nextPosData = null;
+                // try to load the next buffer
+                lock (_bufferLock)
+                {
+                    if (_encodedBuffer.Count > 0)
+                        _nextPosData = _encodedBuffer.Peek().PosData;
+                }
             }
             // Don't make the decoder unless we know that we'll have to
             if(_decoder == null)
@@ -331,8 +361,9 @@ namespace Mumble {
         /// </summary>
         /// <param name="sequence">Sequence number of this packet</param>
         /// <param name="data">The encoded audio packet</param>
+        /// <param name="posData">The raw positional data</param>
         /// <param name="codec">The codec to use to decode this packet</param>
-        public void AddEncodedPacket(long sequence, byte[] data, bool isLast)
+        public void AddEncodedPacket(long sequence, byte[] data, byte[] posData, bool isLast)
         {
             /* TODO this messes up when we hit configure in the desktop mumble app. The sequence number drops to 0
             //If the next seq we expect to decode comes after this packet we've already missed our opportunity!
@@ -360,6 +391,7 @@ namespace Mumble {
             BufferPacket packet = new BufferPacket
             {
                 Data = data,
+                PosData = posData,
                 Sequence = sequence,
                 IsLast = isLast,
                 PrecededLostPkt = precededLostPkt
@@ -384,6 +416,12 @@ namespace Mumble {
                 if (!HasFilledInitialBuffer && (count + 1 >= InitialSampleBuffer))
                     HasFilledInitialBuffer = true;
                 //Debug.Log("Count is now: " + _encodedBuffer.Count);
+            }
+            // Make sure the next position data is loaded
+            lock (_posLock)
+            {
+                if (_nextPosData == null)
+                    _nextPosData = packet.PosData;
             }
         }
 
@@ -422,6 +460,7 @@ namespace Mumble {
         private class BufferPacket
         {
             public byte[] Data;
+            public byte[] PosData;
             public long Sequence;
             public bool IsLast;
             /// <summary>

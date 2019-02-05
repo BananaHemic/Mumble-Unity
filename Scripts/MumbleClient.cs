@@ -97,6 +97,7 @@ namespace Mumble
         private readonly int _outputSampleRate;
         private readonly int _outputChannelCount;
         private readonly SpeakerCreationMode _speakerCreationMode;
+        private readonly int _positionalDataLength;
         // The mute that we're waiting to set
         // Either null, true, or false
         private bool? _pendingMute = null;
@@ -116,8 +117,8 @@ namespace Mumble
         internal PermissionQuery PermissionQuery { get; set; }
         internal ServerConfig ServerConfig { get; set; }
 
-        internal int EncoderSampleRate { get; private set; }
-        internal int NumSamplesPerOutgoingPacket { get; private set; }
+        public int EncoderSampleRate { get; private set; }
+        public int NumSamplesPerOutgoingPacket { get; private set; }
 
         //The Mumble version of this integration
         public const string ReleaseName = "MumbleUnity";
@@ -125,7 +126,10 @@ namespace Mumble
         public const uint Minor = 2;
         public const uint Patch = 8;
 
-        public MumbleClient(string hostName, int port, AudioPlayerCreatorMethod createMumbleAudioPlayerMethod, AudioPlayerRemoverMethod removeMumbleAudioPlayerMethod, AnyUserStateChangedMethod anyChangeMethod=null, bool async=false, SpeakerCreationMode speakerCreationMode=SpeakerCreationMode.ALL, DebugValues debugVals=null)
+        public MumbleClient(string hostName, int port, AudioPlayerCreatorMethod createMumbleAudioPlayerMethod,
+            AudioPlayerRemoverMethod removeMumbleAudioPlayerMethod, AnyUserStateChangedMethod anyChangeMethod=null,
+            bool async=false, SpeakerCreationMode speakerCreationMode=SpeakerCreationMode.ALL,
+            DebugValues debugVals=null, int positionalDataLength=0)
         {
             _hostName = hostName;
             _port = port;
@@ -133,6 +137,7 @@ namespace Mumble
             _audioPlayerDestroyer = removeMumbleAudioPlayerMethod;
             _speakerCreationMode = speakerCreationMode;
             _anyUserStateChange = anyChangeMethod;
+            _positionalDataLength = positionalDataLength;
 
             switch (AudioSettings.outputSampleRate)
             {
@@ -203,7 +208,7 @@ namespace Mumble
             _udpConnection = new MumbleUdpConnection(endpoint, this);
             _tcpConnection = new MumbleTcpConnection(endpoint, _hostName, _udpConnection.UpdateOcbServerNonce, _udpConnection, this);
             _udpConnection.SetTcpConnection(_tcpConnection);
-            _manageSendBuffer = new ManageAudioSendBuffer(_udpConnection, this);
+            _manageSendBuffer = new ManageAudioSendBuffer(_udpConnection, this, _positionalDataLength);
             ReadyToConnect = true;
         }
         private void OnHostRecv(IAsyncResult result)
@@ -211,7 +216,7 @@ namespace Mumble
             IPAddress[] addresses = Dns.EndGetHostAddresses(result);
             Init(addresses);
         }
-        internal void AddMumbleMic(MumbleMicrophone newMic)
+        public void AddMumbleMic(MumbleMicrophone newMic)
         {
             _mumbleMic = newMic;
             _mumbleMic.Initialize(this);
@@ -227,7 +232,7 @@ namespace Mumble
         {
             return _manageSendBuffer.GetAvailablePcmArray();
         }
-        internal UserState GetUserFromSession(uint session)
+        public UserState GetUserFromSession(uint session)
         {
             UserState state = null;
             if(!AllUsers.TryGetValue(session, out state))
@@ -476,13 +481,13 @@ namespace Mumble
             if(_manageSendBuffer != null)
                 _manageSendBuffer.SendVoice(floatData, SpeechTarget.Normal, 0);
         }
-        public void ReceiveEncodedVoice(UInt32 session, byte[] data, long sequence, bool isLast)
+        public void ReceiveEncodedVoice(UInt32 session, byte[] data, byte[] posData, long sequence, bool isLast)
         {
             //Debug.Log("Adding packet for session: " + session);
             AudioDecodingBuffer decodingBuffer;
             if (_audioDecodingBuffers.TryGetValue(session, out decodingBuffer))
             {
-                decodingBuffer.AddEncodedPacket(sequence, data, isLast);
+                decodingBuffer.AddEncodedPacket(sequence, data, posData, isLast);
 
                 if (OnRecvAudioThreaded != null)
                     OnRecvAudioThreaded(session);
@@ -514,6 +519,32 @@ namespace Mumble
             else
                 Debug.LogWarning("Decode buffer not found for session " + session);
             return -1;
+        }
+        public bool LoadArraysWithPositions(UInt32 session, out byte[] previousPosData,
+            out byte[] nextPositionData, out double previousAudioDspTime)
+        {
+            // We don't currently allow reading position from self
+            if (session == ServerSync.Session)
+            {
+                previousPosData = null;
+                nextPositionData = null;
+                previousAudioDspTime = 0;
+                return false;
+            }
+
+            AudioDecodingBuffer decodingBuffer;
+            if (!_audioDecodingBuffers.TryGetValue(session, out decodingBuffer))
+            {
+                Debug.LogWarning("Decode buffer for position not found for session " + session);
+                previousPosData = null;
+                nextPositionData = null;
+                previousAudioDspTime = 0;
+                return false;
+            }
+
+            decodingBuffer.GetPreviousNextPositionData(out previousPosData,
+                out nextPositionData, out previousAudioDspTime);
+            return true;
         }
         /// <summary>
         /// Enter the current user into the provided channel
@@ -564,7 +595,7 @@ namespace Mumble
         {
             return Channels;
         }
-        internal void SetSelfMute(bool mute)
+        public void SetSelfMute(bool mute)
         {
             if (OurUserState == null
                 || !ConnectionSetupFinished)

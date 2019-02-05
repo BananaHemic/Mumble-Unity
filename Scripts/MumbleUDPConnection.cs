@@ -86,6 +86,9 @@ namespace Mumble
             {
                 try
                 {
+                    // This should only happen on exit
+                    if (_udpClient == null)
+                        return;
                     //IPEndPoint remoteIpEndPoint = _host;
                     //byte[] encrypted = _udpClient.Receive(ref remoteIpEndPoint);
                     //int readLen = encrypted.Length;
@@ -174,7 +177,6 @@ namespace Mumble
 
                 Int64 sequence = reader.ReadVarInt64();
 
-
                 //We assume we mean OPUS
                 int size = (int)reader.ReadVarInt64();
                 //Debug.Log("Seq = " + sequence + " Ses: " + session + " Size " + size + " type= " + typeByte + " tar= " + target);
@@ -198,12 +200,15 @@ namespace Mumble
                     return;
                 }
 
+                // All remaining bytes are assumed to be positional data
+                byte[] posData = null;
                 long remaining = reader.GetRemainingBytes();
                 if(remaining != 0)
                 {
-                    Debug.LogWarning("We have " + remaining + " bytes!");
+                    //Debug.LogWarning("We have " + remaining + " bytes!");
+                    posData = reader.ReadBytes((int)remaining);
                 }
-                _mumbleClient.ReceiveEncodedVoice(session, data, sequence, isLast);
+                _mumbleClient.ReceiveEncodedVoice(session, data, posData, sequence, isLast);
             }
         }
         internal void SendPing()

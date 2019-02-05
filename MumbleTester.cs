@@ -14,12 +14,17 @@ using Mumble;
 
 public class MumbleTester : MonoBehaviour {
 
+    // Basic mumble audio player
     public GameObject MyMumbleAudioPlayerPrefab;
+    // Mumble audio player that also receives position commands
+    public GameObject MyMumbleAudioPlayerPositionedPrefab;
+
     public MumbleMicrophone MyMumbleMic;
     public DebugValues DebuggingVariables;
 
     private MumbleClient _mumbleClient;
     public bool ConnectAsyncronously = true;
+    public bool SendPosition = false;
     public string HostName = "1.2.3.4";
     public int Port = 64738;
     public string Username = "ExampleUser";
@@ -34,7 +39,13 @@ public class MumbleTester : MonoBehaviour {
             return;
         }
         Application.runInBackground = true;
-        _mumbleClient = new MumbleClient(HostName, Port, CreateMumbleAudioPlayerFromPrefab, DestroyMumbleAudioPlayer, OnOtherUserStateChange, ConnectAsyncronously, SpeakerCreationMode.ALL, DebuggingVariables);
+        // If SendPosition, we'll send three floats.
+        // This is roughly the standard for Mumble, however it seems that
+        // Murmur supports more
+        int posLength = SendPosition ? 3 * sizeof(float) : 0;
+        _mumbleClient = new MumbleClient(HostName, Port, CreateMumbleAudioPlayerFromPrefab,
+            DestroyMumbleAudioPlayer, OnOtherUserStateChange, ConnectAsyncronously,
+            SpeakerCreationMode.ALL, DebuggingVariables, posLength);
 
         if (DebuggingVariables.UseRandomUsername)
             Username += UnityEngine.Random.Range(0, 100f);
@@ -45,7 +56,11 @@ public class MumbleTester : MonoBehaviour {
         {
             _mumbleClient.Connect(Username, Password);
             if(MyMumbleMic != null)
+            {
                 _mumbleClient.AddMumbleMic(MyMumbleMic);
+                if (SendPosition)
+                    MyMumbleMic.SetPositionalDataFunction(WritePositionalData);
+            }
         }
 
 #if UNITY_EDITOR
@@ -57,6 +72,26 @@ public class MumbleTester : MonoBehaviour {
         }
 #endif
     }
+    /// <summary>
+    /// An example of how to serialize the positional data that you're interested in
+    /// NOTE: this function, in the current implementation, is called regardless
+    /// of if the user is speaking
+    /// </summary>
+    /// <param name="posData"></param>
+    private void WritePositionalData(ref byte[] posData)
+    {
+        // Get the XYZ position of the camera
+        Vector3 pos = Camera.main.transform.position;
+        //Debug.Log("Sending pos: " + pos);
+        // Copy the XYZ floats into our positional array
+        int dstOffset = 0;
+        Buffer.BlockCopy(BitConverter.GetBytes(pos.x), 0, posData, dstOffset, sizeof(float));
+        dstOffset += sizeof(float);
+        Buffer.BlockCopy(BitConverter.GetBytes(pos.y), 0, posData, dstOffset, sizeof(float));
+        dstOffset += sizeof(float);
+        Buffer.BlockCopy(BitConverter.GetBytes(pos.z), 0, posData, dstOffset, sizeof(float));
+        // The reverse method is in MumbleExamplePositionDisplay
+    }
     IEnumerator ConnectAsync()
     {
         while (!_mumbleClient.ReadyToConnect)
@@ -65,13 +100,20 @@ public class MumbleTester : MonoBehaviour {
         _mumbleClient.Connect(Username, Password);
         yield return null;
         if(MyMumbleMic != null)
+        {
             _mumbleClient.AddMumbleMic(MyMumbleMic);
+            if (SendPosition)
+                MyMumbleMic.SetPositionalDataFunction(WritePositionalData);
+        }
     }
     private MumbleAudioPlayer CreateMumbleAudioPlayerFromPrefab(string username, uint session)
     {
         // Depending on your use case, you might want to add the prefab to an existing object (like someone's head)
         // If you have users entering and leaving frequently, you might want to implement an object pool
-        GameObject newObj = GameObject.Instantiate(MyMumbleAudioPlayerPrefab);
+        GameObject newObj = SendPosition
+            ? GameObject.Instantiate(MyMumbleAudioPlayerPositionedPrefab)
+            : GameObject.Instantiate(MyMumbleAudioPlayerPrefab);
+
         newObj.name = username + "_MumbleAudioPlayer";
         MumbleAudioPlayer newPlayer = newObj.GetComponent<MumbleAudioPlayer>();
         Debug.Log("Adding audio player for: " + username);

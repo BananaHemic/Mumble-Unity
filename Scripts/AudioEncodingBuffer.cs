@@ -53,7 +53,7 @@ namespace Mumble
             }
         }
 
-        public ArraySegment<byte> Encode(OpusEncoder encoder, out bool isStop, out bool isEmpty)
+        public CompressedBuffer Encode(OpusEncoder encoder, out bool isStop, out bool isEmpty)
         {
             isStop = false;
             isEmpty = false;
@@ -88,6 +88,7 @@ namespace Mumble
                 isEmpty = true;
 
             encoder_buffer = isEmpty ? EmptyByteSegment : encoder.Encode(nextPcmToSend.Pcm);
+            byte[] pos = nextPcmToSend == null ? null : nextPcmToSend.PositionalData;
 
             if (nextPcmToSend != null)
                 nextPcmToSend.UnRef();
@@ -97,7 +98,20 @@ namespace Mumble
                 Debug.Log("Resetting encoder state");
                 encoder.ResetState();
             }
-            return encoder_buffer;
+
+
+            CompressedBuffer compressedBuffer = new CompressedBuffer
+            {
+                EncodedData = encoder_buffer,
+                PositionalData = pos
+            };
+            return compressedBuffer;
+        }
+
+        public struct CompressedBuffer
+        {
+            public ArraySegment<byte> EncodedData;
+            public byte[] PositionalData;
         }
 
         /// <summary>

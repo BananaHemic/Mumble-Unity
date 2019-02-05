@@ -68,6 +68,23 @@ namespace Mumble {
                 data[i] = Mathf.Clamp(data[i] * Gain, -1f, 1f);
             //Debug.Log("playing audio with avg: " + data.Average() + " and max " + data.Max());
         }
+        public bool GetPositionData(out byte[] positionA, out byte[] positionB, out float distanceAB)
+        {
+            if (!_isPlaying)
+            {
+                positionA = null;
+                positionB = null;
+                distanceAB = 0;
+                return false;
+            }
+            double prevPosTime;
+            bool ret = _mumbleClient.LoadArraysWithPositions(Session, out positionA, out positionB, out prevPosTime);
+
+            // Get the percent from posA->posB based on the dsp time
+            distanceAB = (float)((AudioSettings.dspTime - prevPosTime) / (1000.0 * MumbleConstants.FRAME_SIZE_MS));
+
+            return ret;
+        }
         void Update()
         {
             if (_mumbleClient == null)

@@ -21,6 +21,13 @@ namespace Mumble
         public delegate void OnMicrophoneData(PcmArray array);
         public OnMicrophoneData OnMicData;
 
+        /// <summary>
+        /// Allows your app to send positional data to other mumble users
+        /// The length of the positional data is configured in MumbleClient
+        /// </summary>
+        /// <param name="positionalData"></param>
+        public delegate void WritePositionalData(ref byte[] positionalData);
+
         public bool SendAudioOnStart = true;
         public int MicNumberToUse;
         /// <summary>
@@ -53,11 +60,18 @@ namespace Mumble
         // Amplitude MicType vars
         private int _voiceHoldSamples;
         private int _sampleNumberOfLastMinAmplitudeVoice;
+        private WritePositionalData _writePositionalDataFunc = null;
         
         public void Initialize(MumbleClient mumbleClient)
         {
             _mumbleClient = mumbleClient;
         }
+
+        public void SetPositionalDataFunction(WritePositionalData writePositionalData)
+        {
+            _writePositionalDataFunc = writePositionalData;
+        }
+
         /// <summary>
         /// Find the microphone to use and return it's sample rate
         /// </summary>
@@ -129,6 +143,8 @@ namespace Mumble
                         _sampleNumberOfLastMinAmplitudeVoice = _totalNumSamplesSent;
                         if (OnMicData != null)
                             OnMicData(newData);
+                        if (_writePositionalDataFunc != null)
+                            _writePositionalDataFunc(ref newData.PositionalData);
                         _mumbleClient.SendVoicePacket(newData);
                     }
                     else
@@ -140,6 +156,8 @@ namespace Mumble
                         }
                         if (OnMicData != null)
                             OnMicData(newData);
+                        if (_writePositionalDataFunc != null)
+                            _writePositionalDataFunc(ref newData.PositionalData);
                         _mumbleClient.SendVoicePacket(newData);
                         // If this is the sample before the hold turns off, stop sending after it's sent
                         if (_totalNumSamplesSent + NumSamplesPerOutgoingPacket > _sampleNumberOfLastMinAmplitudeVoice + _voiceHoldSamples)
@@ -150,6 +168,8 @@ namespace Mumble
                 {
                     if (OnMicData != null)
                         OnMicData(newData);
+                    if (_writePositionalDataFunc != null)
+                        _writePositionalDataFunc(ref newData.PositionalData);
                     _mumbleClient.SendVoicePacket(newData);
                 }
             }
