@@ -97,7 +97,7 @@ namespace Mumble {
         }
         public void Init(string name, uint session)
         {
-            Debug.Log("Init decoding buffer for: " + name + " Session #" + session);
+            //Debug.Log("Init decoding buffer for: " + name + " Session #" + session);
             _name = name;
             _session = session;
         }
