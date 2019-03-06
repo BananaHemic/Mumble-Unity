@@ -13,6 +13,7 @@ namespace Mumble
         private readonly IPEndPoint _host;
         private readonly UdpClient _udpClient;
         private readonly MumbleClient _mumbleClient;
+        private readonly AudioDecodeThread _audioDecodeThread;
         private MumbleTcpConnection _tcpConnection;
         private CryptState _cryptState;
         private Timer _udpTimer;
@@ -23,10 +24,11 @@ namespace Mumble
         // These are used for switching to TCP audio and back. Don't rely on them for anything else
         private volatile int _numPingsOutstanding = 0;
 
-        internal MumbleUdpConnection(IPEndPoint host, MumbleClient mumbleClient)
+        internal MumbleUdpConnection(IPEndPoint host, AudioDecodeThread audioDecodeThread, MumbleClient mumbleClient)
         {
             _host = host;
             _udpClient = new UdpClient();
+            _audioDecodeThread = audioDecodeThread;
             _mumbleClient = mumbleClient;
         }
         internal void SetTcpConnection(MumbleTcpConnection tcpConnection)
@@ -158,7 +160,8 @@ namespace Mumble
                 {
                     Debug.LogWarning("We have " + remaining + " bytes!");
                 }
-                _mumbleClient.ReceiveEncodedVoice(session, data, sequence, isLast);
+                //_mumbleClient.ReceiveEncodedVoice(session, data, sequence, isLast);
+                _audioDecodeThread.AddCompressedAudio(session, data, sequence, isLast);
             }
         }
         internal void SendPing()

@@ -53,6 +53,7 @@ namespace Mumble {
                 return;
 
             _mumbleClient.LoadArrayWithVoiceData(Session, data, 0, data.Length);
+            //Debug.Log("Loaded " + data.Length + " samples " + channels + " channels");
 
             if (OnAudioSample != null)
                 OnAudioSample(data);

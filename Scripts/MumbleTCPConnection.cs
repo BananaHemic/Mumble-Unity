@@ -19,7 +19,6 @@ namespace Mumble
         private readonly UpdateOcbServerNonce _updateOcbServerNonce;
         private readonly IPEndPoint _host;
         private readonly string _hostname;
-
         private readonly MumbleClient _mumbleClient;
         private readonly TcpClient _tcpClient;
         private BinaryReader _reader;

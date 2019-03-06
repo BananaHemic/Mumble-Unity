@@ -12,13 +12,11 @@ namespace Mumble
     public class DecodingBufferPool : IDisposable{
 
         private readonly Stack<AudioDecodingBuffer> _audioDecodingBuffers = new Stack<AudioDecodingBuffer>();
-        private readonly int _outputSampleRate;
-        private readonly int _outputChannelCount;
+        private readonly AudioDecodeThread _audioDecodeThread;
 
-        public DecodingBufferPool(int rate, int channelCount)
+        public DecodingBufferPool(AudioDecodeThread audioDecodeThread)
         {
-            _outputSampleRate = rate;
-            _outputChannelCount = channelCount;
+            _audioDecodeThread = audioDecodeThread;
         }
 
         public AudioDecodingBuffer GetDecodingBuffer()
@@ -27,7 +25,7 @@ namespace Mumble
             if(_audioDecodingBuffers.Count != 0)
                 decodingBuffer = _audioDecodingBuffers.Pop();
             else
-                decodingBuffer = new AudioDecodingBuffer(_outputSampleRate, _outputChannelCount);
+                decodingBuffer = new AudioDecodingBuffer(_audioDecodeThread);
             return decodingBuffer;
         }
 

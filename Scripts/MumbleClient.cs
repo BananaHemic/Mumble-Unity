@@ -64,6 +64,7 @@ namespace Mumble
         private MumbleTcpConnection _tcpConnection;
         private MumbleUdpConnection _udpConnection;
         private DecodingBufferPool _decodingBufferPool;
+        private AudioDecodeThread _audioDecodeThread;
         private readonly string _hostName;
         private readonly int _port;
         private ManageAudioSendBuffer _manageSendBuffer;
@@ -165,9 +166,11 @@ namespace Mumble
                     );
             }
             var endpoint = new IPEndPoint(addresses[0], _port);
-            _decodingBufferPool = new DecodingBufferPool(_outputSampleRate, _outputChannelCount);
-            _udpConnection = new MumbleUdpConnection(endpoint, this);
-            _tcpConnection = new MumbleTcpConnection(endpoint, _hostName, _udpConnection.UpdateOcbServerNonce, _udpConnection, this);
+            _audioDecodeThread = new AudioDecodeThread(_outputSampleRate, _outputChannelCount, this);
+            _decodingBufferPool = new DecodingBufferPool(_audioDecodeThread);
+            _udpConnection = new MumbleUdpConnection(endpoint, _audioDecodeThread, this);
+            _tcpConnection = new MumbleTcpConnection(endpoint, _hostName,
+                _udpConnection.UpdateOcbServerNonce, _udpConnection, this);
             _udpConnection.SetTcpConnection(_tcpConnection);
             _manageSendBuffer = new ManageAudioSendBuffer(_udpConnection, this);
             ReadyToConnect = true;
@@ -294,7 +297,7 @@ namespace Mumble
             //Debug.Log("Adding : " + userState.Name + " #" + userState.Session);
             //Debug.Log("Adding decoder session #" + userState.Session);
             AudioDecodingBuffer buffer = _decodingBufferPool.GetDecodingBuffer();
-            buffer.Init(userState.Name);
+            buffer.Init(userState.Name, userState.Session);
             _audioDecodingBuffers.Add(userState.Session, buffer);
             EventProcessor.Instance.QueueEvent(() =>
             {
@@ -408,12 +411,11 @@ namespace Mumble
             if(_manageSendBuffer != null)
                 _manageSendBuffer.SendVoice(floatData, SpeechTarget.Normal, 0);
         }
-        public void ReceiveEncodedVoice(UInt32 session, byte[] data, long sequence, bool isLast)
+        internal void ReceiveDecodedVoice(UInt32 session, float[] pcmData, int numSamples, bool reevaluateInitialBuffer)
         {
-            //Debug.Log("Adding packet for session: " + session);
             AudioDecodingBuffer decodingBuffer;
             if (_audioDecodingBuffers.TryGetValue(session, out decodingBuffer))
-                decodingBuffer.AddEncodedPacket(sequence, data, isLast);
+                decodingBuffer.AddDecodedAudio(pcmData, numSamples, reevaluateInitialBuffer);
             else
             {
                 // This is expected if the user joins a room where people are already talking
