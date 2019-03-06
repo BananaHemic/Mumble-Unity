@@ -57,7 +57,7 @@ namespace Mumble {
                 _messageQueue.Enqueue(removeDecoderMsg);
             _waitHandle.Set();
         }
-        internal void AddCompressedAudio(UInt32 session, byte[] audioData, long sequence,
+        internal void AddCompressedAudio(UInt32 session, byte[] audioData, byte[] posData, long sequence,
             bool isLast)
         {
             if (_isDisposing)
@@ -68,6 +68,7 @@ namespace Mumble {
                 TypeOfMessage = MessageType.DecompressData,
                 Session = session,
                 CompressedAudio = audioData,
+                PosData = posData,
                 Sequence = sequence,
                 IsLast = isLast
             };
@@ -146,7 +147,7 @@ namespace Mumble {
                                     //Debug.Log("Added OpusDecoder for DecoderState session: " + messageData.Session);
                                     decoderState.Decoder = decoder;
                                 }
-                                DecodeAudio(messageData.Session, decoderState, messageData.CompressedAudio, messageData.Sequence,
+                                DecodeAudio(messageData.Session, decoderState, messageData.CompressedAudio, messageData.PosData, messageData.Sequence,
                                     messageData.IsLast);
                                 break;
                             default:
@@ -168,7 +169,7 @@ namespace Mumble {
         }
 
         private void DecodeAudio(UInt32 session, DecoderState decoderState, byte[] compressedAudio,
-            long sequence, bool isLast)
+            byte[] posData, long sequence, bool isLast)
         {
             // We tell the decoded buffer to re-evaluate whether it needs to store
             // a few packets if the previous packet was marked last, or if there
@@ -217,7 +218,7 @@ namespace Mumble {
 
                     // Send this decoded data to the corresponding buffer
                     _mumbleClient.ReceiveDecodedVoice(session, emptyPcmBuffer, emptySampleNumRead,
-                        reevaluateInitialBuffer);
+                        posData, reevaluateInitialBuffer);
                     reevaluateInitialBuffer = false;
                 }
             }
@@ -228,7 +229,8 @@ namespace Mumble {
             {
                 numRead = decoderState.Decoder.Decode(compressedAudio, pcmBuffer);
                 // Send this decoded data to the corresponding buffer
-                _mumbleClient.ReceiveDecodedVoice(session, pcmBuffer, numRead, reevaluateInitialBuffer);
+                _mumbleClient.ReceiveDecodedVoice(session, pcmBuffer, numRead, posData,
+                    reevaluateInitialBuffer);
             }
             else
                 Debug.LogError("empty packet data?");
@@ -299,6 +301,7 @@ namespace Mumble {
 
             // Used only for CompressedData message
             public byte[] CompressedAudio;
+            public byte[] PosData;
             public long Sequence;
             public bool IsLast;
         }

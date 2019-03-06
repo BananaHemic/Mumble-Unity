@@ -26,6 +26,14 @@ namespace Mumble {
         private string _name;
         private UInt32 _session;
 
+        /// <summary>
+        /// The audio DSP time when we last dequeued a buffer
+        /// </summary>
+        private double _lastBufferTime;
+        private byte[] _previousPosData;
+        private byte[] _nextPosData;
+        private readonly object _posLock = new object();
+
         private readonly AudioDecodeThread _audioDecodeThread;
         private readonly object _bufferLock = new object();
         private readonly Queue<DecodedPacket> _decodedBuffer = new Queue<DecodedPacket>();
@@ -82,6 +90,17 @@ namespace Mumble {
             return readCount;
         }
 
+        public void GetPreviousNextPositionData(out byte[] previousPos, out byte[] nextPos,
+            out double previousAudioDSP)
+        {
+            lock (_posLock)
+            {
+                previousPos = _previousPosData;
+                nextPos = _nextPosData;
+                previousAudioDSP = _lastBufferTime;
+            }
+        }
+
         /// <summary>
         /// Read data that has already been decoded
         /// </summary>
@@ -97,14 +116,25 @@ namespace Mumble {
             {
                 lock (_bufferLock)
                 {
-                    if(_decodedBuffer.Count == 0)
+                    if (_decodedBuffer.Count == 0)
                     {
                         Debug.LogError("No available decode buffers!");
                         return 0;
                     }
                     _currentPacket = _decodedBuffer.Dequeue();
+
+                    // If we have a packet, let's update the positions
+                    lock (_posLock)
+                    {
+                        _lastBufferTime = AudioSettings.dspTime;
+                        _previousPosData = _currentPacket.PosData;
+                        _nextPosData = null;
+                        // try to load the next buffer
+                        if (_decodedBuffer.Count > 0)
+                            _nextPosData = _decodedBuffer.Peek().PosData;
+                    }
+                    numInSample = _currentPacket.PcmLength - _currentPacket.ReadOffset;
                 }
-                numInSample = _currentPacket.PcmLength - _currentPacket.ReadOffset;
             }
 
             int readCount = Math.Min(numInSample, count);
@@ -120,12 +150,14 @@ namespace Mumble {
             return readCount;
         }
 
-        internal void AddDecodedAudio(float[] pcmData, int pcmLength, bool reevaluateInitialBuffer)
+        internal void AddDecodedAudio(float[] pcmData, int pcmLength, byte[] posData, bool reevaluateInitialBuffer)
         {
             DecodedPacket decodedPacket = new DecodedPacket
             {
                 PcmData = pcmData,
-                PcmLength = pcmLength
+                PosData = posData,
+                PcmLength = pcmLength,
+                ReadOffset = 0
             };
 
             //if (reevaluateInitialBuffer)
@@ -154,6 +186,13 @@ namespace Mumble {
                     HasFilledInitialBuffer = true;
             }
 
+            // Make sure the next position data is loaded
+            lock (_posLock)
+            {
+                if (_nextPosData == null)
+                    _nextPosData = posData;
+            }
+
             //Debug.Log("Adding " + pcmLength + " num packets: " + count + " total decoded: " + _decodedCount);
         }
 
@@ -162,13 +201,20 @@ namespace Mumble {
             lock (_bufferLock)
             {
                 _name = null;
-                _audioDecodeThread.RemoveDecoder(_session);
+                if(_session != 0)
+                    _audioDecodeThread.RemoveDecoder(_session);
                 NumPacketsLost = 0;
                 HasFilledInitialBuffer = false;
                 _decodedCount = 0;
                 _decodedBuffer.Clear();
                 _currentPacket = new DecodedPacket{ };
                 _session = 0;
+            }
+            lock (_posLock)
+            {
+                _previousPosData = null;
+                _nextPosData = null;
+                _lastBufferTime = 0;
             }
         }
         public void Dispose()
@@ -178,10 +224,9 @@ namespace Mumble {
         private struct DecodedPacket
         {
             public float[] PcmData;
+            public byte[] PosData;
             public int PcmLength;
             public int ReadOffset;
-            //public long Sequence;
-            //public bool IsLast;
         }
     }
 }

@@ -12,8 +12,11 @@ namespace Mumble {
         /// <summary>
         /// Notification that a new audio sample is available for processing
         /// It will be called on the audio thread
+        /// It will contain the audio data, which you may want to process in
+        /// your own code, and it contains the percent of the data left
+        /// un-read
         /// </summary>
-        public Action<float[]> OnAudioSample;
+        public Action<float[], float> OnAudioSample;
 
         private MumbleClient _mumbleClient;
         private AudioSource _audioSource;
@@ -53,15 +56,14 @@ namespace Mumble {
         }
         void OnAudioFilterRead(float[] data, int channels)
         {
-            //Debug.Log("On audio read " + Session);
             if (_mumbleClient == null || !_mumbleClient.ConnectionSetupFinished)
                 return;
 
-            _mumbleClient.LoadArrayWithVoiceData(Session, data, 0, data.Length);
-            //Debug.Log("Loaded " + data.Length + " samples " + channels + " channels");
+            int numRead = _mumbleClient.LoadArrayWithVoiceData(Session, data, 0, data.Length);
+            float percentUnderrun = 1f - numRead / data.Length;
 
             if (OnAudioSample != null)
-                OnAudioSample(data);
+                OnAudioSample(data, percentUnderrun);
 
             //Debug.Log("playing audio with avg: " + data.Average() + " and max " + data.Max());
             if (Gain == 1)
@@ -70,6 +72,23 @@ namespace Mumble {
             for (int i = 0; i < data.Length; i++)
                 data[i] = Mathf.Clamp(data[i] * Gain, -1f, 1f);
             //Debug.Log("playing audio with avg: " + data.Average() + " and max " + data.Max());
+        }
+        public bool GetPositionData(out byte[] positionA, out byte[] positionB, out float distanceAB)
+        {
+            if (!_isPlaying)
+            {
+                positionA = null;
+                positionB = null;
+                distanceAB = 0;
+                return false;
+            }
+            double prevPosTime;
+            bool ret = _mumbleClient.LoadArraysWithPositions(Session, out positionA, out positionB, out prevPosTime);
+
+            // Get the percent from posA->posB based on the dsp time
+            distanceAB = (float)((AudioSettings.dspTime - prevPosTime) / (1000.0 * MumbleConstants.FRAME_SIZE_MS));
+
+            return ret;
         }
         void Update()
         {

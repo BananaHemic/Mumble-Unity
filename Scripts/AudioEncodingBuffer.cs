@@ -7,6 +7,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Threading;
 
 namespace Mumble
 {
@@ -17,6 +18,7 @@ namespace Mumble
         //TODO not certain on this
         public readonly ArraySegment<byte> EmptyByteSegment = new ArraySegment<byte>(new byte[0] {});
 
+        private readonly object _bufferLock = new System.Object();
         private volatile bool _isWaitingToSendLastPacket = false;
 
         /// <summary>
@@ -27,15 +29,16 @@ namespace Mumble
         /// <param name="targetId"></param>
         public void Add(PcmArray pcm, SpeechTarget target, uint targetId)
         {
-            lock (_unencodedBuffer)
+            lock (_bufferLock)
             {
                 _unencodedBuffer.Enqueue(new TargettedSpeech(pcm, target, targetId));
+                Monitor.Pulse(_bufferLock);
             }
         }
 
         public void Stop()
         {
-            lock (_unencodedBuffer)
+            lock (_bufferLock)
             {
                 //If we still have an item in the queue, mark the last one as last
                 _isWaitingToSendLastPacket = true;
@@ -46,18 +49,25 @@ namespace Mumble
                 }
                 else
                     Debug.Log("Marking last packet");
+                Monitor.Pulse(_bufferLock);
             }
         }
 
-        public ArraySegment<byte> Encode(OpusEncoder encoder, out bool isStop, out bool isEmpty)
+        public CompressedBuffer Encode(OpusEncoder encoder, out bool isStop, out bool isEmpty)
         {
             isStop = false;
             isEmpty = false;
             PcmArray nextPcmToSend = null;
             ArraySegment<byte> encoder_buffer;
 
-            lock (_unencodedBuffer)
+
+            lock (_bufferLock)
             {
+                // Make sure we have data, or an end event
+                if (_unencodedBuffer.Count == 0)
+                    Monitor.Wait(_bufferLock);
+
+                // If there are still no unencoded buffers, then we return an empty packet
                 if (_unencodedBuffer.Count == 0)
                     isEmpty = true;
                 else
@@ -78,16 +88,33 @@ namespace Mumble
                 isEmpty = true;
 
             encoder_buffer = isEmpty ? EmptyByteSegment : encoder.Encode(nextPcmToSend.Pcm);
+            byte[] pos = nextPcmToSend == null ? null : nextPcmToSend.PositionalData;
+            int posLen = nextPcmToSend == null ? 0 : nextPcmToSend.PositionalDataLength;
 
-            if(nextPcmToSend != null)
-                nextPcmToSend.IsAvailable = true;
+            if (nextPcmToSend != null)
+                nextPcmToSend.UnRef();
 
             if (isStop)
             {
                 Debug.Log("Resetting encoder state");
                 encoder.ResetState();
             }
-            return encoder_buffer;
+
+
+            CompressedBuffer compressedBuffer = new CompressedBuffer
+            {
+                EncodedData = encoder_buffer,
+                PositionalData = pos,
+                PositionalDataLength = posLen
+            };
+            return compressedBuffer;
+        }
+
+        public struct CompressedBuffer
+        {
+            public ArraySegment<byte> EncodedData;
+            public byte[] PositionalData;
+            public int PositionalDataLength;
         }
 
         /// <summary>

@@ -7,6 +7,9 @@
 // 3) Copying over the net35 protobuf-net.dll to Unity Assets
 // 4) Running protogen.exe --csharp_out=my-out-folder +langver=3.5 ./Mumble.proto
 
+// NOTE: The naming here is very important, so watch out for Obfuscators changing
+// The names. Some obfuscators, like Beebyte, allow you to whitelist this namespace
+
 #pragma warning disable 1591, 0612, 3021
 namespace MumbleProto
 {

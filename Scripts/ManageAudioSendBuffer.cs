@@ -13,18 +13,22 @@ namespace Mumble
         private readonly MumbleClient _mumbleClient;
         private readonly AutoResetEvent _waitHandle;
         private OpusEncoder _encoder;
+        private bool _isRunning;
 
         private Thread _encodingThread;
         private UInt32 sequenceIndex;
         private bool _stopSendingRequested = false;
+        private int _maxPositionalLength;
 
-        public ManageAudioSendBuffer(MumbleUdpConnection udpConnection, MumbleClient mumbleClient)
+        public ManageAudioSendBuffer(MumbleUdpConnection udpConnection, MumbleClient mumbleClient, int maxPositionalLength)
         {
+            _isRunning = true;
             _udpConnection = udpConnection;
             _mumbleClient = mumbleClient;
             _pcmArrays = new List<PcmArray>();
             _encodingBuffer = new AudioEncodingBuffer();
             _waitHandle = new AutoResetEvent(false);
+            _maxPositionalLength = maxPositionalLength;
         }
         internal void InitForSampleRate(int sampleRate)
         {
@@ -52,14 +56,14 @@ namespace Mumble
         {
             foreach(PcmArray ray in _pcmArrays)
             {
-                if (ray.IsAvailable)
+                if (ray._refCount == 0)
                 {
-                    ray.IsAvailable = false;
+                    ray.Ref();
                     //Debug.Log("re-using buffer");
                     return ray;
                 }
             }
-            PcmArray newArray = new PcmArray(_mumbleClient.NumSamplesPerOutgoingPacket, _pcmArrays.Count);
+            PcmArray newArray = new PcmArray(_mumbleClient.NumSamplesPerOutgoingPacket, _pcmArrays.Count, _maxPositionalLength);
             _pcmArrays.Add(newArray);
 
             if(_pcmArrays.Count > 10)
@@ -68,11 +72,6 @@ namespace Mumble
             }
             //Debug.Log("New buffer length is: " + _pcmArrays.Count);
             return newArray;
-        }
-        public void ReleasePcmArray(PcmArray pcmArray)
-        {
-            //Debug.Log("releasing pcm");
-            pcmArray.IsAvailable = true;
         }
         public void SendVoice(PcmArray pcm, SpeechTarget target, uint targetId)
         {
@@ -87,8 +86,15 @@ namespace Mumble
         }
         public void Dispose()
         {
+            _isRunning = false;
+            _waitHandle.Set();
+
             if(_encodingThread != null)
                 _encodingThread.Abort();
+            _encodingThread = null;
+            if(_encoder != null)
+                _encoder.Dispose();
+            _encoder = null;
         }
         private void EncodingThreadEntry()
         {
@@ -99,23 +105,30 @@ namespace Mumble
 
             while (true)
             {
+                if(!_isRunning)
+                    return;
                 try
                 {
                     // Keep running until a stop has been requested and we've encoded the rest of the buffer
                     // Then wait for a new voice packet
                     while (_stopSendingRequested && isLastPacket)
                         _waitHandle.WaitOne();
+                    if(!_isRunning)
+                        return;
                     bool isEmpty;
-                    ArraySegment<byte> packet = _encodingBuffer.Encode(_encoder, out isLastPacket, out isEmpty);
+                    AudioEncodingBuffer.CompressedBuffer buff = _encodingBuffer.Encode(_encoder, out isLastPacket, out isEmpty);
 
                     if (isEmpty && !isLastPacket)
                     {
+                        // This should not normally occur
                         Thread.Sleep(Mumble.MumbleConstants.FRAME_SIZE_MS);
-                        //Debug.LogWarning("Empty Packet");
+                        Debug.LogWarning("Empty Packet");
                         continue;
                     }
                     if (isLastPacket)
                         Debug.Log("Will send last packet");
+
+                    ArraySegment<byte> packet = buff.EncodedData;
 
                     //Make the header
                     byte type = (byte)4;
@@ -134,11 +147,18 @@ namespace Mumble
                     byte[] opusHeader = Var64.writeVarint64_alternative(opusHeaderNum);
                     //Packet:
                     //[type/target] [sequence] [opus length header] [packet data]
-                    byte[] finalPacket = new byte[1 + sequence.Length + opusHeader.Length + packet.Count];
+                    byte[] finalPacket = new byte[1 + sequence.Length + opusHeader.Length + packet.Count + buff.PositionalDataLength];
                     finalPacket[0] = type;
-                    Array.Copy(sequence, 0, finalPacket, 1, sequence.Length);
-                    Array.Copy(opusHeader, 0, finalPacket, 1 + sequence.Length, opusHeader.Length);
-                    Array.Copy(packet.Array, packet.Offset, finalPacket, 1 + sequence.Length + opusHeader.Length, packet.Count);
+                    int finalOffset = 1;
+                    Array.Copy(sequence, 0, finalPacket, finalOffset, sequence.Length);
+                    finalOffset += sequence.Length;
+                    Array.Copy(opusHeader, 0, finalPacket, finalOffset, opusHeader.Length);
+                    finalOffset += opusHeader.Length;
+                    Array.Copy(packet.Array, packet.Offset, finalPacket, finalOffset, packet.Count);
+                    finalOffset += packet.Count;
+                    // Append positional data, if it exists
+                    if(buff.PositionalDataLength > 0)
+                        Array.Copy(buff.PositionalData, 0, finalPacket, finalOffset, buff.PositionalDataLength);
 
                     //Debug.Log("seq: " + sequenceIndex + " | " + finalPacket.Length);
                     _udpConnection.SendVoicePacket(finalPacket);
@@ -160,22 +180,36 @@ namespace Mumble
                 }
             }
             Debug.Log("Terminated encoding thread");
-            _encodingThread = null;
         }
     }
     /// <summary>
     /// Small class to help this script re-use float arrays after their data has become encoded
+    /// Obviously, it's weird to ref-count in a managed environment, but it really
+    /// Does help identify leaks and makes zero-copy buffer sharing easier
     /// </summary>
     public class PcmArray
     {
-        public bool IsAvailable = true;
         public readonly int Index;
         public float[] Pcm;
+        public byte[] PositionalData;
+        public int PositionalDataLength;
+        internal int _refCount;
 
-        public PcmArray(int pcmLength, int index)
+        public PcmArray(int pcmLength, int index, int maxPositionLengthBytes)
         {
             Pcm = new float[pcmLength];
+            if(maxPositionLengthBytes > 0)
+                PositionalData = new byte[maxPositionLengthBytes];
             Index = index;
+            _refCount = 1;
+        }
+        public void Ref()
+        {
+            _refCount++;
+        }
+        public void UnRef()
+        {
+            _refCount--;
         }
     }
 }

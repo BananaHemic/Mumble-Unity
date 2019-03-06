@@ -5,24 +5,30 @@ using System.Timers;
 using UnityEngine;
 using System.IO;
 using MumbleProto;
+using System.Threading;
 
 namespace Mumble
 {
     public class MumbleUdpConnection
     {
+        const int MaxUDPSize = 0x10000;
         private readonly IPEndPoint _host;
         private readonly UdpClient _udpClient;
         private readonly MumbleClient _mumbleClient;
         private readonly AudioDecodeThread _audioDecodeThread;
+        private readonly System.Object _sendLock = new System.Object();
         private MumbleTcpConnection _tcpConnection;
         private CryptState _cryptState;
-        private Timer _udpTimer;
+        private System.Timers.Timer _udpTimer;
         private bool _isConnected = false;
         internal volatile int NumPacketsSent = 0;
         internal volatile int NumPacketsRecv = 0;
         internal volatile bool _useTcp = false;
         // These are used for switching to TCP audio and back. Don't rely on them for anything else
         private volatile int _numPingsOutstanding = 0;
+        private Thread _receiveThread;
+        private byte[] _recvBuffer;
+        private readonly byte[] _sendPingBuffer = new byte[9];
 
         internal MumbleUdpConnection(IPEndPoint host, AudioDecodeThread audioDecodeThread, MumbleClient mumbleClient)
         {
@@ -44,44 +50,85 @@ namespace Mumble
         internal void Connect()
         {
             //Debug.Log("Establishing UDP connection");
-            _cryptState = new CryptState();
-            _cryptState.CryptSetup = _mumbleClient.CryptSetup;
+            _cryptState = new CryptState
+            {
+                CryptSetup = _mumbleClient.CryptSetup
+            };
             _udpClient.Connect(_host);
+            // I believe that I need to enable dontfragment in order to make
+            // sure that all packets received are received as discreet datagrams
+            _udpClient.DontFragment = true;
+
             _isConnected = true;
 
-            _udpTimer = new Timer(MumbleConstants.PING_INTERVAL_MS);
+            _udpTimer = new System.Timers.Timer(MumbleConstants.PING_INTERVAL_MS);
             _udpTimer.Elapsed += RunPing;
             _udpTimer.Enabled = true;
 
             SendPing();
-            _udpClient.BeginReceive(ReceiveUdpMessage, null);
+            _receiveThread = new Thread(ReceiveUDP)
+            {
+                IsBackground = true
+            };
+            _receiveThread.Start();
         }
 
         private void RunPing(object sender, ElapsedEventArgs elapsedEventArgs)
         {
              SendPing();
         }
-        private void ReceiveUdpMessage(byte[] encrypted)
+        private void ReceiveUDP()
         {
-            ProcessUdpMessage(encrypted);
-            _udpClient.BeginReceive(ReceiveUdpMessage, null);
+            int prevPacketSize = 0;
+            if (_recvBuffer == null)
+                _recvBuffer = new byte[MaxUDPSize];
+
+            EndPoint endPoint = (EndPoint)_host;
+            while (true)
+            {
+                try
+                {
+                    // This should only happen on exit
+                    if (_udpClient == null)
+                        return;
+                    //IPEndPoint remoteIpEndPoint = _host;
+                    //byte[] encrypted = _udpClient.Receive(ref remoteIpEndPoint);
+                    //int readLen = encrypted.Length;
+
+                    // We receive the data into a pre-allocated buffer to avoid
+                    // needless allocations
+                    byte[] encrypted;
+                    int readLen = _udpClient.Client.ReceiveFrom(_recvBuffer, ref endPoint);
+                    encrypted = _recvBuffer;
+
+                    bool didProcess = ProcessUdpMessage(encrypted, readLen);
+                    if (!didProcess)
+                    {
+                        Debug.LogError("Failed decrypt of: " + readLen + " bytes. exclusive: "
+                            + _udpClient.ExclusiveAddressUse
+                            + " ttl:" + _udpClient.Ttl
+                            + " avail: " + _udpClient.Available
+                            + " prev pkt size:" + prevPacketSize);
+                    }
+                    prevPacketSize = readLen;
+                }catch(Exception ex)
+                {
+                    if (ex is ObjectDisposedException) { }
+                    else if (ex is ThreadAbortException) { }
+                    else
+                        Debug.LogError("Unhandled UDP receive error: " + ex);
+                }
+            }
         }
-        private void ReceiveUdpMessage(IAsyncResult res)
+        internal bool ProcessUdpMessage(byte[] encrypted, int len)
         {
-            //Debug.Log("Received message");
-            IPEndPoint remoteIpEndPoint = _host;
-            byte[] encrypted = _udpClient.EndReceive(res, ref remoteIpEndPoint);
-            ReceiveUdpMessage(encrypted);
-        }
-        internal void ProcessUdpMessage(byte[] encrypted)
-        {
-            //Debug.Log("encrypted length: " + encrypted.Length);
+            //Debug.Log("encrypted length: " + len);
             //TODO sometimes this fails and I have no idea why
             //Debug.Log(encrypted[0] + " " + encrypted[1]);
-            byte[] message = _cryptState.Decrypt(encrypted, encrypted.Length);
+            byte[] message = _cryptState.Decrypt(encrypted, len);
 
             if (message == null)
-                return;
+                return false;
 
             // figure out type of message
             int type = message[0] >> 5 & 0x7;
@@ -99,9 +146,10 @@ namespace Mumble
                     OnPing(message);
                     break;
                 default:
-                    Debug.LogError("Not implemented: " + ((UDPType)type));
-                    break;
+                    Debug.LogError("Not implemented: " + ((UDPType)type) + " #" + type);
+                    return false;
             }
+            return true;
         }
         internal void OnPing(byte[] message)
         {
@@ -131,7 +179,6 @@ namespace Mumble
 
                 Int64 sequence = reader.ReadVarInt64();
 
-
                 //We assume we mean OPUS
                 int size = (int)reader.ReadVarInt64();
                 //Debug.Log("Seq = " + sequence + " Ses: " + session + " Size " + size + " type= " + typeByte + " tar= " + target);
@@ -155,23 +202,25 @@ namespace Mumble
                     return;
                 }
 
+                // All remaining bytes are assumed to be positional data
+                byte[] posData = null;
                 long remaining = reader.GetRemainingBytes();
                 if(remaining != 0)
                 {
-                    Debug.LogWarning("We have " + remaining + " bytes!");
+                    //Debug.LogWarning("We have " + remaining + " bytes!");
+                    posData = reader.ReadBytes((int)remaining);
                 }
                 //_mumbleClient.ReceiveEncodedVoice(session, data, sequence, isLast);
-                _audioDecodeThread.AddCompressedAudio(session, data, sequence, isLast);
+                _audioDecodeThread.AddCompressedAudio(session, data, posData, sequence, isLast);
             }
         }
         internal void SendPing()
         {
             ulong unixTimeStamp = (ulong) (DateTime.UtcNow.Ticks - DateTime.Parse("01/01/1970 00:00:00").Ticks);
             byte[] timeBytes = BitConverter.GetBytes(unixTimeStamp);
-            var dgram = new byte[9];
-            timeBytes.CopyTo(dgram, 1);
-            dgram[0] = (1 << 5);
-            var encryptedData = _cryptState.Encrypt(dgram, timeBytes.Length + 1);
+            timeBytes.CopyTo(_sendPingBuffer, 1);
+            _sendPingBuffer[0] = (1 << 5);
+            var encryptedData = _cryptState.Encrypt(_sendPingBuffer, timeBytes.Length + 1);
 
             if (!_isConnected)
             {
@@ -186,7 +235,7 @@ namespace Mumble
             }
             //Debug.Log(_numPingsSent - _numPingsReceived);
             _numPingsOutstanding++;
-            lock (_udpClient)
+            lock (_sendLock)
             {
                 _udpClient.Send(encryptedData, encryptedData.Length);
             }
@@ -194,9 +243,13 @@ namespace Mumble
 
         internal void Close()
         {
-            _udpClient.Close();
+            if (_receiveThread != null)
+                _receiveThread.Abort();
+            _receiveThread = null;
             if(_udpTimer != null)
                 _udpTimer.Close();
+            _udpTimer = null;
+            _udpClient.Close();
         }
         internal void SendVoicePacket(byte[] voicePacket)
         {
@@ -214,15 +267,17 @@ namespace Mumble
                 if (_useTcp)
                 {
                     //Debug.Log("Using TCP!");
-                    UDPTunnel udpMsg = new UDPTunnel();
-                    udpMsg.Packet = voicePacket;
+                    UDPTunnel udpMsg = new UDPTunnel
+                    {
+                        Packet = voicePacket
+                    };
                     _tcpConnection.SendMessage(MessageType.UDPTunnel, udpMsg);
                     return;
                 }
                 else
                 {
                     byte[] encrypted = _cryptState.Encrypt(voicePacket, voicePacket.Length);
-                    lock (_udpClient)
+                    lock (_sendLock)
                     {
                         _udpClient.Send(encrypted, encrypted.Length);
                     }

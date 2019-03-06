@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿//#define EVENT_DEBUG
+using UnityEngine;
 using System;
 using System.Collections.Generic;
 
@@ -7,13 +8,17 @@ using System.Collections.Generic;
  * http://stackoverflow.com/questions/22513881/unity3d-how-to-process-events-in-the-correct-thread
  */
 
+
 public class EventProcessor : MonoBehaviour
 {
     public static EventProcessor Instance { get; private set; }
 
-	private object m_queueLock = new object();
-	private List<Action> m_queuedEvents = new List<Action>();
-	private List<Action> m_executingEvents = new List<Action>();
+	private readonly object _queueLock = new object();
+	private readonly Queue<Action> _queuedEvents = new Queue<Action>();
+	private readonly Queue<Action> _executingEvents = new Queue<Action>();
+#if EVENT_DEBUG
+    private bool _wasJustPaused = false;
+#endif
 
     private void Awake()
     {
@@ -24,33 +29,66 @@ public class EventProcessor : MonoBehaviour
         }
         Instance = this;
     }
+#if EVENT_DEBUG
+    private void OnApplicationPause(bool pause)
+    {
+        if (pause)
+            _wasJustPaused = true;
+    }
+#endif
     public void QueueEvent(Action action)
 	{
-		lock (m_queueLock)
+		lock (_queueLock)
 		{
-			m_queuedEvents.Add(action);
+			_queuedEvents.Enqueue(action);
+#if EVENT_DEBUG
+            Debug.Log("Queue'd #" + _queuedEvents.Count);
+#endif
 		}
 	}
 	private void MoveQueuedEventsToExecuting()
 	{
-		lock (m_queueLock)
+		lock (_queueLock)
 		{
-			while (m_queuedEvents.Count > 0)
+			while (_queuedEvents.Count > 0)
 			{
-				Action e = m_queuedEvents[0];
-				m_executingEvents.Add(e);
-				m_queuedEvents.RemoveAt(0);
+#if EVENT_DEBUG
+                if (_wasJustPaused)
+                    Debug.Log("MoveQ count: " + _queuedEvents.Count);
+#endif
+
+                Action e = _queuedEvents.Dequeue();
+#if EVENT_DEBUG
+                if (_wasJustPaused)
+                    Debug.Log("a");
+#endif
+				_executingEvents.Enqueue(e);
+#if EVENT_DEBUG
+                if (_wasJustPaused)
+                    Debug.Log("b");
+#endif
 			}
 		}
 	}
 	void Update()
 	{
+#if EVENT_DEBUG
+        if (_wasJustPaused)
+            Debug.Log("Event processor start update");
+#endif
 		MoveQueuedEventsToExecuting();
 
-		while (m_executingEvents.Count > 0)
+		while (_executingEvents.Count > 0)
 		{
-			Action e = m_executingEvents[0];
-			m_executingEvents.RemoveAt(0);
+#if EVENT_DEBUG
+            if (_wasJustPaused)
+                Debug.Log("Execute count: " + _executingEvents.Count);
+#endif
+            Action e = _executingEvents.Dequeue();
+#if EVENT_DEBUG
+            if (_wasJustPaused)
+                Debug.Log("A");
+#endif
 			e();
 		}
 	}
