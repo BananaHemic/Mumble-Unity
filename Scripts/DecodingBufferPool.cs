@@ -11,7 +11,7 @@ namespace Mumble
     /// </summary>
     public class DecodingBufferPool : IDisposable{
 
-        private readonly Stack<AudioDecodingBuffer> _audioDecodingBuffers = new Stack<AudioDecodingBuffer>();
+        private readonly Stack<DecodedAudioBuffer> _audioDecodingBuffers = new Stack<DecodedAudioBuffer>();
         private readonly AudioDecodeThread _audioDecodeThread;
 
         public DecodingBufferPool(AudioDecodeThread audioDecodeThread)
@@ -19,17 +19,17 @@ namespace Mumble
             _audioDecodeThread = audioDecodeThread;
         }
 
-        public AudioDecodingBuffer GetDecodingBuffer()
+        public DecodedAudioBuffer GetDecodingBuffer()
         {
-            AudioDecodingBuffer decodingBuffer;
+            DecodedAudioBuffer decodingBuffer;
             if(_audioDecodingBuffers.Count != 0)
                 decodingBuffer = _audioDecodingBuffers.Pop();
             else
-                decodingBuffer = new AudioDecodingBuffer(_audioDecodeThread);
+                decodingBuffer = new DecodedAudioBuffer(_audioDecodeThread);
             return decodingBuffer;
         }
 
-        public void ReturnDecodingBuffer(AudioDecodingBuffer decodingBuffer)
+        public void ReturnDecodingBuffer(DecodedAudioBuffer decodingBuffer)
         {
             decodingBuffer.Reset();
             _audioDecodingBuffers.Push(decodingBuffer);
@@ -40,7 +40,7 @@ namespace Mumble
         {
             while(_audioDecodingBuffers.Count != 0)
             {
-                AudioDecodingBuffer decodingBuffer = _audioDecodingBuffers.Pop();
+                DecodedAudioBuffer decodingBuffer = _audioDecodingBuffers.Pop();
                 decodingBuffer.Dispose();
             }
         }

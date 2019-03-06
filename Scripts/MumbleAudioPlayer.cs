@@ -21,6 +21,11 @@ namespace Mumble {
 
         void Start() {
             _audioSource = GetComponent<AudioSource>();
+            // In editor, double check that "auto-play" is turned off
+#if UNITY_EDITOR
+            if (_audioSource.playOnAwake)
+                Debug.LogWarning("For best performance, please turn \"Play On Awake\" off");
+#endif
         }
         public string GetUsername()
         {

@@ -81,7 +81,7 @@ namespace Mumble
         private DebugValues _debugValues;
         private readonly Dictionary<uint, UserState> AllUsers = new Dictionary<uint, UserState>();
         private readonly Dictionary<uint, ChannelState> Channels = new Dictionary<uint, ChannelState>();
-        private readonly Dictionary<UInt32, AudioDecodingBuffer> _audioDecodingBuffers = new Dictionary<uint, AudioDecodingBuffer>();
+        private readonly Dictionary<UInt32, DecodedAudioBuffer> _audioDecodingBuffers = new Dictionary<uint, DecodedAudioBuffer>();
         private readonly Dictionary<UInt32, MumbleAudioPlayer> _mumbleAudioPlayers = new Dictionary<uint, MumbleAudioPlayer>();
 
         internal UserState OurUserState { get; private set; }
@@ -296,7 +296,7 @@ namespace Mumble
                 return;
             //Debug.Log("Adding : " + userState.Name + " #" + userState.Session);
             //Debug.Log("Adding decoder session #" + userState.Session);
-            AudioDecodingBuffer buffer = _decodingBufferPool.GetDecodingBuffer();
+            DecodedAudioBuffer buffer = _decodingBufferPool.GetDecodingBuffer();
             buffer.Init(userState.Name, userState.Session);
             _audioDecodingBuffers.Add(userState.Session, buffer);
             EventProcessor.Instance.QueueEvent(() =>
@@ -310,7 +310,7 @@ namespace Mumble
         }
         private void TryRemoveDecodingBuffer(UInt32 session)
         {
-            AudioDecodingBuffer buffer;
+            DecodedAudioBuffer buffer;
             if(_audioDecodingBuffers.TryGetValue(session, out buffer))
             {
                 //Debug.LogWarning("Removing decoder session #" + session);
@@ -413,7 +413,7 @@ namespace Mumble
         }
         internal void ReceiveDecodedVoice(UInt32 session, float[] pcmData, int numSamples, bool reevaluateInitialBuffer)
         {
-            AudioDecodingBuffer decodingBuffer;
+            DecodedAudioBuffer decodingBuffer;
             if (_audioDecodingBuffers.TryGetValue(session, out decodingBuffer))
                 decodingBuffer.AddDecodedAudio(pcmData, numSamples, reevaluateInitialBuffer);
             else
@@ -425,11 +425,20 @@ namespace Mumble
         }
         public bool HasPlayableAudio(UInt32 session)
         {
-            AudioDecodingBuffer decodingBuffer;
+            DecodedAudioBuffer decodingBuffer;
             if (_audioDecodingBuffers.TryGetValue(session, out decodingBuffer))
-                return decodingBuffer.HasFilledInitialBuffer;
-            else
-                return false;
+            {
+                if (!decodingBuffer.HasFilledInitialBuffer)
+                    return false;
+
+                // Now that we've determined that this user has a
+                // decode buffer, we need to make sure that
+                // they're not speaking
+                UserState user;
+                if (AllUsers.TryGetValue(session, out user))
+                    return (!user.Mute && !user.SelfMute);
+            }
+            return false;
         }
         public void LoadArrayWithVoiceData(UInt32 session, float[] pcmArray, int offset, int length)
         {
@@ -438,7 +447,7 @@ namespace Mumble
             //Debug.Log("Will decode for " + session);
 
             //TODO use bool to show if loading worked or not
-            AudioDecodingBuffer decodingBuffer;
+            DecodedAudioBuffer decodingBuffer;
             if (_audioDecodingBuffers.TryGetValue(session, out decodingBuffer))
                 decodingBuffer.Read(pcmArray, offset, length);
             else

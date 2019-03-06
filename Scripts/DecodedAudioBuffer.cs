@@ -10,7 +10,7 @@ using UnityEngine;
 using System.Threading;
 
 namespace Mumble {
-    public class AudioDecodingBuffer : IDisposable
+    public class DecodedAudioBuffer : IDisposable
     {
         public long NumPacketsLost { get; private set; }
         public bool HasFilledInitialBuffer { get; private set; }
@@ -36,7 +36,7 @@ namespace Mumble {
         /// </summary>
         const int InitialSampleBuffer = 3;
 
-        public AudioDecodingBuffer(AudioDecodeThread audioDecodeThread)
+        public DecodedAudioBuffer(AudioDecodeThread audioDecodeThread)
         {
             _audioDecodeThread = audioDecodeThread;
         }
