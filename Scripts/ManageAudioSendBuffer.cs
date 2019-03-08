@@ -100,7 +100,7 @@ namespace Mumble
         {
             // Wait for an initial voice packet
             _waitHandle.WaitOne();
-            Debug.Log("Starting encoder thread");
+            //Debug.Log("Starting encoder thread");
             bool isLastPacket = false;
 
             while (true)
