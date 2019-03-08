@@ -223,6 +223,8 @@ namespace Mumble {
                 }
             }
 
+            //Debug.Log("Recv: " + sequence + " expected: " + decoderState.NextSequenceToDecode);
+
             float[] pcmBuffer = GetBufferToDecodeInto();
             int numRead = 0;
             if (compressedAudio.Length != 0)

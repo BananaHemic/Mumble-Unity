@@ -3,9 +3,11 @@ using System.Collections;
 using System;
 using MumbleProto;
 
-namespace Mumble {
+namespace Mumble
+{
     [RequireComponent(typeof(AudioSource))]
-    public class MumbleAudioPlayer : MonoBehaviour {
+    public class MumbleAudioPlayer : MonoBehaviour
+    {
 
         public float Gain = 1;
         public UInt32 Session { get; private set; }
@@ -22,20 +24,26 @@ namespace Mumble {
         private AudioSource _audioSource;
         private bool _isPlaying = false;
 
-        void Start() {
+        void Start()
+        {
             _audioSource = GetComponent<AudioSource>();
             // In editor, double check that "auto-play" is turned off
 #if UNITY_EDITOR
             if (_audioSource.playOnAwake)
                 Debug.LogWarning("For best performance, please turn \"Play On Awake\" off");
 #endif
+            // In principle, this line shouldn't need to be here.
+            // however, from profiling it seems that Unity will
+            // call OnAudioFilterRead when the audioSource hits
+            // Awake, even if PlayOnAwake is off
+            _audioSource.Stop();
         }
         public string GetUsername()
         {
             if (_mumbleClient == null)
                 return null;
             UserState state = _mumbleClient.GetUserFromSession(Session);
-            if(state != null)
+            if (state != null)
                 return state.Name;
             return null;
         }
@@ -51,13 +59,14 @@ namespace Mumble {
             Session = 0;
             OnAudioSample = null;
             _isPlaying = false;
-            if(_audioSource != null)
+            if (_audioSource != null)
                 _audioSource.Stop();
         }
         void OnAudioFilterRead(float[] data, int channels)
         {
             if (_mumbleClient == null || !_mumbleClient.ConnectionSetupFinished)
                 return;
+            //Debug.Log("Filter read for: " + GetUsername());
 
             int numRead = _mumbleClient.LoadArrayWithVoiceData(Session, data, 0, data.Length);
             float percentUnderrun = 1f - numRead / data.Length;
@@ -90,6 +99,10 @@ namespace Mumble {
 
             return ret;
         }
+        public void SetVolume(float volume)
+        {
+            _audioSource.volume = volume;
+        }
         void Update()
         {
             if (_mumbleClient == null)
@@ -98,13 +111,13 @@ namespace Mumble {
             {
                 _audioSource.Play();
                 _isPlaying = true;
-                Debug.Log("Playing audio");
+                Debug.Log("Playing audio for: " + GetUsername());
             }
-            else if(_isPlaying && !_mumbleClient.HasPlayableAudio(Session))
+            else if (_isPlaying && !_mumbleClient.HasPlayableAudio(Session))
             {
                 _audioSource.Stop();
                 _isPlaying = false;
-                Debug.Log("Stopping audio");
+                Debug.Log("Stopping audio for: " + GetUsername());
             }
         }
     }
