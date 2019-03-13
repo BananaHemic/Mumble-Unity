@@ -171,19 +171,20 @@ namespace Mumble {
                 {
                     // TODO this seems to happen at times
                     Debug.LogWarning("Max recv buffer size reached, dropping for user " + _name);
-                    return;
                 }
+                else
+                {
+                    _decodedBuffer.Enqueue(decodedPacket);
+                    Interlocked.Add(ref _decodedCount, pcmLength);
 
-                _decodedBuffer.Enqueue(decodedPacket);
-                Interlocked.Add(ref _decodedCount, pcmLength);
+                    // this is set if the previous received packet was a last packet
+                    // or if there was an abrupt change in sequence number
+                    if (reevaluateInitialBuffer)
+                        HasFilledInitialBuffer = false;
 
-                // this is set if the previous received packet was a last packet
-                // or if there was an abrupt change in sequence number
-                if (reevaluateInitialBuffer)
-                    HasFilledInitialBuffer = false;
-
-                if (!HasFilledInitialBuffer && (count + 1 >= InitialSampleBuffer))
-                    HasFilledInitialBuffer = true;
+                    if (!HasFilledInitialBuffer && (count + 1 >= InitialSampleBuffer))
+                        HasFilledInitialBuffer = true;
+                }
             }
 
             // Make sure the next position data is loaded
