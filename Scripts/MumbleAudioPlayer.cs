@@ -23,6 +23,7 @@ namespace Mumble
         private MumbleClient _mumbleClient;
         private AudioSource _audioSource;
         private bool _isPlaying = false;
+        private float _pendingAudioVolume = -1f;
 
         void Start()
         {
@@ -37,6 +38,10 @@ namespace Mumble
             // call OnAudioFilterRead when the audioSource hits
             // Awake, even if PlayOnAwake is off
             _audioSource.Stop();
+
+            if (_pendingAudioVolume >= 0)
+                _audioSource.volume = _pendingAudioVolume;
+            _pendingAudioVolume = -1f;
         }
         public string GetUsername()
         {
@@ -61,6 +66,7 @@ namespace Mumble
             _isPlaying = false;
             if (_audioSource != null)
                 _audioSource.Stop();
+            _pendingAudioVolume = -1f;
         }
         void OnAudioFilterRead(float[] data, int channels)
         {
@@ -101,7 +107,10 @@ namespace Mumble
         }
         public void SetVolume(float volume)
         {
-            _audioSource.volume = volume;
+            if (_audioSource == null)
+                _pendingAudioVolume = volume;
+            else
+                _audioSource.volume = volume;
         }
         void Update()
         {
