@@ -30,7 +30,7 @@ Easily send low-latency text and voice to a group of other users
    Either get a Mumble server at [one of the many Mumble server hosts](https://wiki.mumble.info/wiki/Hosters).
 Or you can [setup your own Mumble server](https://wiki.mumble.info/wiki/Installing_Mumble) (which I recommend)
 
-   If you do make your own server, be sure to set "opusthreshold=0" in mumble.ini in order to make all clients use opus
+   If you do make your own server, be sure to set "opusthreshold=0" in mumble-server.ini or murmur.ini in order to make all clients use opus
 ### Installing
    * If your Unity project is *not* currently tracked with git, then you can navigate to your project's "Assets" folder and run
    `git clone https://github.com/BananaHemic/Mumble-Unity.git`
