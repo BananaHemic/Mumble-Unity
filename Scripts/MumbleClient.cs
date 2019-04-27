@@ -450,6 +450,7 @@ namespace Mumble
         }
         public void Close()
         {
+            Debug.Log("Closing mumble");
             if(_manageSendBuffer != null)
                 _manageSendBuffer.Dispose();
             _manageSendBuffer = null;
@@ -459,6 +460,10 @@ namespace Mumble
             if(_udpConnection != null)
                 _udpConnection.Close();
             _udpConnection = null;
+            if (_audioDecodeThread != null)
+                _audioDecodeThread.Dispose();
+            _audioDecodeThread = null;
+            Debug.Log("Mumble closed");
         }
         public void SendTextMessage(string textMessage)
         {
