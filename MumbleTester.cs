@@ -38,6 +38,9 @@ public class MumbleTester : MonoBehaviour {
             Debug.LogError("Please set the mumble host name to your mumble server");
             return;
         }
+        
+        if(HostName.ToLower() == "localhost") HostName = "127.0.0.1";
+
         Application.runInBackground = true;
         // If SendPosition, we'll send three floats.
         // This is roughly the standard for Mumble, however it seems that
