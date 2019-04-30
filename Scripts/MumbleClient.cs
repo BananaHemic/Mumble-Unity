@@ -140,6 +140,9 @@ namespace Mumble
             _anyUserStateChange = anyChangeMethod;
             _maxPositionalDataLength = maxPositionalDataLength;
 
+            //Check if localhost
+            if(_hostName.ToLower() == "localhost") _hostName = "127.0.0.1";
+
             switch (AudioSettings.outputSampleRate)
             {
                 case 8000:
