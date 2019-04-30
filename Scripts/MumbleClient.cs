@@ -141,7 +141,7 @@ namespace Mumble
             _maxPositionalDataLength = maxPositionalDataLength;
 
             //Check if localhost
-            if(_hostName == "localhost") _hostName = "127.0.0.1";
+            if(_hostName.ToLower() == "localhost") _hostName = "127.0.0.1";
 
             switch (AudioSettings.outputSampleRate)
             {
