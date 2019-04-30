@@ -627,8 +627,10 @@ namespace Mumble
             }
             _pendingMute = null;
 
-            UserState state = new UserState();
-            state.SelfMute = mute;
+            UserState state = new UserState
+            {
+                SelfMute = mute
+            };
             OurUserState.SelfMute = mute;
             //Debug.Log("Will set our self mute to: " + mute);
             _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
@@ -650,6 +652,19 @@ namespace Mumble
 
             Debug.Log("Our Self Mute is " + OurUserState.SelfMute);
             return OurUserState.SelfMute;
+        }
+        public bool SetOurComment(string newComment)
+        {
+            if (OurUserState == null)
+                return false;
+
+            UserState state = new UserState
+            {
+                Comment = newComment
+            };
+            OurUserState.Comment = newComment;
+            _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
+            return true;
         }
         private bool TryGetChannelByName(string channelName, out Channel channelState)
         {

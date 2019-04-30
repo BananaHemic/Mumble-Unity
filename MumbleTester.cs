@@ -177,5 +177,10 @@ public class MumbleTester : MonoBehaviour {
             print("Will join root");
             _mumbleClient.JoinChannel("Root");
         }
+        if (Input.GetKeyDown(KeyCode.C))
+        {
+            print("Will set our comment");
+            _mumbleClient.SetOurComment("Example Comment");
+        }
 	}
 }
