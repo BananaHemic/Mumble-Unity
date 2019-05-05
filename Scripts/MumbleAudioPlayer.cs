@@ -48,9 +48,18 @@ namespace Mumble
             if (_mumbleClient == null)
                 return null;
             UserState state = _mumbleClient.GetUserFromSession(Session);
-            if (state != null)
-                return state.Name;
-            return null;
+            if (state == null)
+                return null;
+            return state.Name;
+        }
+        public string GetUserComment()
+        {
+            if (_mumbleClient == null)
+                return null;
+            UserState state = _mumbleClient.GetUserFromSession(Session);
+            if (state == null)
+                return null;
+            return state.Comment;
         }
         public void Initialize(MumbleClient mumbleClient, UInt32 session)
         {
