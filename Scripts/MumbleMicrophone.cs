@@ -116,13 +116,24 @@ namespace Mumble
             int currentPosition = Microphone.GetPosition(_currentMic);
             //Debug.Log(currentPosition + " " + Microphone.IsRecording(_currentMic));
 
+            Debug.Log(currentPosition);
             if (currentPosition < _previousPosition)
                 _numTimesLooped++;
 
             //Debug.Log("mic position: " + currentPosition + " was: " + _previousPosition + " looped: " + _numTimesLooped);
 
             int totalSamples = currentPosition + _numTimesLooped * NumSamplesInMicBuffer;
+            bool isFirstSample = _numTimesLooped == 0 && _previousPosition == 0;
             _previousPosition = currentPosition;
+
+            // We drop the first sample, because it generally starts with
+            // a lot of pre-existing, stale, audio data which we couldn't
+            // use b/c it's too old
+            if (isFirstSample)
+            {
+                _totalNumSamplesSent = totalSamples;
+                return;
+            }
 
             while(totalSamples - _totalNumSamplesSent >= NumSamplesPerOutgoingPacket)
             {
