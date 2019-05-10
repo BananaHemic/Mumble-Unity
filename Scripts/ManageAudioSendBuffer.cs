@@ -18,7 +18,20 @@ namespace Mumble
         private Thread _encodingThread;
         private UInt32 sequenceIndex;
         private bool _stopSendingRequested = false;
-        private int _maxPositionalLength;
+        private readonly int _maxPositionalLength;
+        /// <summary>
+        /// How long of a duration, in ms should there be
+        /// between sending two packets. This helps
+        /// ensure that fewer udp packets are dropped
+        /// </summary>
+        const long MinSendingElapsedMilliseconds = 5;
+        /// <summary>
+        /// How many pending uncompressed buffers
+        /// are too many to use any sleep. This
+        /// is so that the sleep never causes us
+        /// to have an uncompressed buffer overflow
+        /// </summary>
+        const int MaxPendingBuffersForSleep = 4;
 
         public ManageAudioSendBuffer(MumbleUdpConnection udpConnection, MumbleClient mumbleClient, int maxPositionalLength)
         {
@@ -103,6 +116,9 @@ namespace Mumble
             //Debug.Log("Starting encoder thread");
             bool isLastPacket = false;
 
+            System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
+            stopwatch.Start();
+
             while (true)
             {
                 if(!_isRunning)
@@ -115,6 +131,7 @@ namespace Mumble
                         _waitHandle.WaitOne();
                     if(!_isRunning)
                         return;
+
                     bool isEmpty;
                     AudioEncodingBuffer.CompressedBuffer buff = _encodingBuffer.Encode(_encoder, out isLastPacket, out isEmpty);
 
@@ -161,11 +178,25 @@ namespace Mumble
                         Array.Copy(buff.PositionalData, 0, finalPacket, finalOffset, buff.PositionalDataLength);
 
                     //Debug.Log("seq: " + sequenceIndex + " | " + finalPacket.Length);
+
+                    stopwatch.Stop();
+                    long timeSinceLastSend = stopwatch.ElapsedMilliseconds;
+                    //Debug.Log("Elapsed: " + timeSinceLastSend + " pending: " + _encodingBuffer.GetNumUncompressedPending());
+
+                    if (timeSinceLastSend < MinSendingElapsedMilliseconds
+                        && _encodingBuffer.GetNumUncompressedPending() < MaxPendingBuffersForSleep)
+                    {
+                        Thread.Sleep((int)(MinSendingElapsedMilliseconds - timeSinceLastSend));
+                        //Debug.Log("Slept: " + stopwatch.ElapsedMilliseconds);
+                    }
+
                     _udpConnection.SendVoicePacket(finalPacket);
                     sequenceIndex += MumbleConstants.NUM_FRAMES_PER_OUTGOING_PACKET;
                     //If we've hit a stop packet, then reset the seq number
                     if (isLastPacket)
                         sequenceIndex = 0;
+                    stopwatch.Reset();
+                    stopwatch.Start();
                 }
                 catch (Exception e){
                     if(e is System.Threading.ThreadAbortException)

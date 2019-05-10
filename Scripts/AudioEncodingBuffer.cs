@@ -52,6 +52,10 @@ namespace Mumble
                 Monitor.Pulse(_bufferLock);
             }
         }
+        public int GetNumUncompressedPending()
+        {
+            return _unencodedBuffer.Count;
+        }
 
         public CompressedBuffer Encode(OpusEncoder encoder, out bool isStop, out bool isEmpty)
         {
