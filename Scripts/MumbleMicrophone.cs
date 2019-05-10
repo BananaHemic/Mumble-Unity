@@ -28,6 +28,9 @@ namespace Mumble
         /// <param name="positionalData"></param>
         public delegate void WritePositionalData(ref byte[] positionalData, ref int posDataLength);
 
+        public delegate void OnMicDisconnected();
+        public event OnMicDisconnected OnMicDisconnect;
+
         public bool SendAudioOnStart = true;
         public int MicNumberToUse;
         /// <summary>
@@ -60,6 +63,7 @@ namespace Mumble
         // Amplitude MicType vars
         private int _voiceHoldSamples;
         private int _sampleNumberOfLastMinAmplitudeVoice;
+        private int _numConsequtiveEmptySamples;
         private WritePositionalData _writePositionalDataFunc = null;
         
         public void Initialize(MumbleClient mumbleClient)
@@ -76,7 +80,7 @@ namespace Mumble
         /// Find the microphone to use and return it's sample rate
         /// </summary>
         /// <returns>New Mic's sample rate</returns>
-        internal int GetCurrentMicSampleRate()
+        internal int InitializeMic()
         {
             //Make sure the requested mic index exists
             if (Microphone.devices.Length <= MicNumberToUse)
@@ -85,6 +89,7 @@ namespace Mumble
                 return -1;
             }
 
+            _currentMic = Microphone.devices[MicNumberToUse];
             int minFreq;
             int maxFreq;
             Microphone.GetDeviceCaps(_currentMic, out minFreq, out maxFreq);
@@ -94,7 +99,6 @@ namespace Mumble
 
             if (micSampleRate != 48000)
                 Debug.LogWarning("Using a possibly unsupported sample rate of " + micSampleRate + " things might get weird");
-            _currentMic = Microphone.devices[MicNumberToUse];
             Debug.Log("Device:  " + _currentMic + " has freq: " + minFreq + " to " + maxFreq + " setting to: " + micSampleRate);
 
             _voiceHoldSamples = Mathf.RoundToInt(micSampleRate * VoiceHoldSeconds);
@@ -116,15 +120,31 @@ namespace Mumble
             int currentPosition = Microphone.GetPosition(_currentMic);
             //Debug.Log(currentPosition + " " + Microphone.IsRecording(_currentMic));
 
-            Debug.Log(currentPosition);
+            //Debug.Log(currentPosition);
             if (currentPosition < _previousPosition)
                 _numTimesLooped++;
 
             //Debug.Log("mic position: " + currentPosition + " was: " + _previousPosition + " looped: " + _numTimesLooped);
 
             int totalSamples = currentPosition + _numTimesLooped * NumSamplesInMicBuffer;
+            bool isEmpty = currentPosition == 0 && _previousPosition == 0;
             bool isFirstSample = _numTimesLooped == 0 && _previousPosition == 0;
             _previousPosition = currentPosition;
+            if (isEmpty)
+                _numConsequtiveEmptySamples++;
+            else
+                _numConsequtiveEmptySamples = 0;
+
+            if(_numConsequtiveEmptySamples > 5)
+            {
+                // For 5 times in a row, we received no usable data
+                // this normally means that the mic we were using disconnected
+                Debug.Log("Mic has disconnected!");
+                StopSendingAudio();
+                if (OnMicDisconnect != null)
+                    OnMicDisconnect();
+                return;
+            }
 
             // We drop the first sample, because it generally starts with
             // a lot of pre-existing, stale, audio data which we couldn't
@@ -210,6 +230,10 @@ namespace Mumble
         {
             return _currentMic != null;
         }
+        public string GetCurrentMicName()
+        {
+            return _currentMic;
+        }
         public void StartSendingAudio(int sampleRate)
         {
             if (_currentMic == null)
@@ -222,6 +246,7 @@ namespace Mumble
             _previousPosition = 0;
             _numTimesLooped = 0;
             _totalNumSamplesSent = 0;
+            _numConsequtiveEmptySamples = 0;
             _sampleNumberOfLastMinAmplitudeVoice = int.MinValue;
             isRecording = true;
             _mumbleClient.SetSelfMute(false);

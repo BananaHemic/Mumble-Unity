@@ -228,7 +228,7 @@ namespace Mumble
         {
             _mumbleMic = newMic;
             _mumbleMic.Initialize(this);
-            EncoderSampleRate = _mumbleMic.GetCurrentMicSampleRate();
+            EncoderSampleRate = _mumbleMic.InitializeMic();
 
             if (EncoderSampleRate == -1)
                 return;

@@ -106,6 +106,7 @@ public class MumbleTester : MonoBehaviour {
             _mumbleClient.AddMumbleMic(MyMumbleMic);
             if (SendPosition)
                 MyMumbleMic.SetPositionalDataFunction(WritePositionalData);
+            MyMumbleMic.OnMicDisconnect += OnMicDisconnected;
         }
     }
     private MumbleAudioPlayer CreateMumbleAudioPlayerFromPrefab(string username, uint session)
@@ -129,6 +130,35 @@ public class MumbleTester : MonoBehaviour {
     private void DestroyMumbleAudioPlayer(uint session, MumbleAudioPlayer playerToDestroy)
     {
         UnityEngine.GameObject.Destroy(playerToDestroy.gameObject);
+    }
+    private void OnMicDisconnected()
+    {
+        Debug.LogError("Connected microphone has disconnected!");
+        string disconnectedMicName = MyMumbleMic.GetCurrentMicName();
+        // This means that the mic that we were previously receiving audio from has disconnected
+        // you may want to present a notification to the user, allowing them to select
+        // a new mic to use
+        // here, we will start a coroutine to wait until the mic we want is connected again
+        StartCoroutine(ExampleMicReconnect(disconnectedMicName));
+    }
+    IEnumerator ExampleMicReconnect(string micToConnect)
+    {
+        while (true)
+        {
+            string[] micNames = Microphone.devices;
+            // try to see if the desired mic is connected
+            for(int i = 0; i < micNames.Length; i++)
+            {
+                if(micNames[i] == micToConnect)
+                {
+                    Debug.Log("Desired mic reconnected");
+                    MyMumbleMic.MicNumberToUse = i;
+                    MyMumbleMic.StartSendingAudio(_mumbleClient.EncoderSampleRate);
+                    yield break;
+                }
+            }
+            yield return new WaitForSeconds(2f);
+        }
     }
     void OnApplicationQuit()
     {
