@@ -212,5 +212,11 @@ public class MumbleTester : MonoBehaviour {
             print("Will set our comment");
             _mumbleClient.SetOurComment("Example Comment");
         }
-	}
+        if (Input.GetKeyDown(KeyCode.B))
+        {
+            print("Will set our texture");
+            byte[] commentHash = new byte[] { 1, 2, 3, 4, 5, 6 };
+            _mumbleClient.SetOurTexture(commentHash);
+        }
+    }
 }

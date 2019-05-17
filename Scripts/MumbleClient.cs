@@ -674,6 +674,19 @@ namespace Mumble
             _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
             return true;
         }
+        public bool SetOurTexture(byte[] texture)
+        {
+            if (OurUserState == null)
+                return false;
+
+            UserState state = new UserState
+            {
+                Texture = texture
+            };
+            OurUserState.Texture = texture;
+            _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
+            return true;
+        }
         private bool TryGetChannelByName(string channelName, out Channel channelState)
         {
             foreach(uint key in Channels.Keys)
