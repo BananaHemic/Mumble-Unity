@@ -325,6 +325,14 @@ namespace Mumble
                 });
             }
         }
+        internal int GetBitrate()
+        {
+            return _manageSendBuffer.GetBitrate();
+        }
+        internal void SetBitrate(int bitrate)
+        {
+            _manageSendBuffer.SetBitrate(bitrate);
+        }
         public bool ShouldAddAudioPlayerForUser(UserState other)
         {
             switch (_speakerCreationMode)

@@ -61,6 +61,14 @@ namespace Mumble
                 _encodingThread.Start();
             }
         }
+        public int GetBitrate()
+        {
+            return _encoder.Bitrate;
+        }
+        public void SetBitrate(int bitrate)
+        {
+            _encoder.Bitrate = bitrate;
+        }
         ~ManageAudioSendBuffer()
         {
             Dispose();
@@ -176,6 +184,7 @@ namespace Mumble
                     // Append positional data, if it exists
                     if(buff.PositionalDataLength > 0)
                         Array.Copy(buff.PositionalData, 0, finalPacket, finalOffset, buff.PositionalDataLength);
+                    //Debug.Log("seq: " + sequenceIndex + " final len: " + finalPacket.Length + " pos: " + buff.PositionalDataLength);
 
                     //Debug.Log("seq: " + sequenceIndex + " | " + finalPacket.Length);
 

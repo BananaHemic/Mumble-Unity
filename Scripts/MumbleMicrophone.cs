@@ -115,6 +115,14 @@ namespace Mumble
                 return 0;
             return Microphone.GetPosition(_currentMic);
         }
+        public void SetBitrate(int bitrate)
+        {
+            _mumbleClient.SetBitrate(bitrate);
+        }
+        public int GetBitrate()
+        {
+            return _mumbleClient.GetBitrate();
+        }
         void SendVoiceIfReady()
         {
             int currentPosition = Microphone.GetPosition(_currentMic);
