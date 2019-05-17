@@ -61,6 +61,15 @@ namespace Mumble
                 return null;
             return state.Comment;
         }
+        public byte[] GetUserTexture()
+        {
+            if (_mumbleClient == null)
+                return null;
+            UserState state = _mumbleClient.GetUserFromSession(Session);
+            if (state == null)
+                return null;
+            return state.Texture;
+        }
         public void Initialize(MumbleClient mumbleClient, UInt32 session)
         {
             //Debug.Log("Initialized " + session, this);
