@@ -279,6 +279,8 @@ namespace Mumble
                     userState.Comment = newUserState.Comment;
                 if (newUserState.ShouldSerializeChannelId())
                     userState.ChannelId = newUserState.ChannelId;
+                if (newUserState.ShouldSerializeTexture())
+                    userState.Texture = newUserState.Texture;
 
                 //if (newUserState.ShouldSerializeMute() && userState.Mute)
                 //Debug.Log("User " + userState.Name + " has been muted");
