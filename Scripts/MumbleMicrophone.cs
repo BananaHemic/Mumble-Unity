@@ -63,8 +63,10 @@ namespace Mumble
         // Amplitude MicType vars
         private int _voiceHoldSamples;
         private int _sampleNumberOfLastMinAmplitudeVoice;
-        private int _numConsequtiveEmptySamples;
+        private float _secondsWithoutMicSamples = 0;
         private WritePositionalData _writePositionalDataFunc = null;
+        // How many seconds to wait before we consider the mic being disconnected
+        const float MaxSecondsWithoutMicData = 1f;
         
         public void Initialize(MumbleClient mumbleClient)
         {
@@ -139,11 +141,11 @@ namespace Mumble
             bool isFirstSample = _numTimesLooped == 0 && _previousPosition == 0;
             _previousPosition = currentPosition;
             if (isEmpty)
-                _numConsequtiveEmptySamples++;
+                _secondsWithoutMicSamples += Time.deltaTime;
             else
-                _numConsequtiveEmptySamples = 0;
+                _secondsWithoutMicSamples = 0;
 
-            if(_numConsequtiveEmptySamples > 5)
+            if(_secondsWithoutMicSamples > MaxSecondsWithoutMicData)
             {
                 // For 5 times in a row, we received no usable data
                 // this normally means that the mic we were using disconnected
@@ -254,7 +256,7 @@ namespace Mumble
             _previousPosition = 0;
             _numTimesLooped = 0;
             _totalNumSamplesSent = 0;
-            _numConsequtiveEmptySamples = 0;
+            _secondsWithoutMicSamples = 0;
             _sampleNumberOfLastMinAmplitudeVoice = int.MinValue;
             isRecording = true;
             _mumbleClient.SetSelfMute(false);
