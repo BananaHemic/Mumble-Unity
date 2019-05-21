@@ -44,7 +44,16 @@ namespace Mumble
         public AudioClip TestingClipToUse;
         public KeyCode PushToTalkKeycode = KeyCode.Space;
 
-        const int NumRecordingSeconds = 1;
+        /// <summary>
+        /// How long to make the audio buffer that Unity
+        /// creates to store the mic data. Smaller numbers
+        /// are more memory efficient, but there seems to
+        /// be a Unity bug where there's a pop at the end
+        /// of the audio clip. Larger values seem to better
+        /// hide this pop
+        /// </summary>
+        //const int NumRecordingSeconds = 1;
+        const int NumRecordingSeconds = 5;
         private int NumSamplesInMicBuffer {
             get
             {
