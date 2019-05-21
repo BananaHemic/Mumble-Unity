@@ -218,5 +218,23 @@ public class MumbleTester : MonoBehaviour {
             byte[] commentHash = new byte[] { 1, 2, 3, 4, 5, 6 };
             _mumbleClient.SetOurTexture(commentHash);
         }
+
+        // You can use the up / down arrows to increase/decrease
+        // the bandwidth used by the mumble mic
+        const int BandwidthChange = 5000;
+        if (Input.GetKeyDown(KeyCode.UpArrow))
+        {
+            int currentBW = MyMumbleMic.GetBitrate();
+            int newBitrate = currentBW + BandwidthChange;
+            Debug.Log("Increasing bitrate " + currentBW + "->" + newBitrate);
+            MyMumbleMic.SetBitrate(newBitrate);
+        }
+        if (Input.GetKeyDown(KeyCode.DownArrow))
+        {
+            int currentBW = MyMumbleMic.GetBitrate();
+            int newBitrate = currentBW - BandwidthChange;
+            Debug.Log("Decreasing bitrate " + currentBW + "->" + newBitrate);
+            MyMumbleMic.SetBitrate(newBitrate);
+        }
     }
 }

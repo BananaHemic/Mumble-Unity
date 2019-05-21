@@ -70,15 +70,19 @@ namespace Mumble
                 var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.GET_BITRATE_REQUEST, out bitrate);
                 if (ret < 0)
                     throw new Exception("Encoder error - " + ((OpusErrors)ret));
+                //Debug.Log("Got bw: " + bitrate + " ret: " + ret);
                 return bitrate;
             }
             set
             {
                 if (_encoder == IntPtr.Zero)
                     throw new ObjectDisposedException("OpusEncoder");
-                var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.SET_BITRATE_REQUEST, out value);
+
+                //Debug.Log("Setting bitrate to: " + value);
+                var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.SET_BITRATE_REQUEST, value);
                 if (ret < 0)
                     throw new Exception("Encoder error - " + ((OpusErrors)ret));
+                //Debug.Log("set bw ret: " + ret);
             }
         }
 

@@ -234,8 +234,8 @@ namespace Mumble {
                 _mumbleClient.ReceiveDecodedVoice(session, pcmBuffer, numRead, posData,
                     reevaluateInitialBuffer);
             }
-            else
-                Debug.LogError("empty packet data?");
+            //else
+                //Debug.Log("empty packet data?");
 
             if (numRead < 0)
             {
