@@ -226,7 +226,7 @@ namespace Mumble
                             _mumbleClient.ServerConfig = Serializer.DeserializeWithLengthPrefix<ServerConfig>(_ssl,
                                 PrefixStyle.Fixed32BigEndian);
                             //Debug.Log("Sever config = " + _mumbleClient.ServerConfig);
-                            Debug.Log("Mumble is Connected!");
+                            Debug.Log("Mumble is Connected");
                             _validConnection = true; // handshake complete
                             break;
                         case MessageType.SuggestConfig:

@@ -82,7 +82,7 @@ namespace Mumble
                 var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.SET_BITRATE_REQUEST, value);
                 if (ret < 0)
                     throw new Exception("Encoder error - " + ((OpusErrors)ret));
-                //Debug.Log("set bw ret: " + ret);
+                //Debug.Log("set opus bitrate to: " + value + " return: " + ret);
             }
         }
 

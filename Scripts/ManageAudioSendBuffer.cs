@@ -19,6 +19,7 @@ namespace Mumble
         private UInt32 sequenceIndex;
         private bool _stopSendingRequested = false;
         private readonly int _maxPositionalLength;
+        private int _pendingBitrate = 0;
         /// <summary>
         /// How long of a duration, in ms should there be
         /// between sending two packets. This helps
@@ -52,6 +53,13 @@ namespace Mumble
                 _encoder = null;
             }
             _encoder = new OpusEncoder(sampleRate, 1) { EnableForwardErrorCorrection = false };
+
+            if(_pendingBitrate > 0)
+            {
+                Debug.Log("Using pending bitrate");
+                SetBitrate(_pendingBitrate);
+            }
+
             if (_encodingThread == null)
             {
                 _encodingThread = new Thread(EncodingThreadEntry)
@@ -63,10 +71,18 @@ namespace Mumble
         }
         public int GetBitrate()
         {
+            if (_encoder == null)
+                return -1;
             return _encoder.Bitrate;
         }
         public void SetBitrate(int bitrate)
         {
+            if(_encoder == null)
+            {
+                // We'll use the provided bitrate once we've created the encoder
+                _pendingBitrate = bitrate;
+                return;
+            }
             _encoder.Bitrate = bitrate;
         }
         ~ManageAudioSendBuffer()
