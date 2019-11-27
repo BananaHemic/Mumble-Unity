@@ -39,7 +39,7 @@ namespace Mumble
 #if UNITY_IPHONE && !UNITY_EDITOR
         const string pluginName = "__Internal";
 #else
-        const string pluginName = "opus-1.3";
+        const string pluginName = "opus-1_3";
 #endif
 
         [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
