@@ -25,6 +25,7 @@ namespace Mumble
         internal volatile int NumPacketsRecv = 0;
         internal volatile bool _useTcp = false;
         // These are used for switching to TCP audio and back. Don't rely on them for anything else
+        private bool _running; // This is to signal threads to shut down safely
         private volatile int _numPingsOutstanding = 0;
         private Thread _receiveThread;
         private byte[] _recvBuffer;
@@ -66,6 +67,8 @@ namespace Mumble
             _udpTimer.Enabled = true;
 
             SendPing();
+            // Before starting our thread, set running to true
+            _running = true;
             _receiveThread = new Thread(ReceiveUDP)
             {
                 IsBackground = true
@@ -84,7 +87,7 @@ namespace Mumble
                 _recvBuffer = new byte[MaxUDPSize];
 
             EndPoint endPoint = (EndPoint)_host;
-            while (true)
+            while (_running)
             {
                 try
                 {
@@ -119,6 +122,9 @@ namespace Mumble
                         Debug.LogError("Unhandled UDP receive error: " + ex);
                 }
             }
+            // This probably isn't needed but go ahead and set running back to true
+            // here just to ensure we're always set up for the next thread
+            _running = true;
         }
         internal bool ProcessUdpMessage(byte[] encrypted, int len)
         {
@@ -243,8 +249,10 @@ namespace Mumble
 
         internal void Close()
         {
+            // Signal thread that it's time to shut down
+            _running = false;
             if (_receiveThread != null)
-                _receiveThread.Abort();
+                _receiveThread.Interrupt();
             _receiveThread = null;
             if(_udpTimer != null)
                 _udpTimer.Close();
