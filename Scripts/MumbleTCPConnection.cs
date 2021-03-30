@@ -26,6 +26,7 @@ namespace Mumble
         private MumbleUdpConnection _udpConnection;
         private bool _validConnection;
         private BinaryWriter _writer;
+        private bool _running; // Used to signal threads to shut down safely
         private System.Timers.Timer _tcpTimer;
         private Thread _processThread;
         private string _username;
@@ -40,7 +41,9 @@ namespace Mumble
             _udpConnection = udpConnection;
             _tcpClient = new TcpClient();
             _updateOcbServerNonce = updateOcbServerNonce;
-            
+
+            // Set thread as running before starting
+            _running = true;
             _processThread = new Thread(ProcessTcpData)
             {
                 IsBackground = true
@@ -152,7 +155,7 @@ namespace Mumble
         private void ProcessTcpData()
         {
             // This thread is aborted in Close()
-            while (true)
+            while (_running)
             {
                 try
                 {
@@ -310,6 +313,9 @@ namespace Mumble
                     return;
                 }
             }
+            // This probably isn't needed but just putting this here to ensure we're always set up for
+            // the next thread
+            _running = true;
         }
 
         private void ProcessCryptSetup(CryptSetup cryptSetup)
@@ -334,6 +340,9 @@ namespace Mumble
 
         internal void Close()
         {
+            // Signal thread that it's time to shut down
+            _running = false;
+
             if(_ssl != null)
                 _ssl.Close();
             _ssl = null;
@@ -341,7 +350,7 @@ namespace Mumble
                 _tcpTimer.Close();
             _tcpTimer = null;
             if(_processThread != null)
-                _processThread.Abort();
+                _processThread.Interrupt();
             _processThread = null;
             if(_reader != null)
                 _reader.Close();
