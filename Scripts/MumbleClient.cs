@@ -577,6 +577,76 @@ namespace Mumble
                 out nextPositionData, out previousAudioDspTime);
             return true;
         }
+
+        /// <summary>
+        /// Check if the channel already exist     
+        /// </summary>
+        /// <param name="channelName">The name of the channel you want to check</param>
+        /// <returns>Whether channel exist</returns>
+        public bool IsChannelAvailable(string channelName)
+        {
+            return TryGetChannelByName(channelName, out _);
+        }
+
+
+        /// <summary>
+        /// Create the channel on the server
+        /// The user must have the admin rights
+        /// </summary>
+        /// <param name="channelName">The name of the channel you want to create</param>
+        /// <param name="temporary">temporary Channel, it will be automatically removed when the last user quit</param>
+        /// <param name="parent">parent of the new channel, 0=root</param>
+        /// <param name="description">text descrption of the channel</param>
+        /// <param name="maxusers">0=unlimited users</param>
+        /// <returns>Whether adding channel was successful</returns>
+        public bool CreateChannel(string channelName, bool temporary, uint parent, string description, uint maxusers)
+        {
+            if (OurUserState == null)
+                return false;
+            if (!ConnectionSetupFinished)
+                return false;
+
+            ChannelState state = new ChannelState
+            {
+                Name = channelName,
+                Temporary = temporary,
+                Parent = parent,
+                Description = description,
+                MaxUsers = maxusers,
+                Position = -1
+            };
+
+            _tcpConnection.SendMessage<MumbleProto.ChannelState>(MessageType.ChannelState, state);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Destroy the channel on the server
+        /// The user must have the admin rights
+        /// </summary>
+        /// <param name="channelName">The name of the channel you want to remove</param>      
+        public void DestroyChannel(string channelName)
+        {
+            Channel channel;
+
+            if (!TryGetChannelByName(channelName, out channel))
+            {
+                Debug.LogError("channel :" + channelName + " to remove not found!");
+                return;
+            }
+
+            ChannelRemove channeltoremove = new ChannelRemove
+            {
+                ChannelId = channel.ChannelId
+            };
+
+            _tcpConnection.SendMessage<MumbleProto.ChannelRemove>(MessageType.ChannelRemove, channeltoremove);
+
+            return;
+
+        }
+
         /// <summary>
         /// Enter the current user into the provided channel
         /// Keep in mind that there can be multiple channels with the same 
