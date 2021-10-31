@@ -10,7 +10,7 @@ namespace Mumble
         const int AES_BLOCK_SIZE = 16;
         private readonly byte[] _decryptHistory = new byte[256];
 
-        private CryptSetup _cryptSetup;
+        private CryptSetup _cryptSetup;     //private variables
         private ICryptoTransform _decryptor;
         private ICryptoTransform _encryptor;
 
