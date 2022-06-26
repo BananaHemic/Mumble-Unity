@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections;
+using UnityEngine.UI;
 
 namespace Mumble
 {
@@ -86,7 +87,10 @@ namespace Mumble
         {
             _writePositionalDataFunc = writePositionalData;
         }
-
+        public void setSettings(MicType microphoneSetting, int device){
+            VoiceSendingType = microphoneSetting;
+            MicNumberToUse = device;
+        }
         /// <summary>
         /// Find the microphone to use and return it's sample rate
         /// </summary>
@@ -244,6 +248,9 @@ namespace Mumble
                     return true;
             }
             return currentSum / pcm.Length > minAmplitude;
+        }
+        public MicType GetMicType(){
+            return VoiceSendingType;
         }
         public bool HasMic()
         {

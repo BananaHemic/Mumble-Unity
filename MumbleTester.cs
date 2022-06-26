@@ -19,8 +19,14 @@ public class MumbleTester : MonoBehaviour {
     // Mumble audio player that also receives position commands
     public GameObject MyMumbleAudioPlayerPositionedPrefab;
 
+    public GameObject VoIP_UI;
+
+    private bool VoiceUIEnabled = false;
+
     public MumbleMicrophone MyMumbleMic;
     public DebugValues DebuggingVariables;
+
+    private GameObject VoiceUI;
 
     private MumbleClient _mumbleClient;
     public bool ConnectAsyncronously = true;
@@ -32,7 +38,7 @@ public class MumbleTester : MonoBehaviour {
     public string ChannelToJoin = "";
 
 	void Start () {
-
+        Username = GameManager.players[GameManager.MyID];
         if(HostName == "1.2.3.4")
         {
             Debug.LogError("Please set the mumble host name to your mumble server");
@@ -189,52 +195,67 @@ public class MumbleTester : MonoBehaviour {
             numPacketsLost += numLostThisSample;
         }
     }
+    public void setVoiceUIEnabled(){
+        VoiceUIEnabled = !VoiceUIEnabled;
+    }
 	void Update () {
         if (!_mumbleClient.ReadyToConnect)
             return;
-        if (Input.GetKeyDown(KeyCode.S))
-        {
-            _mumbleClient.SendTextMessage("This is an example message from Unity");
-            print("Sent mumble message");
+        if(Input.GetKeyDown(KeyCode.V)){          
+            if(VoiceUI == null && !VoiceUIEnabled){
+                VoiceUI = GameObject.Instantiate(VoIP_UI);
+                VoiceUI.GetComponent<VoiceUI>().SetUserMicrophone(MyMumbleMic);
+                VoiceUI.GetComponent<VoiceUI>().SetMumble(this);
+                setVoiceUIEnabled();
+            }
+            else
+                VoiceUI.GetComponent<VoiceUI>().Destroy();
+            
+
         }
-        if (Input.GetKeyDown(KeyCode.J))
-        {
-            print("Will attempt to join channel " + ChannelToJoin);
-            _mumbleClient.JoinChannel(ChannelToJoin);
-        }
-        if (Input.GetKeyDown(KeyCode.Escape))
-        {
-            print("Will join root");
-            _mumbleClient.JoinChannel("Root");
-        }
-        if (Input.GetKeyDown(KeyCode.C))
-        {
-            print("Will set our comment");
-            _mumbleClient.SetOurComment("Example Comment");
-        }
-        if (Input.GetKeyDown(KeyCode.B))
-        {
-            print("Will set our texture");
-            byte[] commentHash = new byte[] { 1, 2, 3, 4, 5, 6 };
-            _mumbleClient.SetOurTexture(commentHash);
-        }
+        // if (Input.GetKeyDown(KeyCode.S))
+        // {
+        //     _mumbleClient.SendTextMessage("This is an example message from Unity");
+        //     print("Sent mumble message");
+        // }
+        // if (Input.GetKeyDown(KeyCode.J))
+        // {
+        //     print("Will attempt to join channel " + ChannelToJoin);
+        //     _mumbleClient.JoinChannel(ChannelToJoin);
+        // }
+        // if (Input.GetKeyDown(KeyCode.Escape))
+        // {
+        //     print("Will join root");
+        //     _mumbleClient.JoinChannel("Root");
+        // }
+        // if (Input.GetKeyDown(KeyCode.C))
+        // {
+        //     print("Will set our comment");
+        //     _mumbleClient.SetOurComment("Example Comment");
+        // }
+        // if (Input.GetKeyDown(KeyCode.B))
+        // {
+        //     print("Will set our texture");
+        //     byte[] commentHash = new byte[] { 1, 2, 3, 4, 5, 6 };
+        //     _mumbleClient.SetOurTexture(commentHash);
+        // }
 
         // You can use the up / down arrows to increase/decrease
         // the bandwidth used by the mumble mic
-        const int BandwidthChange = 5000;
-        if (Input.GetKeyDown(KeyCode.UpArrow))
-        {
-            int currentBW = MyMumbleMic.GetBitrate();
-            int newBitrate = currentBW + BandwidthChange;
-            Debug.Log("Increasing bitrate " + currentBW + "->" + newBitrate);
-            MyMumbleMic.SetBitrate(newBitrate);
-        }
-        if (Input.GetKeyDown(KeyCode.DownArrow))
-        {
-            int currentBW = MyMumbleMic.GetBitrate();
-            int newBitrate = currentBW - BandwidthChange;
-            Debug.Log("Decreasing bitrate " + currentBW + "->" + newBitrate);
-            MyMumbleMic.SetBitrate(newBitrate);
-        }
+        // const int BandwidthChange = 5000;
+        // if (Input.GetKeyDown(KeyCode.UpArrow))
+        // {
+        //     int currentBW = MyMumbleMic.GetBitrate();
+        //     int newBitrate = currentBW + BandwidthChange;
+        //     Debug.Log("Increasing bitrate " + currentBW + "->" + newBitrate);
+        //     MyMumbleMic.SetBitrate(newBitrate);
+        // }
+        // if (Input.GetKeyDown(KeyCode.DownArrow))
+        // {
+        //     int currentBW = MyMumbleMic.GetBitrate();
+        //     int newBitrate = currentBW - BandwidthChange;
+        //     Debug.Log("Decreasing bitrate " + currentBW + "->" + newBitrate);
+        //     MyMumbleMic.SetBitrate(newBitrate);
+        // }
     }
 }

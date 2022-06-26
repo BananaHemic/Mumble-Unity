@@ -13,7 +13,7 @@ public class MumbleExamplePositionDisplay : MonoBehaviour {
     public Mumble.MumbleAudioPlayer MumbleAudio;
 
 	void Start () {
-		
+		MumbleAudio = gameObject.GetComponent<Mumble.MumbleAudioPlayer>();
 	}
     private bool ReadPositionalData(byte[] posData, out Vector3 pos)
     {
