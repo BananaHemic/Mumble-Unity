@@ -4,6 +4,7 @@ A simple to use Mumble Client made for Unity3D.
 Easily send low-latency text and voice to a group of other users
 
 ## Features
+
 * End-to-End OCB/AES encryption
 * Client-to-server architecture allowing far more scalability than peer-to-peer
 * Opus codec support, allowing lightweight low latency HD voice communication
@@ -22,26 +23,46 @@ Easily send low-latency text and voice to a group of other users
 * Cross platform
 
 ## Limitations
+
 * Only the Opus codec is supported, meaning very old mumble clients may be unable to connect
 * Requires a (free) Mumble server
 
 ## Getting started
+
 ### Get a server
+
    Either get a Mumble server at [one of the many Mumble server hosts](https://wiki.mumble.info/wiki/Hosters).
 Or you can [setup your own Mumble server](https://wiki.mumble.info/wiki/Installing_Mumble) (which I recommend)
 
    If you do make your own server, be sure to set "opusthreshold=0" in mumble-server.ini or murmur.ini in order to make all clients use opus
+
 ### Installing
+
+**Method 1: using UnityNuGet + OpenUPM scope registry**
+
+1. Add the [UnityNuget](https://github.com/xoofx/UnityNuGet) scope registry:
+
+```
+https://github.com/xoofx/UnityNuGet#add-scope-registry-manifestjson
+```
+
+2. Follow the steps in `Manual installation`: https://openupm.com/packages/com.bananahemic.mumble/
+
+**Method 2: Manually**
+
    * If your Unity project is *not* currently tracked with git, then you can navigate to your project's "Assets" folder and run
    `git clone https://github.com/BananaHemic/Mumble-Unity.git`
    * If your project *is* already tracked with git, you can add this projects as a submodule by navigating to the "Assets" folder and running
    `git submodule add https://github.com/BananaHemic/Mumble-Unity.git`
    * Then, simply open the included example scene, and input your Mumble server's address into "MumbleTester"
+
 ### Integration
+
    * To begin integrating into your application, you can copy "MumbleTester.cs" and adapt the functions to best meet your individual needs
    * For instance, if you would like to make the audio come from an object (like a person's head) you can change the `CreateMumbleAudioPlayerFromPrefab` method to create the prefab as a child of your target object
 
 ## TODO
+
 1. Better support multiple audio per packet sizes (20ms is currently assumed)
 2. Switch to TCP without sending voice packets
 3. Get Opus libraries for iOS
