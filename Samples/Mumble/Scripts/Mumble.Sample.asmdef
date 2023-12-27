@@ -1,0 +1,16 @@
+{
+    "name": "Mumble.Sample",
+    "rootNamespace": "Mumble.Sample",
+    "references": [
+        "GUID:46acf5ea197431d41b4b509df1aba74e"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

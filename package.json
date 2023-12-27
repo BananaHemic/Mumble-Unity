@@ -1,0 +1,19 @@
+{
+    "name": "com.bananahemic.mumble",
+    "version": "1.0.0",
+    "displayName": "Mumble",
+    "description": "A simple to use Mumble Client made for Unity3D. Easily send low-latency text and voice to a group of other users.",
+    "unity": "2021.3",
+    "license": "MIT",
+    "dependencies": {
+        "org.nuget.protobuf-net": "2.4.8",
+        "org.nuget.system.servicemodel.syndication": "8.0.0"
+    },
+    "samples": [
+        {
+            "displayName": "Mumble",
+            "description": "Contains a basic sample",
+            "path": "Samples/Mumble"
+        }
+    ]
+}
