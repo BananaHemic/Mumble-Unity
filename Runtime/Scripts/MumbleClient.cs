@@ -82,6 +82,7 @@ namespace Mumble
         public Action<Channel> OnChannelRemovedThreaded;
 
         public OnChannelChangedMethod OnChannelChanged;
+        public Action<TextMessage> OnTextMessageReceived;
         public OnDisconnectedMethod OnDisconnected;
         private MumbleTcpConnection _tcpConnection;
         private MumbleUdpConnection _udpConnection;
@@ -263,7 +264,7 @@ namespace Mumble
                 // Copy over the things that have changed
                 if (newUserState.ShouldSerializeActor())
                     userState.Actor = newUserState.Actor;
-                if(newUserState.ShouldSerializeName())
+                if (newUserState.ShouldSerializeName())
                     userState.Name = newUserState.Name;
                 if (newUserState.ShouldSerializeMute())
                     userState.Mute = newUserState.Mute;
@@ -326,6 +327,14 @@ namespace Mumble
                         _anyUserStateChange(newUserState.Session, newUserState, userState);
                 });
             }
+        }
+        internal void TextMessageReceived(TextMessage textMessage)
+        {
+            EventProcessor.Instance.QueueEvent(() =>
+            {
+                if (OnTextMessageReceived != null)
+                    OnTextMessageReceived(textMessage);
+            });
         }
         internal int GetBitrate()
         {

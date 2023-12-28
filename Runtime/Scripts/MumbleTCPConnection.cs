@@ -247,6 +247,7 @@ namespace Mumble
                             //Debug.Log("Text channel = " + textMessage.channel_id[0]);
                             //Debug.Log("Text session Length = " + textMessage.Sessions.Length);
                             //Debug.Log("Text Tree Length = " + textMessage.TreeIds.Length);
+                            _mumbleClient.TextMessageReceived(textMessage);
                             break;
                         case MessageType.UDPTunnel:
                             var length = IPAddress.NetworkToHostOrder(_reader.ReadInt32());
