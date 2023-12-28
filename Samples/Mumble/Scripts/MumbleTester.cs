@@ -127,18 +127,18 @@ namespace Mumble.Sample
             Debug.Log("Adding audio player for: " + username);
             return newPlayer;
         }
-        
+
         private void OnOtherUserStateChange(uint session, MumbleProto.UserState updatedDeltaState, MumbleProto.UserState fullUserState)
         {
             print("User #" + session + " had their user state change");
             // Here we can do stuff like update a UI with users' current channel/mute etc.
         }
-        
+
         private void DestroyMumbleAudioPlayer(uint session, MumbleAudioPlayer playerToDestroy)
         {
             Destroy(playerToDestroy.gameObject);
         }
-        
+
         private void OnMicDisconnected()
         {
             Debug.LogError("Connected microphone has disconnected!");
@@ -169,7 +169,7 @@ namespace Mumble.Sample
                 yield return new WaitForSeconds(2f);
             }
         }
-        
+
         void OnApplicationQuit()
         {
             Debug.LogWarning("Shutting down connections");

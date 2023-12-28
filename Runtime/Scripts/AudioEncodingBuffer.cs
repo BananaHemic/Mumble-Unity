@@ -1,7 +1,7 @@
 ﻿/*
  * This puts data from the mics taken on the main thread
  * Then another thread pulls frame data out
- * 
+ *
  * We now assume that each mic packet placed into the buffer is an acceptable size
  */
 using System;

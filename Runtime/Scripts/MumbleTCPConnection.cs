@@ -93,7 +93,7 @@ namespace Mumble
 
         private void StartPingTimer()
         {
-            // Keepalive, if the Mumble server doesn't get a message 
+            // Keepalive, if the Mumble server doesn't get a message
             // for 30 seconds it will close the connection
             _tcpTimer = new System.Timers.Timer(MumbleConstants.PING_INTERVAL_MS);
             _tcpTimer.Elapsed += SendPing;

@@ -1,4 +1,4 @@
-﻿using MumbleProto;
+using MumbleProto;
 using NUnit.Framework;
 using UnityEngine;
 

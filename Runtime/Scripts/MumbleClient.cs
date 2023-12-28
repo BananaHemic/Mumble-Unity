@@ -578,7 +578,7 @@ namespace Mumble
         }
 
         /// <summary>
-        /// Check if the channel already exist     
+        /// Check if the channel already exist
         /// </summary>
         /// <param name="channelName">The name of the channel you want to check</param>
         /// <returns>Whether channel exist</returns>
@@ -623,7 +623,7 @@ namespace Mumble
         /// Destroy the channel on the server
         /// The user must have the admin rights
         /// </summary>
-        /// <param name="channelName">The name of the channel you want to remove</param>      
+        /// <param name="channelName">The name of the channel you want to remove</param>
         public void DestroyChannel(string channelName)
         {
             if (!TryGetChannelByName(channelName, out Channel channel))
@@ -642,7 +642,7 @@ namespace Mumble
 
         /// <summary>
         /// Enter the current user into the provided channel
-        /// Keep in mind that there can be multiple channels with the same 
+        /// Keep in mind that there can be multiple channels with the same
         /// name
         /// </summary>
         /// <param name="channelToJoin">The name of the channel you want to join</param>
