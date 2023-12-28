@@ -32,7 +32,7 @@ namespace Mumble
                 Debug.LogWarning("For best performance, please turn \"Play On Awake\" off");
 #endif
             // In principle, this line shouldn't need to be here.
-            // however, from profiling it seems that Unity will
+            // However, from profiling it seems that Unity will
             // call OnAudioFilterRead when the audioSource hits
             // Awake, even if PlayOnAwake is off
             _audioSource.Stop();

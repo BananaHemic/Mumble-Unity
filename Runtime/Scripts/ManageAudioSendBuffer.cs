@@ -196,7 +196,7 @@ namespace Mumble
                     }
                     byte[] opusHeader = Var64.WriteVarint64_alternative(opusHeaderNum);
                     // Packet:
-                    //[type/target] [sequence] [opus length header] [packet data]
+                    // [type/target] [sequence] [opus length header] [packet data]
                     byte[] finalPacket = new byte[1 + sequence.Length + opusHeader.Length + packet.Count + buff.PositionalDataLength];
                     finalPacket[0] = type;
                     int finalOffset = 1;

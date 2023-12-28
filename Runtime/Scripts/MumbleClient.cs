@@ -126,7 +126,7 @@ namespace Mumble
         public int EncoderSampleRate { get; private set; }
         public int NumSamplesPerOutgoingPacket { get; private set; }
 
-        //The Mumble version of this integration
+        // The Mumble version of this integration
         public const string ReleaseName = "MumbleUnity";
         public const uint Major = 1;
         public const uint Minor = 2;
@@ -145,7 +145,7 @@ namespace Mumble
             _anyUserStateChange = anyChangeMethod;
             _maxPositionalDataLength = maxPositionalDataLength;
 
-            //Check if localhost
+            // Check if localhost
             if (_hostName.ToLower() == "localhost") _hostName = "127.0.0.1";
 
             switch (AudioSettings.outputSampleRate)
@@ -293,7 +293,7 @@ namespace Mumble
                 if (isOurUser && newUserState.ShouldSerializeChannelId())
                 {
                     Debug.Log("Our Channel changed! #" + newUserState.ChannelId);
-                    //AllUsers[newUserState.Session].ChannelId = newUserState.ChannelId;
+
                     Channel ourChannel = Channels[newUserState.ChannelId];
 
                     EventProcessor.Instance.QueueEvent(() =>
@@ -541,9 +541,8 @@ namespace Mumble
         {
             if (session == ServerSync.Session && !_debugValues.UseLocalLoopback)
                 return 0;
-            //Debug.Log("Will decode for " + session);
 
-            //TODO use bool to show if loading worked or not
+            // TODO use bool to show if loading worked or not
             if (_audioDecodingBuffers.TryGetValue(session, out DecodedAudioBuffer decodingBuffer))
                 return decodingBuffer.Read(pcmArray, offset, length);
             else

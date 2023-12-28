@@ -14,7 +14,7 @@
         public const int SAMPLE_BITS = 16;
         public const float MAX_LATENCY_SECONDS = 0.2f;
         public const bool IS_LITTLE_ENDIAN = false;
-        public const int PING_INTERVAL_MS = 5000;//5 seconds
+        public const int PING_INTERVAL_MS = 5000; // 5 seconds
         // TODO experiment with this
         public const int USE_FORWARD_ERROR_CORRECTION = 0;
         // Should probably be 12, but I'm hesitant to double the buffer for everyone to support a rare case
