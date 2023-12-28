@@ -1,13 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.IO;
-using UnityEngine;
 
 namespace Mumble
 {
-    public class UdpPacketReader: IDisposable
+    public class UdpPacketReader : IDisposable
     {
         readonly Stream _inner;
 
@@ -46,22 +42,21 @@ namespace Mumble
 
         public long ReadVarInt64()
         {
-            //return ProtoBuf.ProtoReader.DirectReadVarintInt32(_inner);
             byte b = ReadByte();
             int leadingOnes = LeadingOnes(b);
-            //Debug.Log("b = " + b + " starts with " + leadingOnes);
+
             switch (leadingOnes)
             {
                 case 0:
                     return b & 127;
                 case 1:
-                    //10xxxxxx + 1 byte
+                    // 10xxxxxx + 1 byte
                     return ((b & 63) << 8) | ReadByte();
                 case 2:
-                    //110xxxxx + 2 bytes
+                    // 110xxxxx + 2 bytes
                     return ((b & 31) << 16) | ReadByte() << 8 | ReadByte();
                 case 3:
-                    //1110xxxx + 3 bytes
+                    // 1110xxxx + 3 bytes
                     return ((b & 15) << 24) | ReadByte() << 16 | ReadByte() << 8 | ReadByte();
                 case 4:
                     // Either:
@@ -69,24 +64,24 @@ namespace Mumble
                     //  > 111101__ + long (8 bytes)
                     if ((b & 4) == 4)
                     {
-                        //111101__ + long (8 bytes)
+                        // 111101__ + long (8 bytes)
                         return ReadByte() << 56 | ReadByte() << 48 | ReadByte() << 40 | ReadByte() << 32 | ReadByte() << 24 | ReadByte() << 16 | ReadByte() << 8 | ReadByte();
                     }
                     else
                     {
-                        //111100__ + int (4 bytes)
+                        // 111100__ + int (4 bytes)
                         return ReadByte() << 24 | ReadByte() << 16 | ReadByte() << 8 | ReadByte();
                     }
                 case 5:
-                    //111110 + varint (negative)
+                    // 111110 + varint (negative)
                     return ~ReadVarInt64();
                 case 6:
                 case 7:
                 case 8:
-                    //111111xx Byte-inverted negative two bit number (~xx)
+                    // 111111xx Byte-inverted negative two bit number (~xx)
 
-                    //We need three cases here because all the other leading parts are capped off by a zero, e.g. 11110xxx
-                    //However in this case it's just 6 ones, and then the data (111111xx). Depending on the data, the leading count changes
+                    // We need three cases here because all the other leading parts are capped off by a zero, e.g. 11110xxx
+                    // However in this case it's just 6 ones, and then the data (111111xx). Depending on the data, the leading count changes
                     return ~(b & 3);
                 default:
                     throw new Exception("Invalid varint encoding");

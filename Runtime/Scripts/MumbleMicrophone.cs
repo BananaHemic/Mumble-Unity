@@ -1,5 +1,4 @@
 ﻿using UnityEngine;
-using System.Collections;
 
 namespace Mumble
 {
@@ -8,7 +7,7 @@ namespace Mumble
         public enum MicType
         {
             AlwaysSend,
-            //SignalToNoise, //TODO we need a dll to calculate the signal to noise, as it requires a FFT which I don't want to do in C#
+            //SignalToNoise, // TODO we need a dll to calculate the signal to noise, as it requires a FFT which I don't want to do in C#
             Amplitude,
             PushToTalk,
             MethodBased // Start / Stop speaking based on calls to this method
@@ -37,7 +36,7 @@ namespace Mumble
         /// The minimum aplitude to recognize as voice data
         /// Only used if Mic is set to "Amplitude"
         /// </summary>
-        [Range (0.0f, 1.0f)]
+        [Range(0.0f, 1.0f)]
         public float MinAmplitude = 0.007f;
         public float VoiceHoldSeconds = 0.5f;
         public MicType VoiceSendingType = MicType.AlwaysSend;
@@ -54,7 +53,8 @@ namespace Mumble
         /// </summary>
         //const int NumRecordingSeconds = 1;
         const int NumRecordingSeconds = 5;
-        private int NumSamplesInMicBuffer {
+        private int NumSamplesInMicBuffer
+        {
             get
             {
                 return NumRecordingSeconds * _mumbleClient.EncoderSampleRate;
@@ -76,7 +76,7 @@ namespace Mumble
         private WritePositionalData _writePositionalDataFunc = null;
         // How many seconds to wait before we consider the mic being disconnected
         const float MaxSecondsWithoutMicData = 1f;
-        
+
         public void Initialize(MumbleClient mumbleClient)
         {
             _mumbleClient = mumbleClient;
@@ -93,7 +93,7 @@ namespace Mumble
         /// <returns>New Mic's sample rate</returns>
         internal int InitializeMic()
         {
-            //Make sure the requested mic index exists
+            // Make sure the requested mic index exists
             if (Microphone.devices.Length <= MicNumberToUse)
             {
                 Debug.LogWarning("No microphone connected!");
@@ -101,9 +101,7 @@ namespace Mumble
             }
 
             _currentMic = Microphone.devices[MicNumberToUse];
-            int minFreq;
-            int maxFreq;
-            Microphone.GetDeviceCaps(_currentMic, out minFreq, out maxFreq);
+            Microphone.GetDeviceCaps(_currentMic, out int minFreq, out int maxFreq);
 
             int micSampleRate = MumbleClient.GetNearestSupportedSampleRate(maxFreq);
             NumSamplesPerOutgoingPacket = MumbleConstants.NUM_FRAMES_PER_OUTGOING_PACKET * micSampleRate / 100;
@@ -120,30 +118,30 @@ namespace Mumble
 
             return micSampleRate;
         }
+
         public int GetMicPosition()
         {
             if (_currentMic == null)
                 return 0;
             return Microphone.GetPosition(_currentMic);
         }
+
         public void SetBitrate(int bitrate)
         {
             _mumbleClient.SetBitrate(bitrate);
         }
+
         public int GetBitrate()
         {
             return _mumbleClient.GetBitrate();
         }
+
         void SendVoiceIfReady()
         {
             int currentPosition = Microphone.GetPosition(_currentMic);
-            //Debug.Log(currentPosition + " " + Microphone.IsRecording(_currentMic));
 
-            //Debug.Log(currentPosition);
             if (currentPosition < _previousPosition)
                 _numTimesLooped++;
-
-            //Debug.Log("mic position: " + currentPosition + " was: " + _previousPosition + " looped: " + _numTimesLooped);
 
             int totalSamples = currentPosition + _numTimesLooped * NumSamplesInMicBuffer;
             bool isEmpty = currentPosition == 0 && _previousPosition == 0;
@@ -154,14 +152,13 @@ namespace Mumble
             else
                 _secondsWithoutMicSamples = 0;
 
-            if(_secondsWithoutMicSamples > MaxSecondsWithoutMicData)
+            if (_secondsWithoutMicSamples > MaxSecondsWithoutMicData)
             {
                 // For 5 times in a row, we received no usable data
                 // this normally means that the mic we were using disconnected
                 Debug.Log("Mic has disconnected!");
                 StopSendingAudio();
-                if (OnMicDisconnect != null)
-                    OnMicDisconnect();
+                OnMicDisconnect?.Invoke();
                 return;
             }
 
@@ -174,25 +171,23 @@ namespace Mumble
                 return;
             }
 
-            while(totalSamples - _totalNumSamplesSent >= NumSamplesPerOutgoingPacket)
+            while (totalSamples - _totalNumSamplesSent >= NumSamplesPerOutgoingPacket)
             {
                 PcmArray newData = _mumbleClient.GetAvailablePcmArray();
 
                 if (!_mumbleClient.UseSyntheticSource)
                     SendAudioClip.GetData(newData.Pcm, _totalNumSamplesSent % NumSamplesInMicBuffer);
-                else 
+                else
                     TestingClipToUse.GetData(newData.Pcm, _totalNumSamplesSent % TestingClipToUse.samples);
-                //Debug.Log(Time.frameCount + " " + currentPosition);
 
                 _totalNumSamplesSent += NumSamplesPerOutgoingPacket;
 
-                if(VoiceSendingType == MicType.Amplitude)
+                if (VoiceSendingType == MicType.Amplitude)
                 {
                     if (AmplitudeHigherThan(MinAmplitude, newData.Pcm))
                     {
                         _sampleNumberOfLastMinAmplitudeVoice = _totalNumSamplesSent;
-                        if (OnMicData != null)
-                            OnMicData(newData);
+                        OnMicData?.Invoke(newData);
                         if (_writePositionalDataFunc != null)
                             _writePositionalDataFunc(ref newData.PositionalData, ref newData.PositionalDataLength);
                         else
@@ -206,8 +201,7 @@ namespace Mumble
                             newData.UnRef();
                             continue;
                         }
-                        if (OnMicData != null)
-                            OnMicData(newData);
+                        OnMicData?.Invoke(newData);
                         if (_writePositionalDataFunc != null)
                             _writePositionalDataFunc(ref newData.PositionalData, ref newData.PositionalDataLength);
                         else
@@ -220,8 +214,7 @@ namespace Mumble
                 }
                 else
                 {
-                    if (OnMicData != null)
-                        OnMicData(newData);
+                    OnMicData?.Invoke(newData);
                     if (_writePositionalDataFunc != null)
                         _writePositionalDataFunc(ref newData.PositionalData, ref newData.PositionalDataLength);
                     else
@@ -230,13 +223,14 @@ namespace Mumble
                 }
             }
         }
+
         private static bool AmplitudeHigherThan(float minAmplitude, float[] pcm)
         {
             //return true;
             float currentSum = pcm[0];
             int checkInterval = 200;
 
-            for(int i = 1; i < pcm.Length; i++)
+            for (int i = 1; i < pcm.Length; i++)
             {
                 currentSum += Mathf.Abs(pcm[i]);
                 // Allow early returning
@@ -245,14 +239,17 @@ namespace Mumble
             }
             return currentSum / pcm.Length > minAmplitude;
         }
+
         public bool HasMic()
         {
             return _currentMic != null;
         }
+
         public string GetCurrentMicName()
         {
             return _currentMic;
         }
+
         public void StartSendingAudio(int sampleRate)
         {
             if (_currentMic == null)
@@ -270,6 +267,7 @@ namespace Mumble
             isRecording = true;
             _mumbleClient.SetSelfMute(false);
         }
+
         public void StopSendingAudio()
         {
             Debug.Log("Stopping sending audio");
@@ -277,6 +275,7 @@ namespace Mumble
             _mumbleClient.StopSendingVoice();
             isRecording = false;
         }
+
         void Update()
         {
             if (_mumbleClient == null || !_mumbleClient.ConnectionSetupFinished)

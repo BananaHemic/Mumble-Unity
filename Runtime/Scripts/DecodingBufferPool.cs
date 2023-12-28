@@ -1,7 +1,5 @@
-﻿using System.Collections;
+﻿using System;
 using System.Collections.Generic;
-using System;
-using UnityEngine;
 
 namespace Mumble
 {
@@ -9,9 +7,9 @@ namespace Mumble
     /// Decoding buffers include an opus decoder, which can be expensive to create
     /// If done frequently. So we have a pool of Decoding buffers that we re-use.
     /// </summary>
-    public class DecodingBufferPool : IDisposable{
-
-        private readonly Stack<DecodedAudioBuffer> _audioDecodingBuffers = new Stack<DecodedAudioBuffer>();
+    public class DecodingBufferPool : IDisposable
+    {
+        private readonly Stack<DecodedAudioBuffer> _audioDecodingBuffers = new();
         private readonly AudioDecodeThread _audioDecodeThread;
 
         public DecodingBufferPool(AudioDecodeThread audioDecodeThread)
@@ -22,7 +20,7 @@ namespace Mumble
         public DecodedAudioBuffer GetDecodingBuffer()
         {
             DecodedAudioBuffer decodingBuffer;
-            if(_audioDecodingBuffers.Count != 0)
+            if (_audioDecodingBuffers.Count != 0)
                 decodingBuffer = _audioDecodingBuffers.Pop();
             else
                 decodingBuffer = new DecodedAudioBuffer(_audioDecodeThread);
@@ -38,7 +36,7 @@ namespace Mumble
         // Dispose of all buffers that are currently in use
         public void Dispose()
         {
-            while(_audioDecodingBuffers.Count != 0)
+            while (_audioDecodingBuffers.Count != 0)
             {
                 DecodedAudioBuffer decodingBuffer = _audioDecodingBuffers.Pop();
                 decodingBuffer.Dispose();

@@ -1,20 +1,20 @@
-﻿using System.Collections;
+﻿using System;
 using System.Collections.Generic;
-using UnityEngine;
-using System;
 using System.Threading;
+using UnityEngine;
 
-namespace Mumble {
-    public class AudioDecodeThread : IDisposable{
-
+namespace Mumble
+{
+    public class AudioDecodeThread : IDisposable
+    {
         private readonly MumbleClient _mumbleClient;
         private readonly AutoResetEvent _waitHandle;
         private readonly Thread _decodeThread;
         private readonly int _outputSampleRate;
         private readonly int _outputChannelCount;
-        private readonly Queue<OpusDecoder> _unusedDecoders = new Queue<OpusDecoder>();
-        private readonly Dictionary<UInt32, DecoderState> _currentDecoders = new Dictionary<uint, DecoderState>();
-        private readonly Queue<MessageData> _messageQueue = new Queue<MessageData>();
+        private readonly Queue<OpusDecoder> _unusedDecoders = new();
+        private readonly Dictionary<uint, DecoderState> _currentDecoders = new();
+        private readonly Queue<MessageData> _messageQueue = new();
 
         private bool _isDisposing = false;
 
@@ -35,9 +35,9 @@ namespace Mumble {
             _decodeThread.Start();
         }
 
-        internal void AddDecoder(UInt32 session)
+        internal void AddDecoder(uint session)
         {
-            MessageData addDecoderMsg = new MessageData
+            MessageData addDecoderMsg = new()
             {
                 TypeOfMessage = MessageType.AllocDecoderState,
                 Session = session
@@ -46,9 +46,10 @@ namespace Mumble {
                 _messageQueue.Enqueue(addDecoderMsg);
             _waitHandle.Set();
         }
-        internal void RemoveDecoder(UInt32 session)
+
+        internal void RemoveDecoder(uint session)
         {
-            MessageData removeDecoderMsg = new MessageData
+            MessageData removeDecoderMsg = new()
             {
                 TypeOfMessage = MessageType.FreeDecoder,
                 Session = session
@@ -57,13 +58,14 @@ namespace Mumble {
                 _messageQueue.Enqueue(removeDecoderMsg);
             _waitHandle.Set();
         }
-        internal void AddCompressedAudio(UInt32 session, byte[] audioData, byte[] posData, long sequence,
+
+        internal void AddCompressedAudio(uint session, byte[] audioData, byte[] posData, long sequence,
             bool isLast)
         {
             if (_isDisposing)
                 return;
 
-            MessageData compressed = new MessageData
+            MessageData compressed = new()
             {
                 TypeOfMessage = MessageType.DecompressData,
                 Session = session,
@@ -83,6 +85,7 @@ namespace Mumble {
             while (!_isDisposing)
             {
                 _waitHandle.WaitOne();
+
                 // Keep looping until either disposed
                 // or the message queue is depleted
                 while (!_isDisposing)
@@ -111,16 +114,14 @@ namespace Mumble {
                                 // in current decoders, but only a few of them
                                 // actually are sending audio
                                 _currentDecoders[messageData.Session] = new DecoderState();
-                                //Debug.Log("Alloc'd DecoderState for session: " + messageData.Session);
                                 break;
                             case MessageType.FreeDecoder:
                                 if (_currentDecoders.TryGetValue(messageData.Session, out decoderState))
                                 {
                                     // Return the OpusDecoder
-                                    if(decoderState.Decoder != null)
+                                    if (decoderState.Decoder != null)
                                         _unusedDecoders.Enqueue(decoderState.Decoder);
                                     _currentDecoders.Remove(messageData.Session);
-                                    //Debug.Log("Removing DecoderState for session: " + messageData.Session);
                                 }
                                 else
                                     Debug.Log("Failed to remove decoder for session: " + messageData.Session);
@@ -133,7 +134,7 @@ namespace Mumble {
                                     break;
                                 }
                                 // Make an OpusDecoder if there isn't one
-                                if(decoderState.Decoder == null)
+                                if (decoderState.Decoder == null)
                                 {
                                     if (_unusedDecoders.Count > 0)
                                     {
@@ -144,7 +145,6 @@ namespace Mumble {
                                     {
                                         decoder = new OpusDecoder(_outputSampleRate, _outputChannelCount);
                                     }
-                                    //Debug.Log("Added OpusDecoder for DecoderState session: " + messageData.Session);
                                     decoderState.Decoder = decoder;
                                 }
                                 DecodeAudio(messageData.Session, decoderState, messageData.CompressedAudio, messageData.PosData, messageData.Sequence,
@@ -154,7 +154,8 @@ namespace Mumble {
                                 Debug.LogError("Message type not implemented:" + messageData.TypeOfMessage);
                                 break;
                         }
-                    }catch(Exception e)
+                    }
+                    catch (Exception e)
                     {
                         Debug.LogError("Exception in decode thread: " + e.ToString());
                     }
@@ -164,11 +165,11 @@ namespace Mumble {
 
         private float[] GetBufferToDecodeInto()
         {
-            //TODO use an allocator
+            // TODO use an allocator
             return new float[SubBufferSize];
         }
 
-        private void DecodeAudio(UInt32 session, DecoderState decoderState, byte[] compressedAudio,
+        private void DecodeAudio(uint session, DecoderState decoderState, byte[] compressedAudio,
             byte[] posData, long sequence, bool isLast)
         {
             // We tell the decoded buffer to re-evaluate whether it needs to store
@@ -182,7 +183,7 @@ namespace Mumble {
                 long seqDiff = sequence - decoderState.NextSequenceToDecode;
 
                 // If new packet is VERY late, then the sequence number has probably reset
-                if(seqDiff < -MaxMissingPackets)
+                if (seqDiff < -MaxMissingPackets)
                 {
                     Debug.Log("Sequence has possibly reset diff = " + seqDiff);
                     decoderState.Decoder.ResetState();
@@ -210,11 +211,9 @@ namespace Mumble {
                 else if (seqDiff > 0)
                 {
                     Debug.LogWarning("dropped packet, recv: " + sequence + ", expected " + decoderState.NextSequenceToDecode);
-                    //NumPacketsLost += packet.Value.Sequence - _nextSequenceToDecode;
                     float[] emptyPcmBuffer = GetBufferToDecodeInto();
                     int emptySampleNumRead = decoderState.Decoder.Decode(null, emptyPcmBuffer);
                     decoderState.NextSequenceToDecode = sequence + emptySampleNumRead / ((_outputSampleRate / 100) * _outputChannelCount);
-                    //Debug.Log("Null read returned: " + emptySampleNumRead + " samples");
 
                     // Send this decoded data to the corresponding buffer
                     _mumbleClient.ReceiveDecodedVoice(session, emptyPcmBuffer, emptySampleNumRead,
@@ -222,8 +221,6 @@ namespace Mumble {
                     reevaluateInitialBuffer = false;
                 }
             }
-
-            //Debug.Log("Recv: " + sequence + " expected: " + decoderState.NextSequenceToDecode);
 
             float[] pcmBuffer = GetBufferToDecodeInto();
             int numRead = 0;
@@ -234,8 +231,6 @@ namespace Mumble {
                 _mumbleClient.ReceiveDecodedVoice(session, pcmBuffer, numRead, posData,
                     reevaluateInitialBuffer);
             }
-            //else
-                //Debug.Log("empty packet data?");
 
             if (numRead < 0)
             {
@@ -243,7 +238,6 @@ namespace Mumble {
                 return;
             }
 
-            //Debug.Log("numRead = " + numRead);
             decoderState.WasPrevPacketMarkedLast = isLast;
             decoderState.LastReceivedSequence = sequence;
             if (!isLast)
@@ -252,15 +246,9 @@ namespace Mumble {
             {
                 Debug.Log("Resetting #" + session + " decoder");
                 decoderState.NextSequenceToDecode = 0;
-                // Re-evaluate whether we need to fill up a buffer of audio before playing
-                //lock (_bufferLock)
-                //{
-                    //HasFilledInitialBuffer = (_encodedBuffer.Count + 1 >= InitialSampleBuffer);
-                //}
+
                 decoderState.Decoder.ResetState();
             }
-
-            //Debug.Log("Recv: " + sequence + " next: " + decoderState.NextSequenceToDecode);
         }
 
         ~AudioDecodeThread()
@@ -296,10 +284,11 @@ namespace Mumble {
             /// </summary>
             FreeDecoder
         }
+
         private struct MessageData
         {
             public MessageType TypeOfMessage;
-            public UInt32 Session;
+            public uint Session;
 
             // Used only for CompressedData message
             public byte[] CompressedAudio;
@@ -307,6 +296,7 @@ namespace Mumble {
             public long Sequence;
             public bool IsLast;
         }
+
         private class DecoderState
         {
             // May be null

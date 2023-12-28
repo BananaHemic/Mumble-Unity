@@ -31,7 +31,7 @@ namespace Mumble
         /// need for this lock with later versions of Unity.
         /// This was last validated with Unity 2017.4.1
         /// </summary>
-        private static readonly System.Object _cryptLock = new System.Object();
+        private static readonly object _cryptLock = new();
 
         // Used by Encrypt
         private readonly byte[] _enc_tag = new byte[AES_BLOCK_SIZE];
@@ -77,9 +77,9 @@ namespace Mumble
             int carry = (block[0] >> 7) & 0x1;
             for (int i = 0; i < AES_BLOCK_SIZE - 1; i++)
             {
-                block[i] = (byte) ((block[i] << 1) | ((block[i + 1] >> 7) & 0x1));
+                block[i] = (byte)((block[i] << 1) | ((block[i + 1] >> 7) & 0x1));
             }
-            block[AES_BLOCK_SIZE - 1] = (byte) ((block[AES_BLOCK_SIZE - 1] << 1) ^ (carry*0x87));
+            block[AES_BLOCK_SIZE - 1] = (byte)((block[AES_BLOCK_SIZE - 1] << 1) ^ (carry * 0x87));
         }
 
         private void S3(byte[] block)
@@ -87,23 +87,23 @@ namespace Mumble
             int carry = (block[0] >> 7) & 0x1;
             for (int i = 0; i < AES_BLOCK_SIZE - 1; i++)
             {
-                block[i] ^= (byte) ((block[i] << 1) | ((block[i + 1] >> 7) & 0x1));
+                block[i] ^= (byte)((block[i] << 1) | ((block[i + 1] >> 7) & 0x1));
             }
-            block[AES_BLOCK_SIZE - 1] ^= (byte) ((block[AES_BLOCK_SIZE - 1] << 1) ^ (carry*0x87));
+            block[AES_BLOCK_SIZE - 1] ^= (byte)((block[AES_BLOCK_SIZE - 1] << 1) ^ (carry * 0x87));
         }
 
         private void Xor(byte[] dst, byte[] a, byte[] b)
         {
             for (int i = 0; i < AES_BLOCK_SIZE; i++)
             {
-                dst[i] = (byte) (a[i] ^ b[i]);
+                dst[i] = (byte)(a[i] ^ b[i]);
             }
         }
         private void Xor(byte[] dst, byte[] a, byte[] b, int dst_offset, int a_offset, int b_offset)
         {
             for (int i = 0; i < AES_BLOCK_SIZE; i++)
             {
-                dst[dst_offset + i] = (byte) (a[a_offset + i] ^ b[b_offset + i]);
+                dst[dst_offset + i] = (byte)(a[a_offset + i] ^ b[b_offset + i]);
             }
         }
 
@@ -157,9 +157,9 @@ namespace Mumble
 
             S2(_enc_delta);
             ZERO(_enc_tmp);
-            long num = len*8;
-            _enc_tmp[AES_BLOCK_SIZE - 2] = (byte) ((num >> 8) & 0xFF);
-            _enc_tmp[AES_BLOCK_SIZE - 1] = (byte) (num & 0xFF);
+            long num = len * 8;
+            _enc_tmp[AES_BLOCK_SIZE - 2] = (byte)((num >> 8) & 0xFF);
+            _enc_tmp[AES_BLOCK_SIZE - 1] = (byte)(num & 0xFF);
             Xor(_enc_tmp, _enc_tmp, _enc_delta);
 
             _encryptor.TransformBlock(_enc_tmp, 0, AES_BLOCK_SIZE, _enc_pad, 0);
@@ -225,11 +225,11 @@ namespace Mumble
                     int diff = ivbyte - _cryptSetup.ServerNonce[0];
                     if (diff > 128)
                     {
-                        diff = diff - 256;
+                        diff -= 256;
                     }
                     else if (diff < -128)
                     {
-                        diff = diff + 256;
+                        diff += 256;
                     }
 
                     if ((ivbyte < _cryptSetup.ServerNonce[0]) && (diff > -30) && (diff < 0))
@@ -278,7 +278,7 @@ namespace Mumble
                         return null;
                     }
 
-                    //TODO should ClientNonce end in 0?
+                    // TODO should ClientNonce end in 0?
                     if (_decryptHistory[_cryptSetup.ServerNonce[0]] == _cryptSetup.ClientNonce[1])
                     {
                         Array.Copy(_dec_saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
@@ -298,14 +298,12 @@ namespace Mumble
 
                     Array.Copy(_dec_saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
                     Debug.LogError("Crypt: 4");
-                    //Debug.LogError("Crypt: 4 good:" + _good + " lost: " + _lost + " late: " + _late);
                     return null;
                 }
                 _decryptHistory[_cryptSetup.ServerNonce[0]] = _cryptSetup.ServerNonce[1];
 
                 if (restore)
                 {
-                    //Debug.Log("Restoring");
                     Array.Copy(_dec_saveiv, 0, _cryptSetup.ServerNonce, 0, AES_BLOCK_SIZE);
                 }
 
@@ -348,7 +346,7 @@ namespace Mumble
 
             long num = len * 8;
             _dec_tmp[AES_BLOCK_SIZE - 2] = (byte)((num >> 8) & 0xFF);
-            _dec_tmp[AES_BLOCK_SIZE - 1] = (byte) (num & 0xFF);
+            _dec_tmp[AES_BLOCK_SIZE - 1] = (byte)(num & 0xFF);
             Xor(_dec_tmp, _dec_tmp, _dec_delta);
 
             _encryptor.TransformBlock(_dec_tmp, 0, AES_BLOCK_SIZE, _dec_pad, 0);

@@ -1,18 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace Mumble
 {
     static class Var64
     {
-        //This stuff is a partial duplicate of the varint64 stuff in UdpPacketReader!
-        //Should write a UdpPacketWriter to mirror it
-
-        public static int calculateVarint64(UInt64 value)
+        // This stuff is a partial duplicate of the varint64 stuff in UdpPacketReader!
+        // Should write a UdpPacketWriter to mirror it
+        public static int CalculateVarint64(ulong value)
         {
-            UInt64 part0 = value;
-            UInt64 part1 = value >> 28;
-            UInt64 part2 = value >> 56;
+            ulong part0 = value;
+            ulong part1 = value >> 28;
+            ulong part2 = value >> 56;
             if (part2 == 0)
             {
                 if (part1 == 0)
@@ -34,15 +32,14 @@ namespace Mumble
                 return part2 < (1 << 7) ? 9 : 10;
         }
 
-        public static byte[] writeVarint64(UInt64 value)
+        public static byte[] WriteVarint64(ulong value)
         {
-            UInt64 part0 = value;
-            UInt64 part1 = value >> 28;
-            UInt64 part2 = value >> 56;
-            int size = calculateVarint64(value);
+            ulong part0 = value;
+            ulong part1 = value >> 28;
+            ulong part2 = value >> 56;
+            int size = CalculateVarint64(value);
             byte[] array = new byte[size];
 
-            //var dst = new Uint8Array(this.array);
             switch (size)
             {
                 case 10: array[9] = (byte)((part2 >> 7) | 0x80); goto case 9;
@@ -61,10 +58,10 @@ namespace Mumble
             return array;
         }
 
-        public static byte[] writeVarint64_alternative(UInt64 value)
+        public static byte[] WriteVarint64_alternative(ulong value)
         {
-            UInt64 i = value;
-            List<byte> byteList = new List<byte>();
+            ulong i = value;
+            List<byte> byteList = new();
 
             if (
                     ((i & 0x8000000000000000L) != 0) &&
