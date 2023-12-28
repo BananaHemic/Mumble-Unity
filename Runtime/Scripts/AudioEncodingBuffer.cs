@@ -1,24 +1,24 @@
 ﻿/*
  * This puts data from the mics taken on the main thread
  * Then another thread pulls frame data out
- * 
+ *
  * We now assume that each mic packet placed into the buffer is an acceptable size
  */
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 using System.Threading;
+using UnityEngine;
 
 namespace Mumble
 {
     public class AudioEncodingBuffer
     {
-        private readonly Queue<TargettedSpeech> _unencodedBuffer = new Queue<TargettedSpeech>();
+        private readonly Queue<TargettedSpeech> _unencodedBuffer = new();
 
-        //TODO not certain on this
-        public readonly ArraySegment<byte> EmptyByteSegment = new ArraySegment<byte>(new byte[0] {});
+        // TODO not certain on this
+        public readonly ArraySegment<byte> EmptyByteSegment = new(new byte[0] { });
 
-        private readonly object _bufferLock = new System.Object();
+        private readonly object _bufferLock = new();
         private volatile bool _isWaitingToSendLastPacket = false;
 
         /// <summary>
@@ -40,7 +40,7 @@ namespace Mumble
         {
             lock (_bufferLock)
             {
-                //If we still have an item in the queue, mark the last one as last
+                // If we still have an item in the queue, mark the last one as last
                 _isWaitingToSendLastPacket = true;
                 if (_unencodedBuffer.Count == 0)
                 {
@@ -92,11 +92,10 @@ namespace Mumble
                 isEmpty = true;
 
             encoder_buffer = isEmpty ? EmptyByteSegment : encoder.Encode(nextPcmToSend.Pcm);
-            byte[] pos = nextPcmToSend == null ? null : nextPcmToSend.PositionalData;
+            byte[] pos = nextPcmToSend?.PositionalData;
             int posLen = nextPcmToSend == null ? 0 : nextPcmToSend.PositionalDataLength;
 
-            if (nextPcmToSend != null)
-                nextPcmToSend.UnRef();
+            nextPcmToSend?.UnRef();
 
             if (isStop)
             {
@@ -104,13 +103,13 @@ namespace Mumble
                 encoder.ResetState();
             }
 
-
-            CompressedBuffer compressedBuffer = new CompressedBuffer
+            CompressedBuffer compressedBuffer = new()
             {
                 EncodedData = encoder_buffer,
                 PositionalData = pos,
                 PositionalDataLength = posLen
             };
+
             return compressedBuffer;
         }
 
@@ -140,7 +139,7 @@ namespace Mumble
 
                 IsStop = false;
             }
-            
+
             public TargettedSpeech(bool stop)
             {
                 IsStop = stop;

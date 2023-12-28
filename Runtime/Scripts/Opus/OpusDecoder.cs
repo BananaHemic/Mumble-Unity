@@ -1,8 +1,8 @@
-﻿//  
+﻿//
 //  Author: John Carruthers (johnc@frag-labs.com)
-//  
+//
 //  Copyright (C) 2013 John Carruthers
-//  
+//
 //  Permission is hereby granted, free of charge, to any person obtaining
 //  a copy of this software and associated documentation files (the
 //  "Software"), to deal in the Software without restriction, including
@@ -10,10 +10,10 @@
 //  distribute, sublicense, and/or sell copies of the Software, and to
 //  permit persons to whom the Software is furnished to do so, subject to
 //  the following conditions:
-//   
+//
 //  The above copyright notice and this permission notice shall be
 //  included in all copies or substantial portions of the Software.
-//   
+//
 //  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 //  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 //  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -21,17 +21,16 @@
 //  LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 //  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 //  WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-//  
+//
 
 using System;
-using UnityEngine;
 
 namespace Mumble
 {
     /// <summary>
     /// Opus decoder.
     /// </summary>
-    public class OpusDecoder: IDisposable
+    public class OpusDecoder : IDisposable
     {
         /// <summary>
         /// Opus decoder.
@@ -55,13 +54,15 @@ namespace Mumble
                 outputSampleRate != 24000 &&
                 outputSampleRate != 48000)
                 throw new ArgumentOutOfRangeException("outputSampleRate");
+
             if (outputChannelCount != 1 && outputChannelCount != 2)
                 throw new ArgumentOutOfRangeException("outputChannelCount");
 
-            OpusErrors error;
-            _decoder = NativeMethods.opus_decoder_create(outputSampleRate, outputChannelCount, out error);
+            _decoder = NativeMethods.Opus_decoder_create(outputSampleRate, outputChannelCount, out OpusErrors error);
+
             if (error != OpusErrors.Ok)
                 throw new Exception(string.Format("Exception occured while creating decoder, {0}", ((OpusErrors)error)));
+
             _outputSampleRate = outputSampleRate;
             _outputChannelCount = outputChannelCount;
         }
@@ -79,7 +80,7 @@ namespace Mumble
         {
             if (_decoder != IntPtr.Zero)
             {
-                NativeMethods.destroy_opus(_decoder);
+                NativeMethods.Destroy_opus(_decoder);
                 _decoder = IntPtr.Zero;
             }
         }
@@ -90,17 +91,17 @@ namespace Mumble
         /// </summary>
         public void ResetState()
         {
-            NativeMethods.opus_reset_decoder(_decoder); 
+            NativeMethods.Opus_reset_decoder(_decoder);
         }
 
         public int Decode(byte[] packetData, float[] floatBuffer)
         {
-            return NativeMethods.opus_decode(_decoder, packetData, floatBuffer, _outputSampleRate, _outputChannelCount);
+            return NativeMethods.Opus_decode(_decoder, packetData, floatBuffer, _outputSampleRate, _outputChannelCount);
         }
 
         public static int GetChannels(byte[] srcEncodedBuffer)
         {
-            return NativeMethods.opus_packet_get_nb_channels(srcEncodedBuffer);
+            return NativeMethods.Opus_packet_get_nb_channels(srcEncodedBuffer);
         }
     }
 }

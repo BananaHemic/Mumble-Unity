@@ -1,9 +1,9 @@
-﻿using System;
-using System.Net;
-using MumbleProto;
-using Version = MumbleProto.Version;
-using UnityEngine;
+﻿using MumbleProto;
+using System;
 using System.Collections.Generic;
+using System.Net;
+using UnityEngine;
+using Version = MumbleProto.Version;
 
 namespace Mumble
 {
@@ -14,9 +14,12 @@ namespace Mumble
         IN_ROOM_NOT_SERVER_MUTED, // All users in the same room that are not server muted
         IN_ROOM_NO_MUTE // All users in the same room that are not muted by the server and not self muted
     };
+
     public delegate void UpdateOcbServerNonce(byte[] cryptSetup);
+
     [Serializable]
-    public class DebugValues {
+    public class DebugValues
+    {
         [Header("Whether to add a random number to the end of the username")]
         public bool UseRandomUsername;
         [Header("Whether to stream the audio back to Unity directly")]
@@ -35,8 +38,10 @@ namespace Mumble
         public bool UseSyntheticSource { get { return _debugValues.UseSyntheticSource; } }
         public int NumUDPPacketsSent { get { return _udpConnection.NumPacketsSent; } }
         public int NumUDPPacketsReceieved { get { return _udpConnection.NumPacketsRecv; } }
-        public long NumUDPPacketsLost {
-            get {
+        public long NumUDPPacketsLost
+        {
+            get
+            {
                 long numLost = 0;
                 foreach (var pair in _audioDecodingBuffers)
                     numLost += pair.Value.NumPacketsLost;
@@ -104,12 +109,12 @@ namespace Mumble
         // Either null, true, or false
         private bool? _pendingMute = null;
 
-        private DebugValues _debugValues;
+        private readonly DebugValues _debugValues;
         // TODO there are data structures that would be a lot faster here
-        private readonly Dictionary<uint, UserState> AllUsers = new Dictionary<uint, UserState>();
-        private readonly Dictionary<uint, Channel> Channels = new Dictionary<uint, Channel>();
-        private readonly Dictionary<UInt32, DecodedAudioBuffer> _audioDecodingBuffers = new Dictionary<uint, DecodedAudioBuffer>();
-        private readonly Dictionary<UInt32, MumbleAudioPlayer> _mumbleAudioPlayers = new Dictionary<uint, MumbleAudioPlayer>();
+        private readonly Dictionary<uint, UserState> AllUsers = new();
+        private readonly Dictionary<uint, Channel> Channels = new();
+        private readonly Dictionary<uint, DecodedAudioBuffer> _audioDecodingBuffers = new();
+        private readonly Dictionary<uint, MumbleAudioPlayer> _mumbleAudioPlayers = new();
 
         internal UserState OurUserState { get; private set; }
         internal Version RemoteVersion { get; set; }
@@ -122,16 +127,16 @@ namespace Mumble
         public int EncoderSampleRate { get; private set; }
         public int NumSamplesPerOutgoingPacket { get; private set; }
 
-        //The Mumble version of this integration
+        // The Mumble version of this integration
         public const string ReleaseName = "MumbleUnity";
         public const uint Major = 1;
         public const uint Minor = 2;
         public const uint Patch = 8;
 
         public MumbleClient(string hostName, int port, AudioPlayerCreatorMethod createMumbleAudioPlayerMethod,
-            AudioPlayerRemoverMethod removeMumbleAudioPlayerMethod, AnyUserStateChangedMethod anyChangeMethod=null,
-            bool async=false, SpeakerCreationMode speakerCreationMode=SpeakerCreationMode.ALL,
-            DebugValues debugVals=null, int maxPositionalDataLength=0)
+            AudioPlayerRemoverMethod removeMumbleAudioPlayerMethod, AnyUserStateChangedMethod anyChangeMethod = null,
+            bool async = false, SpeakerCreationMode speakerCreationMode = SpeakerCreationMode.ALL,
+            DebugValues debugVals = null, int maxPositionalDataLength = 0)
         {
             _hostName = hostName;
             _port = port;
@@ -141,8 +146,8 @@ namespace Mumble
             _anyUserStateChange = anyChangeMethod;
             _maxPositionalDataLength = maxPositionalDataLength;
 
-            //Check if localhost
-            if(_hostName.ToLower() == "localhost") _hostName = "127.0.0.1";
+            // Check if localhost
+            if (_hostName.ToLower() == "localhost") _hostName = "127.0.0.1";
 
             switch (AudioSettings.outputSampleRate)
             {
@@ -177,8 +182,7 @@ namespace Mumble
             }
             Debug.Log("Using output channel count of: " + _outputChannelCount);
 
-            if (debugVals == null)
-                debugVals = new DebugValues();
+            debugVals ??= new DebugValues();
             _debugValues = debugVals;
 
             if (async)
@@ -189,16 +193,17 @@ namespace Mumble
                 Init(addresses);
             }
         }
+
         public string GetServerIP()
         {
             if (_addresses == null
                 || _addresses.Length < 1)
                 return null;
-            return _addresses[0].ToString(); 
+            return _addresses[0].ToString();
         }
+
         private void Init(IPAddress[] addresses)
         {
-            //Debug.Log("Host addresses recv");
             if (addresses == null || addresses.Length == 0)
             {
                 Debug.LogError("Failed to get addresses!");
@@ -220,11 +225,13 @@ namespace Mumble
             _manageSendBuffer = new ManageAudioSendBuffer(_udpConnection, this, _maxPositionalDataLength);
             ReadyToConnect = true;
         }
+
         private void OnHostRecv(IAsyncResult result)
         {
             IPAddress[] addresses = Dns.EndGetHostAddresses(result);
             Init(addresses);
         }
+
         public void AddMumbleMic(MumbleMicrophone newMic)
         {
             _mumbleMic = newMic;
@@ -233,29 +240,29 @@ namespace Mumble
 
             if (EncoderSampleRate == -1)
                 return;
-            
+
             NumSamplesPerOutgoingPacket = MumbleConstants.NUM_FRAMES_PER_OUTGOING_PACKET * EncoderSampleRate / 100;
             _manageSendBuffer.InitForSampleRate(EncoderSampleRate);
         }
+
         internal PcmArray GetAvailablePcmArray()
         {
             return _manageSendBuffer.GetAvailablePcmArray();
         }
+
         public UserState GetUserFromSession(uint session)
         {
-            UserState state = null;
-            if(!AllUsers.TryGetValue(session, out state))
+            if (!AllUsers.TryGetValue(session, out UserState state))
                 Debug.LogWarning("User state not found for session " + session);
             return state;
         }
+
         internal void AddOrUpdateUser(UserState newUserState)
         {
             bool isOurUser = OurUserState != null && newUserState.Session == OurUserState.Session;
 
-            UserState userState;
-            if (!AllUsers.TryGetValue(newUserState.Session, out userState))
+            if (!AllUsers.TryGetValue(newUserState.Session, out UserState userState))
             {
-                //Debug.Log("New audio buffer with session: " + newUserState.Session + " name: " + newUserState.Name);
                 AllUsers[newUserState.Session] = newUserState;
                 userState = newUserState;
             }
@@ -283,20 +290,16 @@ namespace Mumble
                 if (newUserState.ShouldSerializeTexture())
                     userState.Texture = newUserState.Texture;
 
-                //if (newUserState.ShouldSerializeMute() && userState.Mute)
-                //Debug.Log("User " + userState.Name + " has been muted");
-
                 // If this is us, and it's signaling that we've changed channels, notify the delegate on the main thread
                 if (isOurUser && newUserState.ShouldSerializeChannelId())
                 {
                     Debug.Log("Our Channel changed! #" + newUserState.ChannelId);
-                    //AllUsers[newUserState.Session].ChannelId = newUserState.ChannelId;
+
                     Channel ourChannel = Channels[newUserState.ChannelId];
 
                     EventProcessor.Instance.QueueEvent(() =>
                     {
-                        if (OnChannelChanged != null)
-                            OnChannelChanged(ourChannel);
+                        OnChannelChanged?.Invoke(ourChannel);
                     });
 
                     // Re-evaluate all users to see if they need decoding buffers
@@ -308,10 +311,11 @@ namespace Mumble
                 return;
 
             // Create the audio player if the user is in the same room, and is not muted
-            if(ShouldAddAudioPlayerForUser(userState))
+            if (ShouldAddAudioPlayerForUser(userState))
             {
                 AddDecodingBuffer(userState);
-            }else
+            }
+            else
             {
                 // Otherwise remove the audio decoding buffer and audioPlayer if it exists
                 TryRemoveDecodingBuffer(userState.Session);
@@ -319,15 +323,15 @@ namespace Mumble
 
             // We check if otherUserStateChange is null multiple times just to
             // be extra safe
-            if(_anyUserStateChange != null)
+            if (_anyUserStateChange != null)
             {
                 EventProcessor.Instance.QueueEvent(() =>
                 {
-                    if (_anyUserStateChange != null)
-                        _anyUserStateChange(newUserState.Session, newUserState, userState);
+                    _anyUserStateChange?.Invoke(newUserState.Session, newUserState, userState);
                 });
             }
         }
+
         internal void TextMessageReceived(TextMessage textMessage)
         {
             EventProcessor.Instance.QueueEvent(() =>
@@ -336,63 +340,59 @@ namespace Mumble
                     OnTextMessageReceived(textMessage);
             });
         }
+
         internal int GetBitrate()
         {
             return _manageSendBuffer.GetBitrate();
         }
+
         internal void SetBitrate(int bitrate)
         {
             _manageSendBuffer.SetBitrate(bitrate);
         }
+
         public bool ShouldAddAudioPlayerForUser(UserState other)
         {
-            switch (_speakerCreationMode)
+            return _speakerCreationMode switch
             {
-                case SpeakerCreationMode.ALL:
-                    return true;
-                case SpeakerCreationMode.IN_ROOM:
-                    return other.ChannelId == OurUserState.ChannelId
-                        || Channels[OurUserState.ChannelId].DoesShareAudio(Channels[other.ChannelId]);
-                case SpeakerCreationMode.IN_ROOM_NOT_SERVER_MUTED:
-                    return (other.ChannelId == OurUserState.ChannelId
-                        || Channels[OurUserState.ChannelId].DoesShareAudio(Channels[other.ChannelId]))
-                        && !other.Mute;
-                case SpeakerCreationMode.IN_ROOM_NO_MUTE:
-                    return (other.ChannelId == OurUserState.ChannelId
-                        || Channels[OurUserState.ChannelId].DoesShareAudio(Channels[other.ChannelId]))
-                        && !other.Mute
-                        && !other.SelfMute;
-                default:
-                    return false;
-            }
+                SpeakerCreationMode.ALL => true,
+                SpeakerCreationMode.IN_ROOM => other.ChannelId == OurUserState.ChannelId
+                                        || Channels[OurUserState.ChannelId].DoesShareAudio(Channels[other.ChannelId]),
+                SpeakerCreationMode.IN_ROOM_NOT_SERVER_MUTED => (other.ChannelId == OurUserState.ChannelId
+                                        || Channels[OurUserState.ChannelId].DoesShareAudio(Channels[other.ChannelId]))
+                                        && !other.Mute,
+                SpeakerCreationMode.IN_ROOM_NO_MUTE => (other.ChannelId == OurUserState.ChannelId
+                                        || Channels[OurUserState.ChannelId].DoesShareAudio(Channels[other.ChannelId]))
+                                        && !other.Mute
+                                        && !other.SelfMute,
+                _ => false,
+            };
         }
+
         private void AddDecodingBuffer(UserState userState)
         {
             // Make sure we don't double add
             if (_audioDecodingBuffers.ContainsKey(userState.Session))
                 return;
-            //Debug.Log("Adding : " + userState.Name + " #" + userState.Session);
-            //Debug.Log("Adding decoder session #" + userState.Session);
+
             DecodedAudioBuffer buffer = _decodingBufferPool.GetDecodingBuffer();
             buffer.Init(userState.Name, userState.Session);
             _audioDecodingBuffers.Add(userState.Session, buffer);
             EventProcessor.Instance.QueueEvent(() =>
             {
-                //Debug.Log("Adding audioPlayer session #" + userState.Session);
                 // We also create a new audio player for the user
                 MumbleAudioPlayer newPlayer = _audioPlayerCreator(userState.Name, userState.Session);
                 _mumbleAudioPlayers.Add(userState.Session, newPlayer);
                 newPlayer.Initialize(this, userState.Session);
             });
-            if (OnNewDecodeBufferThreaded != null)
-                OnNewDecodeBufferThreaded(userState.Session);
+
+            OnNewDecodeBufferThreaded?.Invoke(userState.Session);
         }
-        private void TryRemoveDecodingBuffer(UInt32 session)
+
+        private void TryRemoveDecodingBuffer(uint session)
         {
-            DecodedAudioBuffer buffer;
-            if(_audioDecodingBuffers.TryGetValue(session, out buffer))
+            if (_audioDecodingBuffers.TryGetValue(session, out DecodedAudioBuffer buffer))
             {
-                //Debug.LogWarning("Removing decoder session #" + session);
                 _audioDecodingBuffers.Remove(session);
                 _decodingBufferPool.ReturnDecodingBuffer(buffer);
 
@@ -400,29 +400,29 @@ namespace Mumble
                 // This is because we add it on the main thread
                 EventProcessor.Instance.QueueEvent(() =>
                 {
-                    //Debug.Log("Removing audioPlayer session #" + session);
-                    MumbleAudioPlayer oldAudioPlayer;
-                    if(_mumbleAudioPlayers.TryGetValue(session, out oldAudioPlayer))
+                    if (_mumbleAudioPlayers.TryGetValue(session, out MumbleAudioPlayer oldAudioPlayer))
                     {
                         _mumbleAudioPlayers.Remove(session);
                         _audioPlayerDestroyer(session, oldAudioPlayer);
                     }
                 });
-                if (OnRemovedDecodeBufferThreaded != null)
-                    OnRemovedDecodeBufferThreaded(session);
+
+                OnRemovedDecodeBufferThreaded?.Invoke(session);
             }
         }
+
         private void ReevaluateAllDecodingBuffers()
         {
             // TODO we should index more intelligently to speed this up
-            foreach(KeyValuePair<uint, UserState> user in AllUsers)
+            foreach (KeyValuePair<uint, UserState> user in AllUsers)
             {
-                if(ShouldAddAudioPlayerForUser(user.Value))
+                if (ShouldAddAudioPlayerForUser(user.Value))
                     AddDecodingBuffer(user.Value);
                 else
                     TryRemoveDecodingBuffer(user.Key);
             }
         }
+
         internal void SetServerSync(ServerSync sync)
         {
             ServerSync = sync;
@@ -436,27 +436,28 @@ namespace Mumble
                 SetSelfMute(_pendingMute.Value);
             _pendingMute = null;
         }
+
         internal void RemoveUser(uint removedUserSession)
         {
-            UserState removedUserState;
-            if(AllUsers.TryGetValue(removedUserSession, out removedUserState))
+            if (AllUsers.TryGetValue(removedUserSession, out UserState removedUserState))
             {
                 AllUsers.Remove(removedUserSession);
 
                 // We check if otherUserStateChange is null multiple times just to
                 // be extra safe
-                if(_anyUserStateChange != null)
+                if (_anyUserStateChange != null)
                 {
                     EventProcessor.Instance.QueueEvent(() =>
                     {
-                        if (_anyUserStateChange != null)
-                            _anyUserStateChange(removedUserSession, null, removedUserState);
+                        _anyUserStateChange?.Invoke(removedUserSession, null, removedUserState);
                     });
                 }
             }
+
             // Try to remove the audio player and decoding buffer if it exists
             TryRemoveDecodingBuffer(removedUserSession);
         }
+
         public void Connect(string username, string password)
         {
             if (!ReadyToConnect)
@@ -466,41 +467,41 @@ namespace Mumble
             }
             _tcpConnection.StartClient(username, password);
         }
+
         internal void ConnectUdp()
         {
             _udpConnection.Connect();
         }
+
         public void Close()
         {
             Debug.Log("Closing mumble");
-            if(_manageSendBuffer != null)
-                _manageSendBuffer.Dispose();
+            _manageSendBuffer?.Dispose();
             _manageSendBuffer = null;
-            if(_tcpConnection != null)
-                _tcpConnection.Close();
+            _tcpConnection?.Close();
             _tcpConnection = null;
-            if(_udpConnection != null)
-                _udpConnection.Close();
+            _udpConnection?.Close();
             _udpConnection = null;
-            if (_audioDecodeThread != null)
-                _audioDecodeThread.Dispose();
+            _audioDecodeThread?.Dispose();
             _audioDecodeThread = null;
             Debug.Log("Mumble closed");
         }
+
         public void SendTextMessage(string textMessage)
         {
             if (OurUserState == null)
                 return;
+
             var msg = new TextMessage
             {
                 Message = textMessage,
                 ChannelIds = new uint[] { OurUserState.ChannelId },
                 Actor = ServerSync.Session
             };
-            //Debug.Log("Now session length = " + msg.Sessions.Length);
 
             _tcpConnection.SendMessage(MessageType.TextMessage, msg);
         }
+
         public void SendVoicePacket(PcmArray floatData)
         {
             // Don't send anything out if we're muted
@@ -510,17 +511,16 @@ namespace Mumble
                 floatData.UnRef();
                 return;
             }
-            if(_manageSendBuffer != null)
-                _manageSendBuffer.SendVoice(floatData, SpeechTarget.Normal, 0);
+
+            _manageSendBuffer?.SendVoice(floatData, SpeechTarget.Normal, 0);
         }
-        public void ReceiveDecodedVoice(UInt32 session, float[] pcmData, int numSamples, byte[] posData, bool reevaluateInitialBuffer)
+
+        public void ReceiveDecodedVoice(uint session, float[] pcmData, int numSamples, byte[] posData, bool reevaluateInitialBuffer)
         {
-            DecodedAudioBuffer decodingBuffer;
-            if (_audioDecodingBuffers.TryGetValue(session, out decodingBuffer))
+            if (_audioDecodingBuffers.TryGetValue(session, out DecodedAudioBuffer decodingBuffer))
             {
                 decodingBuffer.AddDecodedAudio(pcmData, numSamples, posData, reevaluateInitialBuffer);
-                if (OnRecvAudioThreaded != null)
-                    OnRecvAudioThreaded(session);
+                OnRecvAudioThreaded?.Invoke(session);
             }
             else
             {
@@ -529,10 +529,10 @@ namespace Mumble
                 Debug.LogWarning("No decoding buffer found for session:" + session);
             }
         }
-        public bool HasPlayableAudio(UInt32 session)
+
+        public bool HasPlayableAudio(uint session)
         {
-            DecodedAudioBuffer decodingBuffer;
-            if (_audioDecodingBuffers.TryGetValue(session, out decodingBuffer))
+            if (_audioDecodingBuffers.TryGetValue(session, out DecodedAudioBuffer decodingBuffer))
             {
                 if (!decodingBuffer.HasFilledInitialBuffer)
                     return false;
@@ -540,27 +540,27 @@ namespace Mumble
                 // Now that we've determined that this user has a
                 // decode buffer, we need to make sure that
                 // they're not speaking
-                UserState user;
-                if (AllUsers.TryGetValue(session, out user))
+                if (AllUsers.TryGetValue(session, out UserState user))
                     return (!user.Mute && !user.SelfMute);
             }
+
             return false;
         }
-        public int LoadArrayWithVoiceData(UInt32 session, float[] pcmArray, int offset, int length)
+
+        public int LoadArrayWithVoiceData(uint session, float[] pcmArray, int offset, int length)
         {
             if (session == ServerSync.Session && !_debugValues.UseLocalLoopback)
                 return 0;
-            //Debug.Log("Will decode for " + session);
 
-            //TODO use bool to show if loading worked or not
-            DecodedAudioBuffer decodingBuffer;
-            if (_audioDecodingBuffers.TryGetValue(session, out decodingBuffer))
+            // TODO use bool to show if loading worked or not
+            if (_audioDecodingBuffers.TryGetValue(session, out DecodedAudioBuffer decodingBuffer))
                 return decodingBuffer.Read(pcmArray, offset, length);
             else
                 Debug.LogWarning("Decode buffer not found for session " + session);
             return -1;
         }
-        public bool LoadArraysWithPositions(UInt32 session, out byte[] previousPosData,
+
+        public bool LoadArraysWithPositions(uint session, out byte[] previousPosData,
             out byte[] nextPositionData, out double previousAudioDspTime)
         {
             // We don't currently allow reading position from self
@@ -572,8 +572,7 @@ namespace Mumble
                 return false;
             }
 
-            DecodedAudioBuffer decodingBuffer;
-            if (!_audioDecodingBuffers.TryGetValue(session, out decodingBuffer))
+            if (!_audioDecodingBuffers.TryGetValue(session, out DecodedAudioBuffer decodingBuffer))
             {
                 Debug.LogWarning("Decode buffer for position not found for session " + session);
                 previousPosData = null;
@@ -588,7 +587,7 @@ namespace Mumble
         }
 
         /// <summary>
-        /// Check if the channel already exist     
+        /// Check if the channel already exist
         /// </summary>
         /// <param name="channelName">The name of the channel you want to check</param>
         /// <returns>Whether channel exist</returns>
@@ -596,7 +595,6 @@ namespace Mumble
         {
             return TryGetChannelByName(channelName, out _);
         }
-
 
         /// <summary>
         /// Create the channel on the server
@@ -615,7 +613,7 @@ namespace Mumble
             if (!ConnectionSetupFinished)
                 return false;
 
-            ChannelState state = new ChannelState
+            ChannelState state = new()
             {
                 Name = channelName,
                 Temporary = temporary,
@@ -625,7 +623,7 @@ namespace Mumble
                 Position = -1
             };
 
-            _tcpConnection.SendMessage<MumbleProto.ChannelState>(MessageType.ChannelState, state);
+            _tcpConnection.SendMessage(MessageType.ChannelState, state);
 
             return true;
         }
@@ -634,31 +632,26 @@ namespace Mumble
         /// Destroy the channel on the server
         /// The user must have the admin rights
         /// </summary>
-        /// <param name="channelName">The name of the channel you want to remove</param>      
+        /// <param name="channelName">The name of the channel you want to remove</param>
         public void DestroyChannel(string channelName)
         {
-            Channel channel;
-
-            if (!TryGetChannelByName(channelName, out channel))
+            if (!TryGetChannelByName(channelName, out Channel channel))
             {
                 Debug.LogError("channel :" + channelName + " to remove not found!");
                 return;
             }
 
-            ChannelRemove channeltoremove = new ChannelRemove
+            ChannelRemove channeltoremove = new()
             {
                 ChannelId = channel.ChannelId
             };
 
-            _tcpConnection.SendMessage<MumbleProto.ChannelRemove>(MessageType.ChannelRemove, channeltoremove);
-
-            return;
-
+            _tcpConnection.SendMessage(MessageType.ChannelRemove, channeltoremove);
         }
 
         /// <summary>
         /// Enter the current user into the provided channel
-        /// Keep in mind that there can be multiple channels with the same 
+        /// Keep in mind that there can be multiple channels with the same
         /// name
         /// </summary>
         /// <param name="channelToJoin">The name of the channel you want to join</param>
@@ -669,13 +662,12 @@ namespace Mumble
                 return false;
             if (!ConnectionSetupFinished)
                 return false;
-            Channel channel;
-            if (!TryGetChannelByName(channelToJoin, out channel))
+            if (!TryGetChannelByName(channelToJoin, out Channel channel))
             {
                 Debug.LogError("Channel " + channelToJoin + " not found!");
                 return false;
             }
-            UserState state = new UserState
+            UserState state = new()
             {
                 ChannelId = channel.ChannelId,
                 Actor = OurUserState.Session,
@@ -685,7 +677,7 @@ namespace Mumble
             _pendingMute = null;
 
             Debug.Log("Attempting to join channel Id: " + state.ChannelId);
-            _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
+            _tcpConnection.SendMessage(MessageType.UserState, state);
             return true;
         }
 
@@ -697,6 +689,7 @@ namespace Mumble
         {
             return AllUsers;
         }
+
         /// <summary>
         /// Returns the dictionary of all channels
         /// NOTE: This is NOT a copy, so do not edit the returned dictionary
@@ -705,25 +698,25 @@ namespace Mumble
         {
             return Channels;
         }
+
         public void SetSelfMute(bool mute)
         {
             if (OurUserState == null
                 || !ConnectionSetupFinished)
             {
-                //Debug.Log("Setting pending self mute: " + mute);
                 _pendingMute = mute;
                 return;
             }
             _pendingMute = null;
 
-            UserState state = new UserState
+            UserState state = new()
             {
                 SelfMute = mute
             };
             OurUserState.SelfMute = mute;
-            //Debug.Log("Will set our self mute to: " + mute);
-            _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
+            _tcpConnection.SendMessage(MessageType.UserState, state);
         }
+
         public bool IsSelfMuted()
         {
             // The default self mute is false
@@ -742,69 +735,72 @@ namespace Mumble
             Debug.Log("Our Self Mute is " + OurUserState.SelfMute);
             return OurUserState.SelfMute;
         }
+
         public bool SetOurComment(string newComment)
         {
             if (OurUserState == null)
                 return false;
 
-            UserState state = new UserState
+            UserState state = new()
             {
                 Comment = newComment
             };
             OurUserState.Comment = newComment;
-            _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
+            _tcpConnection.SendMessage(MessageType.UserState, state);
             return true;
         }
+
         public bool SetOurTexture(byte[] texture)
         {
             if (OurUserState == null)
                 return false;
 
-            UserState state = new UserState
+            UserState state = new()
             {
                 Texture = texture
             };
             OurUserState.Texture = texture;
-            _tcpConnection.SendMessage<MumbleProto.UserState>(MessageType.UserState, state);
+            _tcpConnection.SendMessage(MessageType.UserState, state);
             return true;
         }
+
         private bool TryGetChannelByName(string channelName, out Channel channelState)
         {
-            foreach(uint key in Channels.Keys)
+            foreach (uint key in Channels.Keys)
             {
                 if (Channels[key].Name == channelName)
                 {
                     channelState = Channels[key];
                     return true;
                 }
-                //Debug.Log("Not " + Channels[key].name + " == " + channelName);
             }
             channelState = null;
             return false;
         }
+
         public string GetCurrentChannel()
         {
             if (Channels == null
                 || OurUserState == null)
                 return null;
-            Channel ourChannel;
-            if(Channels.TryGetValue(OurUserState.ChannelId, out ourChannel))
+            if (Channels.TryGetValue(OurUserState.ChannelId, out Channel ourChannel))
                 return ourChannel.Name;
 
             Debug.LogError("Could not get current channel");
             return null;
         }
+
         public uint GetOurSession()
         {
             if (OurUserState != null)
                 return OurUserState.Session;
             return 0;
         }
+
         internal void AddChannel(ChannelState channelToAdd)
         {
             // If the channel already exists, just copy over the non-null data
-            Channel channel;
-            bool isExistingChannel = Channels.TryGetValue(channelToAdd.ChannelId, out channel);
+            bool isExistingChannel = Channels.TryGetValue(channelToAdd.ChannelId, out Channel channel);
 
             if (isExistingChannel)
             {
@@ -818,45 +814,47 @@ namespace Mumble
 
             // Update all the channel audio sharing settings
             // We can probably do this less, but we're cautious
-            foreach(KeyValuePair<uint, Channel> kvp in Channels)
+            foreach (KeyValuePair<uint, Channel> kvp in Channels)
                 kvp.Value.UpdateSharedAudioChannels(Channels);
 
             if (!isExistingChannel
                 && OnChannelAddedThreaded != null)
                 OnChannelAddedThreaded(channel);
         }
+
         internal void RemoveChannel(uint channelIdToRemove)
         {
             if (channelIdToRemove == OurUserState.ChannelId)
                 Debug.LogWarning("Removed current channel");
 
-            Channel channelToRemove;
-            if(Channels.TryGetValue(channelIdToRemove, out channelToRemove))
+            if (Channels.TryGetValue(channelIdToRemove, out Channel channelToRemove))
                 Channels.Remove(channelIdToRemove);
 
             // Update all the channel audio sharing settings
             // We can probably do this less, but we're cautious
-            foreach(KeyValuePair<uint, Channel> kvp in Channels)
+            foreach (KeyValuePair<uint, Channel> kvp in Channels)
                 kvp.Value.UpdateSharedAudioChannels(Channels);
 
             if (channelToRemove != null
                 && OnChannelRemovedThreaded != null)
                 OnChannelRemovedThreaded(channelToRemove);
         }
+
         /// <summary>
         /// Tell the encoder to send the last audio packet, then reset the sequence number
         /// </summary>
         internal void StopSendingVoice()
         {
-            if(_manageSendBuffer != null)
-                _manageSendBuffer.SendVoiceStopSignal();
+            _manageSendBuffer?.SendVoiceStopSignal();
         }
+
         public byte[] GetLatestClientNonce()
         {
-            if(_udpConnection != null)
+            if (_udpConnection != null)
                 return _udpConnection.GetLatestClientNonce();
             return null;
         }
+
         internal void OnConnectionDisconnect()
         {
             Debug.LogError("Mumble connection disconnected");
@@ -881,22 +879,21 @@ namespace Mumble
 
             if (OnDisconnected != null)
             {
-                //Debug.Log("Sending disconnect");
                 EventProcessor.Instance.QueueEvent(() =>
                 {
-                    if (OnDisconnected != null)
-                        OnDisconnected();
+                    OnDisconnected?.Invoke();
                 });
             }
         }
+
         public static int GetNearestSupportedSampleRate(int listedRate)
         {
             int currentBest = -1;
             int currentDifference = int.MaxValue;
 
-            for(int i = 0; i < MumbleConstants.SUPPORTED_SAMPLE_RATES.Length; i++)
+            for (int i = 0; i < MumbleConstants.SUPPORTED_SAMPLE_RATES.Length; i++)
             {
-                if(Math.Abs(listedRate - MumbleConstants.SUPPORTED_SAMPLE_RATES[i]) < currentDifference)
+                if (Math.Abs(listedRate - MumbleConstants.SUPPORTED_SAMPLE_RATES[i]) < currentDifference)
                 {
                     currentBest = MumbleConstants.SUPPORTED_SAMPLE_RATES[i];
                     currentDifference = Math.Abs(listedRate - MumbleConstants.SUPPORTED_SAMPLE_RATES[i]);

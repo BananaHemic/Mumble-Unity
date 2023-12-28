@@ -1,19 +1,19 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using MumbleProto;
+﻿using MumbleProto;
 using System;
+using System.Collections.Generic;
 using System.Text;
-using UnityEngine;
 
 namespace Mumble
 {
     public class Channel
     {
-
-        public string Name { get
+        public string Name
+        {
+            get
             {
                 return _channelState.Name;
-            } }
+            }
+        }
         public uint ChannelId
         {
             get
@@ -22,11 +22,11 @@ namespace Mumble
             }
         }
         public uint[] Links { get { return _channelState.Links; } }
-        private ChannelState _channelState;
+        private readonly ChannelState _channelState;
         // The audio channels that we shared audio with
-        //TODO we can get a faster data structure here
-        private List<Channel> _sharedAudioChannels;
-        private readonly object _lock = new object();
+        // TODO we can get a faster data structure here
+        private readonly List<Channel> _sharedAudioChannels;
+        private readonly object _lock = new();
 
         internal Channel(ChannelState initialState)
         {
@@ -48,14 +48,14 @@ namespace Mumble
 
         public string Links2String()
         {
-            StringBuilder sb = new StringBuilder();
+            StringBuilder sb = new();
             sb.Append("[");
-            if(_channelState.Links != null)
+            if (_channelState.Links != null)
             {
-                for(int i = 0; i < _channelState.Links.Length; i++)
+                for (int i = 0; i < _channelState.Links.Length; i++)
                 {
                     sb.Append(_channelState.Links[i]);
-                    if(i < _channelState.Links.Length - 1)
+                    if (i < _channelState.Links.Length - 1)
                         sb.Append(",");
                 }
             }
@@ -75,9 +75,9 @@ namespace Mumble
                     return;
 
                 // We can use a faster data structure here
-                List<uint> checkedChannels = new List<uint>();
+                List<uint> checkedChannels = new();
 
-                Stack<Channel> channelsToCheck = new Stack<Channel>();
+                Stack<Channel> channelsToCheck = new();
                 channelsToCheck.Push(this);
 
                 while (channelsToCheck.Count > 0)
@@ -95,8 +95,7 @@ namespace Mumble
                         if (checkedChannels.Contains(val))
                             continue;
 
-                        Channel linkedChan;
-                        if (!Channels.TryGetValue(val, out linkedChan))
+                        if (!Channels.TryGetValue(val, out Channel linkedChan))
                             continue;
                         _sharedAudioChannels.Add(linkedChan);
                         channelsToCheck.Push(linkedChan);
@@ -107,15 +106,13 @@ namespace Mumble
 
         void UpdateLinks(uint[] addedLinks, uint[] removedLinks)
         {
-            //Debug.Log("Was: " + Links2String());
             // If we have no current links, then we just use the new links
-            if(_channelState.Links == null || _channelState.Links.Length == 0)
+            if (_channelState.Links == null || _channelState.Links.Length == 0)
             {
                 _channelState.Links = addedLinks;
-                //Debug.Log("Channel " + Name + " now has links: " + Links2String());
                 return;
             }
-            
+
             // Get the updated number of links to add
             int newNumLinks = _channelState.Links.Length
                 + (addedLinks == null ? 0 : addedLinks.Length)
@@ -129,14 +126,14 @@ namespace Mumble
 
             int dstIdx = 0;
             // First add the old links
-            if(removedLinks == null || removedLinks.Length == 0)
+            if (removedLinks == null || removedLinks.Length == 0)
             {
                 Array.Copy(oldLinks, _channelState.Links, oldLinks.Length);
                 dstIdx = oldLinks.Length;
             }
             else
             {
-                for(int i = 0; i < oldLinks.Length; i++)
+                for (int i = 0; i < oldLinks.Length; i++)
                 {
                     uint val = oldLinks[i];
                     // Don't add links that were removed
@@ -148,10 +145,8 @@ namespace Mumble
             }
 
             // Now add all the new links
-            if(addedLinks != null)
+            if (addedLinks != null)
                 Array.Copy(addedLinks, 0, _channelState.Links, dstIdx, addedLinks.Length);
-
-            //Debug.Log("Channel " + Name + " now has links: " + Links2String());
         }
 
         internal void UpdateFromState(ChannelState deltaState)
@@ -173,10 +168,6 @@ namespace Mumble
             if (deltaState.Links != null)
                 _channelState.Links = deltaState.Links;
             UpdateLinks(deltaState.LinksAdds, deltaState.LinksRemoves);
-            //Debug.LogWarning("Updated channel: " + Name);
-            //Debug.Log("Set: " + (deltaState.Links == null ? 0 : deltaState.Links.Length));
-            //Debug.Log("Added: " + (deltaState.LinksAdds == null ? 0 : deltaState.LinksAdds.Length));
-            //Debug.Log("Removed: " + (deltaState.LinksRemoves == null ? 0 : deltaState.LinksRemoves.Length));
         }
     }
 }

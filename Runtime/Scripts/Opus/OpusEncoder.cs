@@ -1,8 +1,8 @@
-﻿// 
+﻿//
 // Author: John Carruthers (johnc@frag-labs.com)
-// 
+//
 // Copyright (C) 2013 John Carruthers
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
 // "Software"), to deal in the Software without restriction, including
@@ -10,10 +10,10 @@
 // distribute, sublicense, and/or sell copies of the Software, and to
 // permit persons to whom the Software is furnished to do so, subject to
 // the following conditions:
-//  
+//
 // The above copyright notice and this permission notice shall be
 // included in all copies or substantial portions of the Software.
-//  
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 // EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 // MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -21,10 +21,9 @@
 // LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-// 
+//
 
 using System;
-using System.Linq;
 using UnityEngine;
 
 namespace Mumble
@@ -32,8 +31,7 @@ namespace Mumble
     /// <summary>
     /// Opus encoder.
     /// </summary>
-    public class OpusEncoder
-        : IDisposable
+    public class OpusEncoder : IDisposable
     {
         /// <summary>
         /// Opus encoder.
@@ -52,6 +50,7 @@ namespace Mumble
             2.5f, 5, 10,
             20, 40, 60
         };
+
         /// <summary>
         /// Permitted frame sizes in samples per channel.
         /// </summary>
@@ -66,11 +65,12 @@ namespace Mumble
             {
                 if (_encoder == IntPtr.Zero)
                     throw new ObjectDisposedException("OpusEncoder");
-                int bitrate;
-                var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.GET_BITRATE_REQUEST, out bitrate);
+
+                var ret = NativeMethods.Opus_encoder_ctl(_encoder, OpusCtl.GET_BITRATE_REQUEST, out int bitrate);
+
                 if (ret < 0)
                     throw new Exception("Encoder error - " + ((OpusErrors)ret));
-                //Debug.Log("Got bw: " + bitrate + " ret: " + ret);
+
                 return bitrate;
             }
             set
@@ -78,11 +78,10 @@ namespace Mumble
                 if (_encoder == IntPtr.Zero)
                     throw new ObjectDisposedException("OpusEncoder");
 
-                //Debug.Log("Setting bitrate to: " + value);
-                var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.SET_BITRATE_REQUEST, value);
+                var ret = NativeMethods.Opus_encoder_ctl(_encoder, OpusCtl.SET_BITRATE_REQUEST, value);
+
                 if (ret < 0)
                     throw new Exception("Encoder error - " + ((OpusErrors)ret));
-                //Debug.Log("set opus bitrate to: " + value + " return: " + ret);
             }
         }
 
@@ -95,18 +94,23 @@ namespace Mumble
             {
                 if (_encoder == IntPtr.Zero)
                     throw new ObjectDisposedException("OpusEncoder");
-                int fec;
-                var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.GET_INBAND_FEC_REQUEST, out fec);
+
+                var ret = NativeMethods.Opus_encoder_ctl(_encoder, OpusCtl.GET_INBAND_FEC_REQUEST, out int fec);
+
                 if (ret < 0)
                     throw new Exception("Encoder error - " + ((OpusErrors)ret));
+
                 return fec > 0;
             }
             set
             {
                 if (_encoder == IntPtr.Zero)
                     throw new ObjectDisposedException("OpusEncoder");
+
                 int req = Convert.ToInt32(value);
-                var ret = NativeMethods.opus_encoder_ctl(_encoder, OpusCtl.SET_INBAND_FEC_REQUEST, req);
+
+                var ret = NativeMethods.Opus_encoder_ctl(_encoder, OpusCtl.SET_INBAND_FEC_REQUEST, req);
+
                 if (ret < 0)
                     throw new Exception("Encoder error - " + ((OpusErrors)ret));
             }
@@ -118,8 +122,8 @@ namespace Mumble
         /// </summary>
         const int MaxPacketSize = 1020;
 
-        private byte[] _encodedPacket = new byte[MaxPacketSize];
-        
+        private readonly byte[] _encodedPacket = new byte[MaxPacketSize];
+
         /// <summary>
         /// Creates a new Opus encoder.
         /// </summary>
@@ -136,18 +140,20 @@ namespace Mumble
             if (srcChannelCount != 1 && srcChannelCount != 2)
                 throw new ArgumentOutOfRangeException("srcChannelCount");
 
-            OpusErrors error;
-            var encoder = NativeMethods.opus_encoder_create(srcSamplingRate, srcChannelCount, OpusApplication.Voip, out error);
+            var encoder = NativeMethods.Opus_encoder_create(srcSamplingRate, srcChannelCount, OpusApplication.Voip, out OpusErrors error);
+
             if (error != OpusErrors.Ok)
             {
                 throw new Exception("Exception occured while creating encoder");
             }
+
             _encoder = encoder;
 
             const int BIT_DEPTH = 16;
             _sampleSize = SampleSize(BIT_DEPTH, srcChannelCount);
 
             PermittedFrameSizes = new int[_permittedFrameSizes.Length];
+
             for (var i = 0; i < _permittedFrameSizes.Length; i++)
                 PermittedFrameSizes[i] = (int)(srcSamplingRate / 1000f * _permittedFrameSizes[i]);
         }
@@ -164,7 +170,7 @@ namespace Mumble
 
         public ArraySegment<byte> Encode(float[] pcmSamples)
         {
-            int size = NativeMethods.opus_encode(_encoder, pcmSamples, pcmSamples.Length, _encodedPacket);
+            int size = NativeMethods.Opus_encode(_encoder, pcmSamples, pcmSamples.Length, _encodedPacket);
 
             if (size <= 1)
             {
@@ -191,7 +197,7 @@ namespace Mumble
         /// </summary>
         public void ResetState()
         {
-            NativeMethods.opus_reset_encoder(_encoder);
+            NativeMethods.Opus_reset_encoder(_encoder);
         }
 
         /// <summary>
@@ -202,7 +208,7 @@ namespace Mumble
         {
             if (_encoder != IntPtr.Zero)
             {
-                NativeMethods.destroy_opus(_encoder);
+                NativeMethods.Destroy_opus(_encoder);
                 _encoder = IntPtr.Zero;
             }
         }
