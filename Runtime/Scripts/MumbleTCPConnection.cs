@@ -210,6 +210,8 @@ namespace Mumble
 
                             Debug.Log("Text message = " + textMessage.Message);
                             Debug.Log("Text actor = " + textMessage.Actor);
+
+                            _mumbleClient.TextMessageReceived(textMessage);
                             break;
                         case MessageType.UDPTunnel:
                             var length = IPAddress.NetworkToHostOrder(_reader.ReadInt32());

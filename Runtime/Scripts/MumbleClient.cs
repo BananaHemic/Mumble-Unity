@@ -87,6 +87,7 @@ namespace Mumble
         public Action<Channel> OnChannelRemovedThreaded;
 
         public OnChannelChangedMethod OnChannelChanged;
+        public Action<TextMessage> OnTextMessageReceived;
         public OnDisconnectedMethod OnDisconnected;
         private MumbleTcpConnection _tcpConnection;
         private MumbleUdpConnection _udpConnection;
@@ -329,6 +330,15 @@ namespace Mumble
                     _anyUserStateChange?.Invoke(newUserState.Session, newUserState, userState);
                 });
             }
+        }
+
+        internal void TextMessageReceived(TextMessage textMessage)
+        {
+            EventProcessor.Instance.QueueEvent(() =>
+            {
+                if (OnTextMessageReceived != null)
+                    OnTextMessageReceived(textMessage);
+            });
         }
 
         internal int GetBitrate()
