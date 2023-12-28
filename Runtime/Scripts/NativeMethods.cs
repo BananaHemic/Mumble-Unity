@@ -40,56 +40,56 @@ namespace Mumble
         const string pluginName = "opus-1_3";
 #endif
 
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(pluginName, EntryPoint = "opus_encoder_get_size", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern int Opus_encoder_get_size(int numChannels);
 
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(pluginName, EntryPoint = "opus_decoder_get_size", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern int Opus_decoder_get_size(int numChannels);
 
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(pluginName, EntryPoint = "opus_encoder_init", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern OpusErrors Opus_encoder_init(IntPtr encoder, int sampleRate, int channelCount, int application);
 
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(pluginName, EntryPoint = "opus_decoder_init", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern OpusErrors Opus_decoder_init(IntPtr decoder, int sampleRate, int channelCount);
 
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(pluginName, EntryPoint = "opus_encode_float", CallingConvention = CallingConvention.Cdecl)]
         private static extern int Opus_encode_float(IntPtr st, float[] pcm, int frame_size, byte[] data, int max_data_bytes);
 
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(pluginName, EntryPoint = "opus_packet_get_nb_channels", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         internal static extern int Opus_packet_get_nb_channels(byte[] encodedData);
 
         //Control the encoder
         // Used to get values
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(pluginName, EntryPoint = "opus_encoder_ctl", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int Opus_encoder_ctl(IntPtr encoder, OpusCtl request, out int value);
         // Used to set values
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(pluginName, EntryPoint = "opus_encoder_ctl", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int Opus_encoder_ctl(IntPtr encoder, OpusCtl request, int value);
         // Mostly just used for reset
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(pluginName, EntryPoint = "opus_encoder_ctl", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int Opus_encoder_ctl(IntPtr encoder, OpusCtl request);
 
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(pluginName, EntryPoint = "opus_decoder_create", CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr Opus_decoder_create(int sampleRate, int channelCount, out IntPtr error);
 
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(pluginName, EntryPoint = "opus_decode", CallingConvention = CallingConvention.Cdecl)]
         private static extern int Opus_decode(IntPtr decoder, IntPtr data, int len, IntPtr pcm, int frameSize, int decodeFec);
 
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(pluginName, EntryPoint = "opus_decode_float", CallingConvention = CallingConvention.Cdecl)]
         private static extern int Opus_decode_float(IntPtr decoder, byte[] data, int len, float[] pcm, int frameSize, int useFEC);//NB: useFEC means to use in-band forward error correction!
 
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(pluginName, EntryPoint = "opus_decoder_destroy", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void Opus_decoder_destroy(IntPtr decoder);
 
         // Control the decoder
         // Used to get values
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(pluginName, EntryPoint = "opus_decoder_ctl", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int Opus_decoder_ctl(IntPtr decoder, OpusCtl request, out int value);
         // Used to set values
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(pluginName, EntryPoint = "opus_decoder_ctl", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int Opus_decoder_ctl(IntPtr decoder, OpusCtl request, int value);
         // Mostly just used for reset
-        [DllImport(pluginName, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(pluginName, EntryPoint = "opus_decoder_ctl", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int Opus_decoder_ctl(IntPtr decoder, OpusCtl request);
 
         #region internal methods
