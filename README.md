@@ -38,18 +38,6 @@ Or you can [setup your own Mumble server](https://wiki.mumble.info/wiki/Installi
 
 ### Installing
 
-**Method 1: using UnityNuGet + OpenUPM scope registry**
-
-1. Add the [UnityNuget](https://github.com/xoofx/UnityNuGet) scope registry:
-
-```
-https://github.com/xoofx/UnityNuGet#add-scope-registry-manifestjson
-```
-
-2. Follow the steps in `Manual installation`: https://openupm.com/packages/com.bananahemic.mumble/
-
-**Method 2: Manually**
-
    * If your Unity project is *not* currently tracked with git, then you can navigate to your project's "Assets" folder and run
    `git clone https://github.com/BananaHemic/Mumble-Unity.git`
    * If your project *is* already tracked with git, you can add this projects as a submodule by navigating to the "Assets" folder and running
