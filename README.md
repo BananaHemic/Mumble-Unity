@@ -36,13 +36,38 @@ Or you can [setup your own Mumble server](https://wiki.mumble.info/wiki/Installi
 
    If you do make your own server, be sure to set "opusthreshold=0" in mumble-server.ini or murmur.ini in order to make all clients use opus
 
-### Installing
+## Installing
 
-   * If your Unity project is *not* currently tracked with git, then you can navigate to your project's "Assets" folder and run
-   `git clone https://github.com/BananaHemic/Mumble-Unity.git`
-   * If your project *is* already tracked with git, you can add this projects as a submodule by navigating to the "Assets" folder and running
-   `git submodule add https://github.com/BananaHemic/Mumble-Unity.git`
-   * Then, simply open the included example scene, and input your Mumble server's address into "MumbleTester"
+### Manual Method
+   * Download / clone this repo into your Assets folder
+   * Download the [protobuf dll](https://github.com/BananaHemic/Mumble-Unity/blob/per-speaker-codec/protobuf-net.dll) and extract into your Assets folder
+   * Then, simply open the included example scene and input your Mumble server's address into "MumbleTester"
+     
+### Package Method 
+   * Open the Packages/manifest.json file
+   * Add the following line under dependencies
+      `"com.bananahemic.mumble": "1.0.0",
+   * After the dependencies section add nuget support (as outlined [here](https://github.com/xoofx/UnityNuGet#add-scope-registry-manifestjson))
+   ```
+     "scopedRegistries": [
+    {
+      "name": "Unity NuGet",
+      "url": "https://unitynuget-registry.azurewebsites.net",
+      "scopes": [
+        "org.nuget"
+      ]
+    },
+    {
+      "name": "package.openupm.com",
+      "url": "https://package.openupm.com",
+      "scopes": [
+          "com.bananahemic.mumble"
+      ]
+  }
+  ]
+  ```
+* Then, in Unity, copy over the Example scene (Packages/Mumble/Samples/Example.unity) to your assets
+* Open the scene and input your Mumble server's address into "MumbleTester"
 
 ### Integration
 
